@@ -1,0 +1,43 @@
+# ===================================================================
+# General
+# ===================================================================
+.DS_Store
+Thumbs.db
+*.log
+
+# ===================================================================
+# IDEs & Editors (IntelliJ, VSCode, Eclipse)
+# ===================================================================
+.idea/
+.vscode/
+*.iml
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ===================================================================
+# Java / Spring Boot (Maven & Gradle)
+# ===================================================================
+/backend/target/
+/backend/build/
+/backend/.gradle/
+
+# ===================================================================
+# Node.js / Angular
+# ===================================================================
+/frontend/node_modules/
+/frontend/dist/
+/frontend/.angular/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ===================================================================
+# Secrets - IMPORTANT!
+# Never commit your environment variables.
+# ===================================================================
+.env
+
+# Note: You SHOULD commit a template file so others know what variables are needed.
+# For example, create a file named '.env.example' and commit that instead.
