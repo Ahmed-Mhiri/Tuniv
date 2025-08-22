@@ -2,6 +2,8 @@ package com.tuniv.backend.university.model;
 
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.tuniv.backend.qa.model.Question;
 
 import jakarta.persistence.CascadeType;
@@ -31,9 +33,11 @@ public class Module {
     private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "universityId", nullable = false)
+    @JoinColumn(name = "university_id", nullable = false)
+    @JsonBackReference("university-modules")
     private University university;
 
     @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference("module-questions")
     private Set<Question> questions;
 }

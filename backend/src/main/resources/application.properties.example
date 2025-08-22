@@ -29,3 +29,12 @@ spring.mail.password=${MAIL_PASSWORD:your-google-app-password}
 
 spring.mail.properties.mail.smtp.auth=true
 spring.mail.properties.mail.smtp.starttls.enable=true
+# ===============================
+# CLOUD FILE STORAGE (S3)
+# ===============================
+# MUST be set as environment variables in production
+aws.s3.bucket-name=${S3_BUCKET_NAME:your-bucket-name}
+aws.s3.region=${S3_REGION:fra1} # e.g., fra1 for Frankfurt on DigitalOcean
+aws.s3.endpoint=${S3_ENDPOINT:https://fra1.digitaloceanspaces.com}
+aws.access.key=${S3_ACCESS_KEY:your-access-key}
+aws.secret.key=${S3_SECRET_KEY:your-secret-key}

@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.qa.dto.VoteRequest;
-import com.tuniv.backend.qa.service.QuestionService;
+import com.tuniv.backend.qa.service.VoteService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,32 +20,35 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class VoteController {
 
-    private final QuestionService questionService;
+    private final VoteService voteService;
 
     @PostMapping("/questions/{questionId}/vote")
     public ResponseEntity<?> voteOnQuestion(@PathVariable Integer questionId,
                                             @Valid @RequestBody VoteRequest voteRequest,
                                             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        try {
-            // value will be 1 for upvote, -1 for downvote
-            int value = (voteRequest.value() > 0) ? 1 : -1;
-            questionService.voteOnQuestion(questionId, currentUser, value);
-            return ResponseEntity.ok("Vote registered successfully.");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+        
+        int value = (voteRequest.value() >= 0) ? 1 : -1;
+        voteService.voteOnQuestion(questionId, currentUser, value);
+        return ResponseEntity.ok("Vote registered successfully.");
     }
 
     @PostMapping("/answers/{answerId}/vote")
     public ResponseEntity<?> voteOnAnswer(@PathVariable Integer answerId,
                                           @Valid @RequestBody VoteRequest voteRequest,
                                           @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        try {
-            int value = (voteRequest.value() > 0) ? 1 : -1;
-            questionService.voteOnAnswer(answerId, currentUser, value);
-            return ResponseEntity.ok("Vote registered successfully.");
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
+
+        int value = (voteRequest.value() >= 0) ? 1 : -1;
+        voteService.voteOnAnswer(answerId, currentUser, value);
+        return ResponseEntity.ok("Vote registered successfully.");
+    }
+
+    @PostMapping("/comments/{commentId}/vote")
+    public ResponseEntity<?> voteOnComment(@PathVariable Integer commentId,
+                                           @Valid @RequestBody VoteRequest voteRequest,
+                                           @AuthenticationPrincipal UserDetailsImpl currentUser) {
+                                               
+        int value = (voteRequest.value() >= 0) ? 1 : -1;
+        voteService.voteOnComment(commentId, currentUser, value);
+        return ResponseEntity.ok("Vote on comment registered successfully.");
     }
 }

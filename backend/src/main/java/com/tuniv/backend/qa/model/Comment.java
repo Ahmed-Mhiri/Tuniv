@@ -23,34 +23,31 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "answers")
+@Table(name = "comments")
 @Getter
 @Setter
-public class Answer {
+public class Comment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer answerId;
+    private Integer commentId;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String body;
 
-    @Column(name = "is_solution", nullable = false)
-    private Boolean isSolution = false;
-
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "question_id", nullable = false)
-    @JsonBackReference("question-answers")
-    private Question question;
+    @JoinColumn(name = "answer_id", nullable = false)
+    @JsonBackReference("answer-comments")
+    private Answer answer;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
-    @JsonBackReference("user-answers")
+    @JsonBackReference("user-comments")
     private User author;
-
-    @OneToMany(mappedBy = "answer", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("answer-comments")
-    private Set<Comment> comments = new HashSet<>(); // <-- INITIALIZED SET
+    
+    @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("comment-votes")
+    private Set<CommentVote> votes = new HashSet<>(); // <-- INITIALIZED SET
 }

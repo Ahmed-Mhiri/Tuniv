@@ -2,6 +2,8 @@ package com.tuniv.backend.university.model;
 
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
+
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -27,8 +29,10 @@ public class University {
     private String name;
 
     @OneToMany(mappedBy = "university", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference("university-modules")
     private Set<Module> modules;
 
     @OneToMany(mappedBy = "university", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference("university-members")
     private Set<UniversityMembership> members;
 }

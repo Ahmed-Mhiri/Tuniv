@@ -1,11 +1,24 @@
 package com.tuniv.backend.qa.model;
 
-import com.tuniv.backend.user.model.User;
-import jakarta.persistence.*;
-import lombok.*;
-
 import java.io.Serializable;
 import java.util.Objects;
+
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Entity
 @Table(name = "answer_votes")
@@ -21,26 +34,34 @@ public class AnswerVote {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
+    @JoinColumn(name = "user_id") // <-- ADDED THIS
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("answerId")
+    @JoinColumn(name = "answer_id") // <-- ADDED THIS
     private Answer answer;
 
     @Column(nullable = false)
-    private int value; // +1 for upvote, -1 for downvote
+    private int value;
 
     @Embeddable
     @Getter
     @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
     public static class AnswerVoteId implements Serializable {
+        
+        @Column(name = "user_id") // <-- ADDED THIS
         private Integer userId;
+        
+        @Column(name = "answer_id") // <-- ADDED THIS
         private Integer answerId;
 
-        // --- THIS IS THE FIX ---
-        // Manually adding the constructor solves the first error.
+        // Constructors, equals, and hashCode...
+        public AnswerVoteId() {}
+        public AnswerVoteId(Integer userId, Integer answerId) {
+            this.userId = userId;
+            this.answerId = answerId;
+        }
 
         @Override
         public boolean equals(Object o) {

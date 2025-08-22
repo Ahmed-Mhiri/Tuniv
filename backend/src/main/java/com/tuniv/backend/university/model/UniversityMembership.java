@@ -1,15 +1,28 @@
 package com.tuniv.backend.university.model;
 
-import com.tuniv.backend.user.model.User;
-import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.io.Serializable;
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.Getter;
+import lombok.Setter;
+
 @Entity
-@Table(name = "university_memberships")
+@Table(name = "university_memberships", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"user_id", "university_id"})
+})
 @Getter
 @Setter
 public class UniversityMembership {
@@ -19,24 +32,37 @@ public class UniversityMembership {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
+    @JoinColumn(name = "user_id")
+    @JsonBackReference("user-memberships")
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("universityId")
+    @JoinColumn(name = "university_id")
+    @JsonBackReference("university-members")
     private University university;
 
     @Column(nullable = false)
-    private String role; // e.g., "student", "professor"
+    private String role;
 
-    // Composite Key Class
     @Embeddable
     @Getter
     @Setter
     public static class UniversityMembershipId implements Serializable {
+        
+        @Column(name = "user_id")
         private Integer userId;
+
+        @Column(name = "university_id")
         private Integer universityId;
 
-        // equals and hashCode methods are essential for composite keys
+        public UniversityMembershipId() {}
+
+        public UniversityMembershipId(Integer userId, Integer universityId) {
+            this.userId = userId;
+            this.universityId = universityId;
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;

@@ -2,6 +2,7 @@ package com.tuniv.backend.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -40,9 +41,13 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/v1/auth/**").permitAll() // Allow registration/login
-                .requestMatchers("/ws/**").permitAll() // Allow WebSocket connections
-                .anyRequest().authenticated() // Secure all other endpoints
+                // --- THIS SECTION IS UPDATED ---
+                // 1. Allow public access to auth endpoints and websockets
+                .requestMatchers("/api/v1/auth/**", "/ws/**").permitAll() 
+                // 2. Allow public READ-ONLY access to universities, modules, questions, and user profiles
+                .requestMatchers(HttpMethod.GET, "/api/v1/universities/**", "/api/v1/modules/**", "/api/v1/questions/**", "/api/v1/users/**").permitAll()
+                // 3. Secure all other requests (POST, PUT, DELETE etc.)
+                .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

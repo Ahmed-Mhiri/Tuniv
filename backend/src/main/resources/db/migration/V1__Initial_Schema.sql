@@ -1,0 +1,96 @@
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    profile_photo_url VARCHAR(255),
+    bio TEXT,
+    major VARCHAR(255),
+    reputation_score INT NOT NULL DEFAULT 0
+);
+
+CREATE TABLE universities (
+    university_id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE
+);
+
+CREATE TABLE modules (
+    module_id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    university_id INT NOT NULL,
+    CONSTRAINT fk_module_university FOREIGN KEY (university_id) REFERENCES universities(university_id)
+);
+
+CREATE TABLE university_memberships (
+    user_id INT NOT NULL,
+    university_id INT NOT NULL,
+    role VARCHAR(255) NOT NULL,
+    PRIMARY KEY (user_id, university_id),
+    CONSTRAINT fk_membership_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_membership_university FOREIGN KEY (university_id) REFERENCES universities(university_id)
+);
+
+CREATE TABLE questions (
+    question_id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    user_id INT NOT NULL,
+    module_id INT NOT NULL,
+    CONSTRAINT fk_question_author FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_question_module FOREIGN KEY (module_id) REFERENCES modules(module_id)
+);
+
+CREATE TABLE answers (
+    answer_id SERIAL PRIMARY KEY,
+    body TEXT NOT NULL,
+    is_solution BOOLEAN NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    question_id INT NOT NULL,
+    user_id INT NOT NULL,
+    CONSTRAINT fk_answer_question FOREIGN KEY (question_id) REFERENCES questions(question_id),
+    CONSTRAINT fk_answer_author FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+CREATE TABLE question_votes (
+    user_id INT NOT NULL,
+    question_id INT NOT NULL,
+    value INT NOT NULL,
+    PRIMARY KEY (user_id, question_id),
+    CONSTRAINT fk_qvote_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_qvote_question FOREIGN KEY (question_id) REFERENCES questions(question_id)
+);
+
+CREATE TABLE answer_votes (
+    user_id INT NOT NULL,
+    answer_id INT NOT NULL,
+    value INT NOT NULL,
+    PRIMARY KEY (user_id, answer_id),
+    CONSTRAINT fk_avote_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_avote_answer FOREIGN KEY (answer_id) REFERENCES answers(answer_id)
+);
+
+-- --- THIS IS THE FIX ---
+-- Added the missing tables for the chat feature
+CREATE TABLE conversations (
+    conversation_id SERIAL PRIMARY KEY,
+    created_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE conversation_participants (
+    user_id INT NOT NULL,
+    conversation_id INT NOT NULL,
+    PRIMARY KEY (user_id, conversation_id),
+    CONSTRAINT fk_participant_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_participant_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id)
+);
+
+CREATE TABLE messages (
+    message_id SERIAL PRIMARY KEY,
+    content TEXT NOT NULL,
+    sent_at TIMESTAMP NOT NULL,
+    conversation_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    CONSTRAINT fk_message_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id),
+    CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(user_id)
+);

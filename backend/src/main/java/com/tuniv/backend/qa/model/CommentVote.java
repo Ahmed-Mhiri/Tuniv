@@ -3,6 +3,7 @@ package com.tuniv.backend.qa.model;
 import java.io.Serializable;
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.Column;
@@ -15,32 +16,32 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "question_votes")
+@Table(name = "comment_votes")
 @Getter
 @Setter
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class QuestionVote {
+public class CommentVote {
 
     @EmbeddedId
-    private QuestionVoteId id;
+    private CommentVoteId id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
-    @JoinColumn(name = "user_id") // <-- ADDED THIS
+    @JoinColumn(name = "user_id")
+    @JsonBackReference("user-comment-votes")
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("questionId")
-    @JoinColumn(name = "question_id") // <-- ADDED THIS
-    private Question question;
+    @MapsId("commentId")
+    @JoinColumn(name = "comment_id")
+    @JsonBackReference("comment-votes")
+    private Comment comment;
 
     @Column(nullable = false)
     private int value;
@@ -48,32 +49,26 @@ public class QuestionVote {
     @Embeddable
     @Getter
     @Setter
-    public static class QuestionVoteId implements Serializable {
-        
-        @Column(name = "user_id") // <-- ADDED THIS
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CommentVoteId implements Serializable {
+        @Column(name = "user_id")
         private Integer userId;
+        @Column(name = "comment_id")
+        private Integer commentId;
 
-        @Column(name = "question_id") // <-- ADDED THIS
-        private Integer questionId;
-        
-        // Constructors, equals, and hashCode...
-        public QuestionVoteId() {}
-        public QuestionVoteId(Integer userId, Integer questionId) {
-            this.userId = userId;
-            this.questionId = questionId;
-        }
-
+        // --- FULL IMPLEMENTATION OF equals and hashCode ---
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            QuestionVoteId that = (QuestionVoteId) o;
-            return Objects.equals(userId, that.userId) && Objects.equals(questionId, that.questionId);
+            CommentVoteId that = (CommentVoteId) o;
+            return Objects.equals(userId, that.userId) && Objects.equals(commentId, that.commentId);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(userId, questionId);
+            return Objects.hash(userId, commentId);
         }
     }
 }
