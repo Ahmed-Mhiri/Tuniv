@@ -1,0 +1,31 @@
+# ===============================
+# DATABASE CONFIGURATION
+# ===============================
+# Use the DB_URL environment variable in production, otherwise default to localhost for local dev
+spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5432/tuniv_db}
+spring.datasource.username=${DB_USERNAME:postgres}
+spring.datasource.password=${DB_PASSWORD:your_local_password} 
+
+# ===============================
+# JPA / HIBERNATE CONFIGURATION
+# ===============================
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+
+# ===============================
+# SECURITY / JWT CONFIGURATION
+# ===============================
+# MUST be set as an environment variable in production
+jwt.secret=${JWT_SECRET:bXlzdXBlcnNlY3JldGtleWZvcmF3ZXNvbWVhcHBsaWNhdGlvbjEyMzQ1Njc4OQ==}
+
+# ===============================
+# EMAIL (SMTP) CONFIGURATION
+# ===============================
+spring.mail.host=${MAIL_HOST:smtp.gmail.com}
+spring.mail.port=${MAIL_PORT:587}
+spring.mail.username=${MAIL_USERNAME:your-email@gmail.com}
+spring.mail.password=${MAIL_PASSWORD:your-google-app-password}
+
+spring.mail.properties.mail.smtp.auth=true
+spring.mail.properties.mail.smtp.starttls.enable=true
