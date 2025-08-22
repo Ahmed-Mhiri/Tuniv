@@ -39,6 +39,9 @@ public class AnswerVote {
         private Integer userId;
         private Integer answerId;
 
+        // --- THIS IS THE FIX ---
+        // Manually adding the constructor solves the first error.
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
