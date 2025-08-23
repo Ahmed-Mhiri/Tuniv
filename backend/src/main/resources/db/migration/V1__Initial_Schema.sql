@@ -55,7 +55,7 @@ CREATE TABLE answers (
 CREATE TABLE question_votes (
     user_id INT NOT NULL,
     question_id INT NOT NULL,
-    value INT NOT NULL,
+    "value" INT NOT NULL, -- <-- QUOTED
     PRIMARY KEY (user_id, question_id),
     CONSTRAINT fk_qvote_user FOREIGN KEY (user_id) REFERENCES users(user_id),
     CONSTRAINT fk_qvote_question FOREIGN KEY (question_id) REFERENCES questions(question_id)
@@ -64,33 +64,38 @@ CREATE TABLE question_votes (
 CREATE TABLE answer_votes (
     user_id INT NOT NULL,
     answer_id INT NOT NULL,
-    value INT NOT NULL,
+    "value" INT NOT NULL, -- <-- QUOTED
     PRIMARY KEY (user_id, answer_id),
     CONSTRAINT fk_avote_user FOREIGN KEY (user_id) REFERENCES users(user_id),
     CONSTRAINT fk_avote_answer FOREIGN KEY (answer_id) REFERENCES answers(answer_id)
 );
 
--- --- THIS IS THE FIX ---
--- Added the missing tables for the chat feature
-CREATE TABLE conversations (
-    conversation_id SERIAL PRIMARY KEY,
-    created_at TIMESTAMP NOT NULL
-);
-
-CREATE TABLE conversation_participants (
+CREATE TABLE comments (
+    comment_id SERIAL PRIMARY KEY,
+    body TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    answer_id INT NOT NULL,
     user_id INT NOT NULL,
-    conversation_id INT NOT NULL,
-    PRIMARY KEY (user_id, conversation_id),
-    CONSTRAINT fk_participant_user FOREIGN KEY (user_id) REFERENCES users(user_id),
-    CONSTRAINT fk_participant_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id)
+    CONSTRAINT fk_comment_answer FOREIGN KEY (answer_id) REFERENCES answers(answer_id),
+    CONSTRAINT fk_comment_author FOREIGN KEY (user_id) REFERENCES users(user_id)
 );
 
-CREATE TABLE messages (
-    message_id SERIAL PRIMARY KEY,
-    content TEXT NOT NULL,
-    sent_at TIMESTAMP NOT NULL,
-    conversation_id INT NOT NULL,
-    sender_id INT NOT NULL,
-    CONSTRAINT fk_message_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id),
-    CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(user_id)
+CREATE TABLE comment_votes (
+    user_id INT NOT NULL,
+    comment_id INT NOT NULL,
+    "value" INT NOT NULL, -- <-- QUOTED
+    PRIMARY KEY (user_id, comment_id),
+    CONSTRAINT fk_cvote_user FOREIGN KEY (user_id) REFERENCES users(user_id),
+    CONSTRAINT fk_cvote_comment FOREIGN KEY (comment_id) REFERENCES comments(comment_id)
+);
+
+CREATE TABLE attachments (
+    attachment_id SERIAL PRIMARY KEY,
+    file_name VARCHAR(255) NOT NULL,
+    file_url VARCHAR(1024) NOT NULL,
+    file_type VARCHAR(100),
+    file_size BIGINT,
+    uploaded_at TIMESTAMP NOT NULL,
+    post_id INT NOT NULL,
+    post_type VARCHAR(50) NOT NULL
 );
