@@ -32,4 +32,4 @@ build/
 ### VS Code ###
 .vscode/
 # Application Secrets - DO NOT COMMIT
-backend/src/main/resources/application.properties
+/backend/src/main/resources/application.properties

@@ -1,5 +1,8 @@
 package com.tuniv.backend.config;
 
+import com.tuniv.backend.config.security.jwt.JwtAuthFilter;
+import com.tuniv.backend.config.security.services.UserDetailsServiceImpl;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -13,11 +16,14 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import com.tuniv.backend.config.security.jwt.JwtAuthFilter;
-import com.tuniv.backend.config.security.services.UserDetailsServiceImpl;
+import java.util.Arrays;
+import java.util.List;
 
-import lombok.RequiredArgsConstructor;
+import static org.springframework.security.config.Customizer.withDefaults;
 
 @Configuration
 @EnableWebSecurity
@@ -38,21 +44,40 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            .cors(withDefaults()) // <-- ENABLE CORS
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // --- THIS SECTION IS UPDATED ---
-                // 1. Allow public access to auth endpoints and websockets
-                .requestMatchers("/api/v1/auth/**", "/ws/**").permitAll() 
-                // 2. Allow public READ-ONLY access to universities, modules, questions, and user profiles
-                .requestMatchers(HttpMethod.GET, "/api/v1/universities/**", "/api/v1/modules/**", "/api/v1/questions/**", "/api/v1/users/**").permitAll()
-                // 3. Secure all other requests (POST, PUT, DELETE etc.)
+                // Allow public access to auth, websockets, and API docs
+                .requestMatchers(
+                    "/api/v1/auth/**",
+                    "/ws/**",
+                    "/swagger-ui/**",
+                    "/v3/api-docs/**"
+                ).permitAll()
+                // Allow public READ-ONLY access to main content
+                .requestMatchers(HttpMethod.GET, "/api/v1/universities/**", "/api/v1/modules/**", "/api/v1/questions/**", "/api/v1/users/**", "/api/v1/answers/**/comments").permitAll()
+                // Secure all other requests
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
             
         return http.build();
+    }
+
+    // --- NEW BEAN FOR CORS CONFIGURATION ---
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        // The origin of your frontend application (e.g., http://localhost:4200 for Angular)
+        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 
     @Bean

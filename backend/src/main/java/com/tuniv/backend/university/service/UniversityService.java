@@ -1,10 +1,17 @@
 package com.tuniv.backend.university.service;
 
-import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.tuniv.backend.config.security.services.UserDetailsImpl; // <-- IMPORT ADDED
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.university.dto.ModuleDto;
 import com.tuniv.backend.university.dto.UniversityDto;
-import com.tuniv.backend.university.model.Module;
+import com.tuniv.backend.university.mapper.UniversityMapper;
 import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.university.model.UniversityMembership;
 import com.tuniv.backend.university.repository.ModuleRepository;
@@ -12,12 +19,8 @@ import com.tuniv.backend.university.repository.UniversityMembershipRepository;
 import com.tuniv.backend.university.repository.UniversityRepository;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import java.util.List;
-import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -27,10 +30,11 @@ public class UniversityService {
     private final ModuleRepository moduleRepository;
     private final UserRepository userRepository;
     private final UniversityMembershipRepository membershipRepository;
-
+    
+    @Cacheable("universities")
     public List<UniversityDto> getAllUniversities() {
         return universityRepository.findAll().stream()
-                .map(this::mapUniversityToDto)
+                .map(UniversityMapper::toUniversityDto) // Use the central mapper
                 .collect(Collectors.toList());
     }
 
@@ -39,7 +43,7 @@ public class UniversityService {
             throw new ResourceNotFoundException("University not found with id: " + universityId);
         }
         return moduleRepository.findByUniversityUniversityId(universityId).stream()
-                .map(this::mapModuleToDto)
+                .map(UniversityMapper::toModuleDto) // Use the central mapper
                 .collect(Collectors.toList());
     }
 
@@ -68,14 +72,5 @@ public class UniversityService {
         membershipRepository.save(membership);
     }
     
-    private UniversityDto mapUniversityToDto(University university) {
-        List<ModuleDto> moduleDtos = university.getModules().stream()
-                .map(this::mapModuleToDto)
-                .collect(Collectors.toList());
-        return new UniversityDto(university.getUniversityId(), university.getName(), moduleDtos);
-    }
-
-    private ModuleDto mapModuleToDto(Module module) {
-        return new ModuleDto(module.getModuleId(), module.getName());
-    }
+    // The private mapUniversityToDto and mapModuleToDto methods have been REMOVED.
 }

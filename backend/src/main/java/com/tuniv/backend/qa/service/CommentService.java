@@ -4,17 +4,18 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Service; // <-- IMPORT ADDED
 import org.springframework.web.multipart.MultipartFile;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.qa.dto.CommentCreateRequest;
 import com.tuniv.backend.qa.dto.CommentResponseDto;
+import com.tuniv.backend.qa.mapper.QAMapper;
 import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.model.Comment;
 import com.tuniv.backend.qa.repository.AnswerRepository;
 import com.tuniv.backend.qa.repository.CommentRepository;
-import com.tuniv.backend.shared.exception.ResourceNotFoundException; // <-- IMPORT ADDED
+import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
 
@@ -27,9 +28,8 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final AnswerRepository answerRepository;
     private final UserRepository userRepository;
-    private final AttachmentService attachmentService; // <-- DEPENDENCY ADDED
+    private final AttachmentService attachmentService;
 
-    // Method signature is updated to accept a list of files
     public CommentResponseDto createComment(
             Integer answerId,
             CommentCreateRequest request,
@@ -50,11 +50,10 @@ public class CommentService {
 
         Comment savedComment = commentRepository.save(comment);
 
-        // --- NEW FILE UPLOAD LOGIC ---
-        // Call the dedicated service to handle attachments
         attachmentService.saveAttachments(files, savedComment.getCommentId(), "COMMENT");
 
-        return mapToDto(savedComment);
+        // Use the central mapper
+        return QAMapper.toCommentResponseDto(savedComment);
     }
 
     public List<CommentResponseDto> getCommentsByAnswer(Integer answerId) {
@@ -63,16 +62,9 @@ public class CommentService {
         }
         return commentRepository.findByAnswerAnswerIdOrderByCreatedAtAsc(answerId)
                 .stream()
-                .map(this::mapToDto)
+                .map(QAMapper::toCommentResponseDto) // Use the central mapper
                 .collect(Collectors.toList());
     }
-
-    private CommentResponseDto mapToDto(Comment comment) {
-        return new CommentResponseDto(
-                comment.getCommentId(),
-                comment.getBody(),
-                comment.getCreatedAt(),
-                comment.getAuthor().getUsername()
-        );
-    }
+    
+    // The private mapToDto method has been removed.
 }
