@@ -12,8 +12,6 @@ public class UserDetailsImpl implements UserDetails {
 
     private final User user;
 
-    // --- THIS IS THE FIX ---
-    // Manually added the constructor.
     public UserDetailsImpl(User user) {
         this.user = user;
     }
@@ -21,14 +19,20 @@ public class UserDetailsImpl implements UserDetails {
     public Integer getId() {
         return user.getUserId();
     }
+    
+    public String getEmail() {
+        return user.getEmail();
+    }
+
+    // --- THIS IS THE FIX ---
+    // Added the missing getter for the profile photo URL.
+    public String getProfilePhotoUrl() {
+        return user.getProfilePhotoUrl();
+    }
 
     @Override
     public String getUsername() {
         return user.getUsername();
-    }
-    
-    public String getEmail() {
-        return user.getEmail();
     }
 
     @Override

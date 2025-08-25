@@ -8,6 +8,7 @@ export interface AuthResponse {
   id: number;
   username: string;
   email: string;
+  profilePhotoUrl?: string | null;
 }
 
 export interface DecodedToken {

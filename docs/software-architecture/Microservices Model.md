@@ -1,32 +1,37 @@
 ```mermaid
 graph TD
-    subgraph "End Users"
-        direction LR
-        UA[Web/Mobile Clients]
+    subgraph Clients
+        C1[Web/Mobile Apps]
     end
 
-    subgraph "Cloud Provider VPC"
-        LB[Load Balancer]
+    subgraph "Microservices Architecture (Final)"
         
-        subgraph "Auto-Scaling Group"
-            AS1[App Server 1]
-            AS2[App Server 2]
+        APIGateway_External[Dedicated API Gateway]
+        
+        subgraph Services
+            MS1[Auth & User Service]
+            MS2[University Service]
+            MS3[Q&A Service]
+            MS4[Vote Service]
+            MS5[Notification Service]
+            MS6[Chat Service]
+            MS7[Attachment Service]
+        end
+        
+        Broker[(Message Broker)]
+        
+        subgraph "External Dependencies"
+            S3[Cloud Object Storage]
+            EMAIL_SVC[Email Service]
         end
 
-        subgraph "Data Tier"
-            DB[PostgreSQL Cluster]
-            Cache[Redis Cluster]
-        end
+        C1 -- "REST & WebSocket" --> APIGateway_External
 
-        subgraph Monitoring["Monitoring & Observability Stack"]
-            style Monitoring fill:#e8f5e9
-            PRO[Prometheus - Metrics]
-            GRA[Grafana - Dashboards]
-            JAE[Jaeger - Tracing]
-        end
+        APIGateway_External -- Routes Traffic --> MS1 & MS2 & MS3 & MS4 & MS5 & MS6 & MS7
+        
+        MS3 -- Publishes Events --> Broker
+        Broker -- Delivers Events --> MS5 & MS6
+        
+        MS7 -- Uploads/Downloads --> S3
+        MS5 -- Sends Emails --> EMAIL_SVC
     end
-    
-    UA -- HTTPS --> LB;
-    LB --> AS1 & AS2;
-    AS1 & AS2 <--> DB & Cache;
-    AS1 & AS2 -- Send Data --> PRO & JAE;

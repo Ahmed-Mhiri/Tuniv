@@ -1,1 +1,136 @@
-<p>navbar works!</p>
+<nz-header>
+  <div class="navbar-content">
+
+    <div class="navbar-start">
+      <a routerLink="/" class="navbar-logo">
+        <img
+          ngSrc="assets/images/TunivLogo.svg"
+          alt="Tuniv Logo"
+          width="80"
+          height="80"
+          class="h-10 w-auto"
+          priority
+        />
+      </a>
+      <ul nz-menu nzMode="horizontal" [nzTheme]="menuTheme()" class="main-menu hidden md:flex">
+        <li
+          nz-menu-item
+          routerLink="/"
+          routerLinkActive="active-link"
+          [routerLinkActiveOptions]="{exact: true}"
+        >Home</li>
+        <li
+          nz-menu-item
+          routerLink="/universities"
+          routerLinkActive="active-link"
+        >Universities</li>
+      </ul>
+    </div>
+
+    @if (isBrowser()) {
+      <div class="navbar-end">
+        <nz-switch
+          class="hidden sm:inline-flex"
+          [ngModel]="isDarkMode()"
+          (ngModelChange)="toggleTheme($event)"
+          [nzCheckedChildren]="iconMoon"
+          [nzUnCheckedChildren]="iconSun"
+        >
+        </nz-switch>
+        <ng-template #iconSun><span nz-icon nzType="sun"></span></ng-template>
+        <ng-template #iconMoon><span nz-icon nzType="moon"></span></ng-template>
+
+        <div class="hidden md:flex user-actions">
+          @if (isUserLoggedIn()) {
+            <a
+              nz-dropdown
+              [nzDropdownMenu]="userMenu"
+              nzPlacement="bottomRight"
+              class="flex items-center gap-2 cursor-pointer p-1 rounded-md hover:bg-surface-subtle"
+            >
+              <nz-avatar
+                nzIcon="user"
+                [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
+              ></nz-avatar>
+              <span class="text-text-primary font-body font-medium">
+                {{ currentUser()?.username }}
+              </span>
+            </a>
+            <nz-dropdown-menu #userMenu="nzDropdownMenu">
+              <ul nz-menu>
+                <li nz-menu-item [routerLink]="['/user/profile', currentUser()?.id]">
+                  My Profile
+                </li>
+                <li nz-menu-item (click)="logout()">Logout</li>
+              </ul>
+            </nz-dropdown-menu>
+            <a routerLink="/qa/ask">
+              <button nz-button class="btn btn-accent">Ask Question</button>
+            </a>
+          } @else {
+            <a routerLink="/login">
+              <button nz-button class="btn btn-secondary">Login</button>
+            </a>
+            <a routerLink="/register">
+              <button nz-button class="btn btn-primary">Register</button>
+            </a>
+          }
+        </div>
+
+        <button
+          nz-button
+          nzType="text"
+          (click)="openMobileDrawer()"
+          class="md:hidden text-primary"
+          aria-label="Open menu"
+        >
+          <span nz-icon nzType="menu" class="text-2xl"></span>
+        </button>
+      </div>
+    }
+  </div>
+</nz-header>
+
+<nz-drawer
+  [nzVisible]="isMobileDrawerVisible()"
+  (nzOnClose)="closeMobileDrawer()"
+  nzPlacement="right"
+  nzTitle="Menu"
+  [nzClosable]="true"
+>
+  <ng-container *nzDrawerContent>
+    <ul nz-menu nzMode="vertical" class="mobile-menu">
+      <li nz-menu-item routerLink="/" (click)="closeMobileDrawer()">Home</li>
+      <li nz-menu-item routerLink="/universities" (click)="closeMobileDrawer()">
+        Universities
+      </li>
+    </ul>
+
+    <nz-divider></nz-divider>
+
+    <div class="mobile-actions">
+      @if (isUserLoggedIn()) {
+        <a [routerLink]="['/user/profile', currentUser()?.id]" (click)="closeMobileDrawer()" class="profile-link">
+          <nz-avatar
+            nzIcon="user"
+            [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
+          ></nz-avatar>
+          <span class="font-medium">My Profile</span>
+        </a>
+        <button nz-button nzBlock class="btn btn-accent" routerLink="/qa/ask" (click)="closeMobileDrawer()">
+          Ask Question
+        </button>
+        <button nz-button nzBlock class="btn btn-secondary" (click)="logout(); closeMobileDrawer();">
+          Logout
+        </button>
+      } @else {
+        <button nz-button nzBlock class="btn btn-secondary" routerLink="/login" (click)="closeMobileDrawer()">
+          Login
+        </button>
+        <button nz-button nzBlock class="btn btn-primary" routerLink="/register" (click)="closeMobileDrawer()">
+          Register
+        </button>
+      }
+    </div>
+  </ng-container>
+</nz-drawer>

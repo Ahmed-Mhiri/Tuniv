@@ -11,7 +11,9 @@ public class AuthMapper {
                 jwt,
                 userDetails.getId(),
                 userDetails.getUsername(),
-                userDetails.getEmail()
+                userDetails.getEmail(),
+                userDetails.getProfilePhotoUrl() // <-- ADD THIS LINE
+
         );
     }
 }

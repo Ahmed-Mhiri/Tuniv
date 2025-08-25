@@ -1,12 +1,10 @@
 import { HttpClient } from '@angular/common/http';
-import { Injectable, signal, inject, computed } from '@angular/core';
+import { Injectable, signal, inject, computed, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common'; // <-- IMPORT ADDED
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { jwtDecode } from 'jwt-decode';
-import { environment } from '../../environments/environment';
-
-// --- THIS IS THE FIX ---
-// Interfaces are now imported from their own dedicated model file.
+import { environment } from '../../../environments/environment';
 import { AuthRequest, AuthResponse, DecodedToken } from '../../shared/models/auth.model';
 
 @Injectable({
@@ -15,13 +13,17 @@ import { AuthRequest, AuthResponse, DecodedToken } from '../../shared/models/aut
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly platformId = inject(PLATFORM_ID); // <-- INJECT PLATFORM_ID
   private readonly apiUrl = environment.apiUrl;
 
   currentUser = signal<AuthResponse | null>(null);
   isUserLoggedIn = computed(() => !!this.currentUser());
 
   constructor() {
-    this.tryAutoLogin();
+    // Only try to auto-login if we are in a browser environment
+    if (isPlatformBrowser(this.platformId)) {
+      this.tryAutoLogin();
+    }
   }
 
   login(credentials: AuthRequest): Observable<AuthResponse> {
@@ -35,19 +37,24 @@ export class AuthService {
   }
 
   logout(): void {
-    localStorage.removeItem('authToken');
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.removeItem('authToken');
+    }
     this.currentUser.set(null);
     this.router.navigate(['/login']);
   }
 
-  // --- THIS IS THE FIX ---
-  // The getToken() method is added back for the interceptor to use synchronously.
   getToken(): string | null {
-    return localStorage.getItem('authToken');
+    if (isPlatformBrowser(this.platformId)) {
+      return localStorage.getItem('authToken');
+    }
+    return null;
   }
 
   private setSession(authResult: AuthResponse): void {
-    localStorage.setItem('authToken', authResult.token);
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.setItem('authToken', authResult.token);
+    }
     this.currentUser.set(authResult);
   }
 
@@ -57,12 +64,12 @@ export class AuthService {
       const decodedToken: AuthResponse = jwtDecode(token);
       this.currentUser.set(decodedToken);
     } else if (token) {
-      // If token exists but is expired, clear it
       localStorage.removeItem('authToken');
     }
   }
 
   private isTokenExpired(token: string): boolean {
+    // ... (this method is safe as it doesn't use browser APIs)
     try {
       const decoded: DecodedToken = jwtDecode(token);
       const expirationDate = decoded.exp * 1000;

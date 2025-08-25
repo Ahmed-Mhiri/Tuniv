@@ -11,18 +11,24 @@ graph TD
         CDN[CDN & WAF - e.g., Cloudflare]
     end
 
-    subgraph "Cloud Provider VPC - e.g., AWS, GCP, DO"
+    subgraph "Cloud Provider VPC"
         LB[Load Balancer]
         
         subgraph "Auto-Scaling Group"
-            AS1[App Server 1 - Spring Boot Container]
-            AS2[App Server 2 - Spring Boot Container]
-            AS3[...]
+            AS1[App Server 1]
+            AS2[App Server 2]
         end
 
         subgraph "Data Tier"
-            DB[Managed PostgreSQL DB]
-            Cache[Managed Redis Cache]
+            DB[PostgreSQL Cluster]
+            Cache[Redis Cluster]
+        end
+
+        subgraph Monitoring["Monitoring & Observability Stack"]
+            style Monitoring fill:#e8f5e9
+            PRO[Prometheus - Metrics]
+            GRA[Grafana - Dashboards]
+            JAE[Jaeger - Tracing]
         end
     end
     
@@ -36,13 +42,8 @@ graph TD
     UM1 -- HTTPS --> CDN;
     UM2 -- HTTPS --> CDN;
     CDN -- Forwards Traffic --> LB;
-    LB -- Distributes Traffic --> AS1;
-    LB -- Distributes Traffic --> AS2;
-    LB -- Distributes Traffic --> AS3;
-    AS1 <--> DB;
-    AS2 <--> DB;
-    AS1 <--> Cache;
-    AS2 <--> Cache;
-    AS1 -- File Uploads/Downloads --> OS;
-    AS2 -- Search Indexing --> Search;
-    AS2 -- Sends Emails --> Email;
+    LB -- Distributes Traffic --> AS1 & AS2;
+    AS1 & AS2 <--> DB & Cache;
+    AS1 & AS2 -- File Uploads --> OS;
+    AS1 & AS2 -- Search/Email --> Search & Email;
+    AS1 & AS2 -- Send Telemetry --> Monitoring;

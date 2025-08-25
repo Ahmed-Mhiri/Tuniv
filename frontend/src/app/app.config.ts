@@ -1,18 +1,37 @@
-import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+// src/app/app.config.ts
+
+import { ApplicationConfig, provideBrowserGlobalErrorListeners, provideZoneChangeDetection, importProvidersFrom } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { provideHttpClient, withInterceptors } from '@angular/common/http'; // <-- IMPORT ADDED
 import { routes } from './app.routes';
 import { provideClientHydration, withEventReplay } from '@angular/platform-browser';
-import { jwtInterceptor } from './core/interceptors/jwt.interceptor'; // <-- IMPORT ADDED
+import { en_US, provideNzI18n } from 'ng-zorro-antd/i18n';
+import { registerLocaleData } from '@angular/common';
+import en from '@angular/common/locales/en';
+import { FormsModule } from '@angular/forms';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { provideHttpClient } from '@angular/common/http';
+
+// NEW: Import the icon module and the specific icons you need
+import { NzIconModule } from 'ng-zorro-antd/icon';
+import { MenuOutline, SunOutline, MoonOutline, UserOutline } from '@ant-design/icons-angular/icons';
+
+registerLocaleData(en);
+
+// NEW: Create a list of the icons to make them available in your app
+const icons = [MenuOutline, SunOutline, MoonOutline, UserOutline];
 
 export const appConfig: ApplicationConfig = {
   providers: [
+    provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
-    provideRouter(routes),
-    provideClientHydration(withEventReplay()),
+    provideRouter(routes), 
+    provideClientHydration(withEventReplay()), 
+    provideNzI18n(en_US), 
+    importProvidersFrom(FormsModule), 
+    provideAnimationsAsync(), 
+    provideHttpClient(),
 
-    // --- THIS IS THE FIX ---
-    // This provides HttpClient to your whole app and registers the interceptor.
-    provideHttpClient(withInterceptors([jwtInterceptor]))
+    // NEW: Add this line to provide the icons to your entire application
+    importProvidersFrom(NzIconModule.forRoot(icons))
   ]
 };
