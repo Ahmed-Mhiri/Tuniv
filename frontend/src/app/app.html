@@ -1,2 +1,44 @@
 <app-navbar></app-navbar>
-<div></div>
+
+<main class="main-content" style="padding: 2rem;">
+  <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">
+    Test 1: Default Image Uploader
+  </h2>
+  <app-file-upload (filesChanged)="onImagesChanged($event)"></app-file-upload>
+
+  @if (uploadedImageFiles().length > 0) {
+    <div style="margin-top: 1rem; border: 1px solid #ccc; padding: 1rem;">
+      <strong>Selected Images:</strong>
+      <ul>
+        @for (file of uploadedImageFiles(); track file.name) {
+          <li>{{ file.name }} ({{ (file.size / 1024).toFixed(2) }} KB)</li>
+        }
+      </ul>
+    </div>
+  }
+
+  <hr style="margin: 3rem 0;">
+
+  <h2 style="font-size: 1.5rem; font-weight: bold; margin-bottom: 1rem;">
+    Test 2: Custom PDF Uploader (Single File, Max 5MB)
+  </h2>
+  <app-file-upload
+    [multiple]="false"
+    [acceptedTypes]="['application/pdf']"
+    [maxFileSize]="5"
+    uploadText="Click or drag a PDF document here"
+    uploadHint="Only a single PDF file smaller than 5MB is allowed."
+    (filesChanged)="onPdfChanged($event)"
+  ></app-file-upload>
+
+  @if (uploadedPdfFile()) {
+    <div style="margin-top: 1rem; border: 1px solid #ccc; padding: 1rem;">
+      <strong>Selected PDF:</strong>
+      <p>{{ uploadedPdfFile()?.name }} ({{ (uploadedPdfFile()!.size / 1024).toFixed(2) }} KB)</p>
+    </div>
+  }
+
+  <router-outlet></router-outlet>
+</main>
+
+<app-footer></app-footer>

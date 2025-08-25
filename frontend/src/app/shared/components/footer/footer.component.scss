@@ -1,0 +1,16 @@
+// src/app/layout/footer/footer.component.scss
+// No changes needed! This code is solid.
+
+:host {
+  display: block;
+  width: 100%;
+}
+
+.footer-link {
+  color: var(--color-text-secondary);
+  transition: color 0.2s ease-in-out;
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}

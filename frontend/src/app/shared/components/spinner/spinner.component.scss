@@ -1,0 +1,29 @@
+/* src/app/components/spinner/spinner.component.scss */
+
+:host {
+  // Default styling for inline mode
+  display: block; 
+  text-align: center;
+
+  // When the component is used as an overlay, it shouldn't affect layout.
+  // The .is-overlay class is applied via the @HostBinding in the TS file.
+  &.is-overlay:not(.is-inline) {
+    display: contents;
+  }
+}
+
+.spinner-overlay {
+  position: absolute;
+  inset: 0; // Covers the entire parent element
+  background-color: rgba(var(--color-surface-rgb), 0.7);
+  backdrop-filter: blur(2px);
+  z-index: 999;
+  display: flex;
+  
+  /* --- FIX STARTS HERE --- */
+  flex-direction: column; /* This is the key change to stack the spinner and tip */
+  /* --- FIX ENDS HERE --- */
+
+  justify-content: center;
+  align-items: center;
+}

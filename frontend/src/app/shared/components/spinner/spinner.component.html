@@ -1,1 +1,11 @@
-<p>spinner works!</p>
+@if (isLoading()) {
+  
+  @if (isOverlay()) {
+    <div class="spinner-overlay" [@fade]>
+      <nz-spin nzSimple [nzSize]="size()" [nzTip]="nzTip()"></nz-spin>
+    </div>
+  } @else {
+    <nz-spin nzSimple [nzSize]="size()" [nzTip]="nzTip()"></nz-spin>
+  }
+
+}

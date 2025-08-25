@@ -1,1 +1,12 @@
-<p>file-upload works!</p>
+<nz-upload
+  nzType="drag"
+  [nzMultiple]="multiple()"
+  [(nzFileList)]="fileList"
+  [nzBeforeUpload]="beforeUpload"
+>
+  <p class="ant-upload-drag-icon">
+    <span nz-icon nzType="inbox"></span>
+  </p>
+  <p class="ant-upload-text">{{ uploadText() }}</p>
+  <p class="ant-upload-hint">{{ uploadHint() }}</p>
+</nz-upload>

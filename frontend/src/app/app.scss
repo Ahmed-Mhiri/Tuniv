@@ -1,0 +1,6 @@
+// src/app/app.component.scss
+
+.main-content {
+  position: relative; // This is crucial for the spinner overlay
+  min-height: 50vh;   // Ensures the content area has some height
+}

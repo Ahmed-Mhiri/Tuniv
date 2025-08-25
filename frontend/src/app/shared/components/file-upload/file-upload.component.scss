@@ -1,0 +1,49 @@
+/* Styles for the app-file-upload component using Tailwind's @apply.
+  This ensures the component respects the application's light/dark mode theme.
+*/
+
+// We use ::ng-deep to style the internal parts of the nz-upload component.
+
+::ng-deep .ant-upload.ant-upload-drag {
+  // --- Main Dropzone Area ---
+  @apply bg-surface border-2 border-dashed border-border rounded-lg;
+  @apply hover:border-primary; // Highlight on hover
+
+  .ant-upload-drag-container {
+    // --- Text and Icon Styling ---
+    .ant-upload-drag-icon .anticon {
+      @apply text-primary mb-4;
+    }
+
+    .ant-upload-text {
+      @apply text-text-primary font-semibold;
+    }
+
+    .ant-upload-hint {
+      @apply text-text-secondary text-sm;
+    }
+  }
+}
+
+// --- File List Styling ---
+::ng-deep .ant-upload-list-item {
+  @apply bg-surface-subtle border border-border rounded-md text-text-secondary;
+  
+  // Style for the remove icon (x) on hover
+  .ant-upload-list-item-actions .ant-btn-text:hover {
+    @apply bg-accent/10; // Use a subtle accent color background
+    
+    .anticon-delete {
+      @apply text-accent;
+    }
+  }
+}
+
+// Style for a file that is in an error state (e.g., validation failed)
+::ng-deep .ant-upload-list-item-error {
+  @apply border-accent;
+
+  .ant-upload-list-item-name {
+    @apply text-accent;
+  }
+}

@@ -71,3 +71,103 @@ html.dark {
   --color-surface-rgb: 31, 41, 55;
   --color-background-rgb: 17, 24, 39;
 }
+/* ==========================================================================
+   Custom Theming for File Upload Component
+   ========================================================================== */
+
+/* By placing these rules here, Tailwind can process the @apply directives.
+   We wrap them in the 'app-file-upload' selector to ensure they ONLY
+   affect this specific component and don't leak out. */
+app-file-upload {
+  
+  .ant-upload.ant-upload-drag {
+    // --- Main Dropzone Area ---
+    @apply bg-surface border-2 border-dashed border-border rounded-lg transition-colors;
+    @apply hover:border-primary; // Highlight on hover
+
+    .ant-upload-drag-container {
+      // --- Text and Icon Styling ---
+      .ant-upload-drag-icon .anticon {
+        @apply text-primary mb-4;
+      }
+
+      .ant-upload-text {
+        @apply text-text-primary font-semibold;
+      }
+
+      .ant-upload-hint {
+        @apply text-text-secondary text-sm;
+      }
+    }
+  }
+
+  // --- File List Styling ---
+  .ant-upload-list-item {
+    @apply bg-surface-subtle border border-border rounded-md text-text-secondary mt-2;
+    
+    // Style for the remove icon (x) on hover
+    .ant-upload-list-item-actions .ant-btn-text:hover {
+      @apply bg-accent/10; // Use a subtle accent color background
+      
+      .anticon-delete {
+        @apply text-accent;
+      }
+    }
+  }
+
+  // Style for a file that is in an error state (e.g., validation failed)
+  .ant-upload-list-item-error {
+    @apply border-accent;
+
+    .ant-upload-list-item-name {
+      @apply text-accent;
+    }
+  }
+}
+/* ==========================================================================
+   Custom Theming for Paginator Component
+   ========================================================================== */
+
+/* We wrap these rules in the 'app-paginator' selector to ensure they
+   ONLY affect this specific component. */
+app-paginator {
+  .paginator-container {
+    @apply flex justify-center mt-8;
+  }
+
+  // Style for the page number buttons, and the prev/next arrows
+  .ant-pagination-item,
+  .ant-pagination-prev .ant-pagination-item-link,
+  .ant-pagination-next .ant-pagination-item-link {
+    @apply bg-surface border border-border text-text-secondary rounded-md transition-colors;
+    @apply hover:border-primary hover:text-primary;
+  }
+
+  // Style for the currently active page number
+  .ant-pagination-item-active {
+    @apply bg-primary border-primary text-white;
+    @apply hover:bg-primary-hover hover:border-primary-hover;
+
+    a {
+      @apply text-white hover:text-white;
+    }
+  }
+
+  // Style for the disabled prev/next arrows
+  .ant-pagination-disabled .ant-pagination-item-link {
+    @apply bg-surface-subtle text-text-secondary/50 cursor-not-allowed;
+    @apply hover:border-border hover:text-text-secondary/50;
+  }
+
+  // Style for the "..." jump icons
+  .ant-pagination-jump-next .ant-pagination-item-link-icon,
+  .ant-pagination-jump-prev .ant-pagination-item-link-icon {
+    @apply text-text-secondary/70;
+  }
+
+  // Style for the page size changer dropdown
+  .ant-pagination-options .ant-select-selector {
+    @apply bg-surface border border-border text-text-secondary rounded-md;
+    @apply hover:border-primary;
+  }
+}
