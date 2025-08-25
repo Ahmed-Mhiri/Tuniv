@@ -1,136 +1,109 @@
-<nz-header>
+<nz-header class="bg-surface border-b border-border shadow-md">
   <div class="navbar-content">
-
-    <div class="navbar-start">
-      <a routerLink="/" class="navbar-logo">
-        <img
-          ngSrc="assets/images/TunivLogo.svg"
-          alt="Tuniv Logo"
-          width="80"
-          height="80"
-          class="h-10 w-auto"
-          priority
-        />
-      </a>
-      <ul nz-menu nzMode="horizontal" [nzTheme]="menuTheme()" class="main-menu hidden md:flex">
-        <li
-          nz-menu-item
-          routerLink="/"
-          routerLinkActive="active-link"
-          [routerLinkActiveOptions]="{exact: true}"
-        >Home</li>
-        <li
-          nz-menu-item
-          routerLink="/universities"
-          routerLinkActive="active-link"
-        >Universities</li>
-      </ul>
-    </div>
+    
+    <a routerLink="/" class="flex items-center gap-3">
+      <img 
+        ngSrc="assets/images/TunivLogo.svg" 
+        alt="Tuniv Logo" 
+        width="80" 
+        height="80"
+        class="h-10 w-auto"
+        priority
+      />
+    </a>
 
     @if (isBrowser()) {
-      <div class="navbar-end">
+      <div class="flex items-center gap-4">
+        
+        <div class="hidden md:flex">
+          <ul nz-menu nzMode="horizontal" [nzTheme]="menuTheme()" class="main-menu">
+            <li nz-menu-item routerLink="/" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">Home</li>
+            <li nz-menu-item routerLink="/universities" routerLinkActive="active-link">Universities</li>
+          </ul>
+        </div>
+        
         <nz-switch
           class="hidden sm:inline-flex"
           [ngModel]="isDarkMode()"
           (ngModelChange)="toggleTheme($event)"
           [nzCheckedChildren]="iconMoon"
           [nzUnCheckedChildren]="iconSun"
-        >
-        </nz-switch>
+        ></nz-switch>
         <ng-template #iconSun><span nz-icon nzType="sun"></span></ng-template>
         <ng-template #iconMoon><span nz-icon nzType="moon"></span></ng-template>
 
-        <div class="hidden md:flex user-actions">
+        <div class="hidden md:flex user-actions items-center gap-2">
           @if (isUserLoggedIn()) {
-            <a
-              nz-dropdown
-              [nzDropdownMenu]="userMenu"
-              nzPlacement="bottomRight"
-              class="flex items-center gap-2 cursor-pointer p-1 rounded-md hover:bg-surface-subtle"
-            >
-              <nz-avatar
-                nzIcon="user"
-                [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
-              ></nz-avatar>
-              <span class="text-text-primary font-body font-medium">
-                {{ currentUser()?.username }}
-              </span>
+            <a nz-dropdown [nzDropdownMenu]="userMenu" nzPlacement="bottomRight" class="flex items-center gap-2 cursor-pointer p-1 rounded-md hover:bg-surface-subtle">
+              <nz-avatar nzIcon="user" [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"></nz-avatar>
+              <span class="text-text-primary font-body font-medium">{{ currentUser()?.username }}</span>
             </a>
             <nz-dropdown-menu #userMenu="nzDropdownMenu">
               <ul nz-menu>
-                <li nz-menu-item [routerLink]="['/user/profile', currentUser()?.id]">
-                  My Profile
-                </li>
+                <li nz-menu-item [routerLink]="['/user/profile', currentUser()?.id]">My Profile</li>
                 <li nz-menu-item (click)="logout()">Logout</li>
               </ul>
             </nz-dropdown-menu>
+            
             <a routerLink="/qa/ask">
-              <button nz-button class="btn btn-accent">Ask Question</button>
+              <button nz-button class="btn btn-accent">
+                <span nz-icon nzType="plus"></span>
+                Ask Question
+              </button>
             </a>
           } @else {
             <a routerLink="/login">
-              <button nz-button class="btn btn-secondary">Login</button>
+              <button nz-button nzType="default" class="btn btn-secondary">
+                <span nz-icon nzType="login"></span>
+                Login
+              </button>
             </a>
             <a routerLink="/register">
-              <button nz-button class="btn btn-primary">Register</button>
+              <button nz-button nzType="primary" class="btn btn-primary">
+                <span nz-icon nzType="user-add"></span>
+                Register
+              </button>
             </a>
           }
         </div>
-
-        <button
-          nz-button
-          nzType="text"
-          (click)="openMobileDrawer()"
+        
+        <button 
+          nz-button 
+          nzType="text" 
+          (click)="openMobileDrawer()" 
           class="md:hidden text-primary"
           aria-label="Open menu"
         >
-          <span nz-icon nzType="menu" class="text-2xl"></span>
+          <span nz-icon nzType="menu"></span>
         </button>
       </div>
     }
   </div>
 </nz-header>
 
-<nz-drawer
-  [nzVisible]="isMobileDrawerVisible()"
-  (nzOnClose)="closeMobileDrawer()"
+<nz-drawer 
+  [nzClosable]="true"                       
+  [nzVisible]="isMobileDrawerVisible()" 
+  (nzOnClose)="closeMobileDrawer()" 
+  [nzWidth]="'85vw'"                        
   nzPlacement="right"
   nzTitle="Menu"
-  [nzClosable]="true"
 >
   <ng-container *nzDrawerContent>
-    <ul nz-menu nzMode="vertical" class="mobile-menu">
-      <li nz-menu-item routerLink="/" (click)="closeMobileDrawer()">Home</li>
-      <li nz-menu-item routerLink="/universities" (click)="closeMobileDrawer()">
-        Universities
-      </li>
-    </ul>
-
-    <nz-divider></nz-divider>
-
-    <div class="mobile-actions">
+    <ul nz-menu nzMode="inline" [nzTheme]="menuTheme()">
+      <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/">Home</li>
+      <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/universities">Universities</li>
+      <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/qa/ask">Ask Question</li>
+      <li nz-menu-divider></li>
       @if (isUserLoggedIn()) {
-        <a [routerLink]="['/user/profile', currentUser()?.id]" (click)="closeMobileDrawer()" class="profile-link">
-          <nz-avatar
-            nzIcon="user"
-            [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
-          ></nz-avatar>
-          <span class="font-medium">My Profile</span>
-        </a>
-        <button nz-button nzBlock class="btn btn-accent" routerLink="/qa/ask" (click)="closeMobileDrawer()">
-          Ask Question
-        </button>
-        <button nz-button nzBlock class="btn btn-secondary" (click)="logout(); closeMobileDrawer();">
-          Logout
-        </button>
+        <li nz-menu-item (click)="closeMobileDrawer()" [routerLink]="['/user/profile', currentUser()?.id]">
+          My Profile
+        </li>
+        <li nz-menu-item (click)="logout(); closeMobileDrawer()">Logout</li>
       } @else {
-        <button nz-button nzBlock class="btn btn-secondary" routerLink="/login" (click)="closeMobileDrawer()">
-          Login
-        </button>
-        <button nz-button nzBlock class="btn btn-primary" routerLink="/register" (click)="closeMobileDrawer()">
-          Register
-        </button>
+        <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/login">Login</li>
+        <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/register">Register</li>
       }
-    </div>
+    </ul>
   </ng-container>
 </nz-drawer>

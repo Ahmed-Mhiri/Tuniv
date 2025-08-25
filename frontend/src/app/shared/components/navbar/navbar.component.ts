@@ -1,17 +1,17 @@
-import { 
-  Component, 
-  OnInit, 
-  inject, 
-  signal, 
+import {
+  Component,
+  OnInit,
+  inject,
+  signal,
   computed,
-  ChangeDetectionStrategy, 
+  ChangeDetectionStrategy,
   Renderer2,
   PLATFORM_ID
 } from '@angular/core';
-import { 
-  DOCUMENT, 
-  isPlatformBrowser, 
-  NgOptimizedImage 
+import {
+  DOCUMENT,
+  isPlatformBrowser,
+  NgOptimizedImage
 } from '@angular/common';
 import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -49,6 +49,8 @@ import { AuthService } from '../../../core/services/auth.service';
     NzDividerModule,
   ],
   templateUrl: './navbar.component.html',
+  // --- THIS LINE WAS MISSING ---
+  styleUrls: ['./navbar.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'block'
@@ -61,12 +63,12 @@ export class NavbarComponent implements OnInit {
   private document = inject(DOCUMENT);
   private platformId = inject(PLATFORM_ID);
   private router = inject(Router);
-  
+
   // State signals
   isDarkMode = signal(false);
   isMobileDrawerVisible = signal(false);
   isBrowser = signal(false);
-  
+
   // Computed properties
   currentUser = computed(() => this.authService.currentUser());
   isUserLoggedIn = computed(() => this.authService.isUserLoggedIn());
@@ -75,14 +77,14 @@ export class NavbarComponent implements OnInit {
   ngOnInit(): void {
     // Check if we're in the browser environment
     this.isBrowser.set(isPlatformBrowser(this.platformId));
-    
+
     if (this.isBrowser()) {
       const savedTheme = localStorage.getItem('theme');
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      
+
       // Set theme based on saved preference or system preference
       const shouldUseDarkMode = savedTheme === 'dark' || (!savedTheme && prefersDark);
-      
+
       if (shouldUseDarkMode) {
         this.isDarkMode.set(true);
         this.renderer.addClass(this.document.documentElement, 'dark');
@@ -93,7 +95,7 @@ export class NavbarComponent implements OnInit {
   toggleTheme(isDark: boolean): void {
     this.isDarkMode.set(isDark);
     const htmlEl = this.document.documentElement;
-    
+
     if (isDark) {
       this.renderer.addClass(htmlEl, 'dark');
       localStorage.setItem('theme', 'dark');
