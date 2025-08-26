@@ -37,7 +37,6 @@ import { AuthService } from '../../../core/services/auth.service';
     RouterLinkActive,
     RouterLink,
     FormsModule,
-    NgOptimizedImage,
     NzLayoutModule,
     NzMenuModule,
     NzButtonModule,

@@ -1,24 +1,16 @@
-/* src/styles.css */
+/* src/styles.scss */
 
-/* Import Tailwind and Google Fonts */
+/* ==========================================================================
+   1. Imports & Global Setup
+   ========================================================================== */
 @use "tailwindcss";
-
-/* Google Fonts imports */
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&display=swap');
 
-/* Base reset + border-box */
-*,
-*::before,
-*::after {
+*, *::before, *::after {
   box-sizing: border-box;
-  /* --> ENHANCEMENT: Add a global transition for smoother UI interactions */
-  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow, transform;
+  transition-property: color, background-color, border-color;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 200ms;
-}
-
-html {
-  scroll-behavior: smooth;
 }
 
 body {
@@ -26,149 +18,193 @@ body {
   padding: 0;
   font-family: var(--font-body);
   background-color: var(--color-background);
-  color: var(--color-text-primary);
+  color: var(--color-text-primary); // Base color
   line-height: 1.6;
 }
 
-/* Tailwind @theme definitions */
-/* src/styles.css */
-
-/* ... (imports and resets remain the same) ... */
-
+/* ==========================================================================
+   2. Theme Variable Definitions
+   ========================================================================== */
 @theme {
   /* Font */
   --font-body: "Plus Jakarta Sans", sans-serif;
+  --font-display: "Plus Jakarta Sans", sans-serif;
 
   /* Light Mode */
   --color-primary: #4338CA;
   --color-primary-hover: #3730A3;
-  --color-accent: #E11D48;
-  --color-accent-hover: #BE123C;
+  --color-accent: #f59e0b;        /* Amber 500 */
+  --color-accent-hover: #d97706;  /* Amber 600 */
   --color-background: #F9FAFB;
   --color-surface: #FFFFFF;
   --color-surface-subtle: #F3F4F6;
   --color-text-primary: #1F2937;
   --color-text-secondary: #6B7280;
   --color-border: #E5E7EB;
-  /* --> NEW: RGB values for dynamic transparency */
-  --color-surface-rgb: 255, 255, 255;
-  --color-background-rgb: 249, 250, 251;
+  --color-on-primary: #ffffff;
 }
 
-/* Dark mode overrides */
 html.dark {
+  /* Dark Mode */
   --color-primary: #818CF8;
   --color-primary-hover: #6366F1;
-  --color-accent: #F472B6;
-  --color-accent-hover: #EC4899;
+  --color-accent: #fbbf24;        /* Amber 400 */
+  --color-accent-hover: #f59e0b;  /* Amber 500 */
   --color-background: #111827;
   --color-surface: #1F2937;
   --color-surface-subtle: #374151;
   --color-text-primary: #F3F4F6;
   --color-text-secondary: #9CA3AF;
   --color-border: #374151;
-  /* --> NEW: RGB values for dynamic transparency */
-  --color-surface-rgb: 31, 41, 55;
-  --color-background-rgb: 17, 24, 39;
+  --color-on-primary: #ffffff;
 }
+
 /* ==========================================================================
-   Custom Theming for File Upload Component
+   3. Base Element & Typography Reset (The "Stronger Pattern")
+   ========================================================================== */
+/*
+ * This ensures all common text elements inherit the correct theme
+ * color by default, preventing issues with unstyled <p> or <h2> tags.
+*/
+h1, h2, h3, h4, h5, h6, p, span, div, li, strong {
+  color: var(--color-text-primary); /* FIX: Apply the theme color directly */
+}
+
+/* Ensure links also use a primary color and are readable */
+a {
+  color: var(--color-primary);
+  &:hover {
+    color: var(--color-primary-hover);
+  }
+}
+
+/* ==========================================================================
+   4. Global NG-ZORRO Theming Overrides
    ========================================================================== */
 
-/* By placing these rules here, Tailwind can process the @apply directives.
-   We wrap them in the 'app-file-upload' selector to ensure they ONLY
-   affect this specific component and don't leak out. */
-app-file-upload {
+/* --- Typography --- */
+.ant-typography, [nz-typography] {
+  color: var(--color-text-primary) !important;
+}
+.ant-typography[nztype='secondary'] {
+  color: var(--color-text-secondary) !important;
+}
+
+/* ==========================================================================
+   Global Button Styles (Final Version)
+   ========================================================================== */
+/*
+ * This provides a robust base style for all antd buttons and specific
+ * overrides for custom variants like primary and accent.
+*/
+
+// --- Base/Default Button Style ---
+// Targets any button or link with the ant-btn class that IS NOT a primary or accent button.
+// This will fix your "Edit Profile" button.
+.ant-btn:not(.btn-primary):not(.btn-accent):not([nztype='primary']) {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-secondary) !important;
+
+  &:hover,
+  &:focus {
+    border-color: var(--color-primary) !important;
+    color: var(--color-primary) !important;
+  }
+}
+
+// --- Primary Button ---
+.btn-primary,
+button[nzType='primary'].ant-btn {
+  background-color: var(--color-primary) !important;
+  border-color: var(--color-primary) !important;
+  color: var(--color-on-primary) !important;
+
+  &:hover,
+  &:focus {
+    background-color: var(--color-primary-hover) !important;
+    border-color: var(--color-primary-hover) !important;
+  }
+}
+
+// --- Accent Button ---
+// This will now correctly style your "Ask Question" button.
+.btn-accent {
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-on-primary) !important;
+
+  &:hover,
+  &:focus {
+    background-color: var(--color-accent-hover) !important;
+    border-color: var(--color-accent-hover) !important;
+  }
+}
+
+// --- Global Disabled State ---
+button[disabled],
+.ant-btn[disabled] {
+  background-color: var(--color-surface-subtle) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-secondary) !important;
+  opacity: 0.6;
+}
+
+/* --- Forms & Inputs --- */
+.ant-form-item-label > label {
+  color: var(--color-text-secondary) !important;
+  font-weight: 500;
+}
+.ant-input, .ant-input-affix-wrapper {
+  background-color: var(--color-background) !important;
+  border-color: var(--color-border) !important;
+  color: var(--color-text-primary) !important;
+  input {
+    background-color: transparent !important;
+    color: var(--color-text-primary) !important;
+  }
+  &::placeholder {
+    color: var(--color-text-secondary) !important;
+  }
+  &:hover, &:focus-within {
+    border-color: var(--color-primary) !important;
+  }
+}
+.ant-input-prefix .anticon {
+  color: var(--color-text-secondary) !important;
+}
+
+/* --- Cards & Menus --- */
+.ant-card, .ant-dropdown-menu, .ant-menu {
+  background-color: var(--color-surface) !important;
+  border-color: var(--color-border) !important;
+}
+.ant-card-head { border-bottom-color: var(--color-border) !important; }
+.ant-card-head-title { color: var(--color-text-primary) !important; }
+.ant-menu-item {
+  color: var(--color-text-secondary) !important;
+  &:hover { color: var(--color-primary) !important; }
+}
+.ant-menu-item-selected {
+  background-color: var(--color-surface-subtle) !important;
+  color: var(--color-primary) !important;
+}
+// --- THEMED SVG LOGO ---
+.themed-logo {
+  display: inline-block;
+  // Use the primary text color of your theme as the logo color
+  background-color: var(--color-text-primary);
   
-  .ant-upload.ant-upload-drag {
-    // --- Main Dropzone Area ---
-    @apply bg-surface border-2 border-dashed border-border rounded-lg transition-colors;
-    @apply hover:border-primary; // Highlight on hover
+  // Use the SVG file as a mask (stencil)
+  mask-image: url('/assets/images/TunivLogo.svg');
+  -webkit-mask-image: url('/assets/images/TunivLogo.svg'); // For broader browser compatibility
+  
+  // Ensure the mask scales correctly
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
 
-    .ant-upload-drag-container {
-      // --- Text and Icon Styling ---
-      .ant-upload-drag-icon .anticon {
-        @apply text-primary mb-4;
-      }
-
-      .ant-upload-text {
-        @apply text-text-primary font-semibold;
-      }
-
-      .ant-upload-hint {
-        @apply text-text-secondary text-sm;
-      }
-    }
-  }
-
-  // --- File List Styling ---
-  .ant-upload-list-item {
-    @apply bg-surface-subtle border border-border rounded-md text-text-secondary mt-2;
-    
-    // Style for the remove icon (x) on hover
-    .ant-upload-list-item-actions .ant-btn-text:hover {
-      @apply bg-accent/10; // Use a subtle accent color background
-      
-      .anticon-delete {
-        @apply text-accent;
-      }
-    }
-  }
-
-  // Style for a file that is in an error state (e.g., validation failed)
-  .ant-upload-list-item-error {
-    @apply border-accent;
-
-    .ant-upload-list-item-name {
-      @apply text-accent;
-    }
-  }
+  // Set the size to match your original <img> tag (h-10 is 2.5rem)
+  width: 2.5rem;
+  height: 2.5rem;
 }
-/* ==========================================================================
-   Custom Theming for Paginator Component
-   ========================================================================== */
-
-/* We wrap these rules in the 'app-paginator' selector to ensure they
-   ONLY affect this specific component. */
-app-paginator {
-  .paginator-container {
-    @apply flex justify-center mt-8;
-  }
-
-  // Style for the page number buttons, and the prev/next arrows
-  .ant-pagination-item,
-  .ant-pagination-prev .ant-pagination-item-link,
-  .ant-pagination-next .ant-pagination-item-link {
-    @apply bg-surface border border-border text-text-secondary rounded-md transition-colors;
-    @apply hover:border-primary hover:text-primary;
-  }
-
-  // Style for the currently active page number
-  .ant-pagination-item-active {
-    @apply bg-primary border-primary text-white;
-    @apply hover:bg-primary-hover hover:border-primary-hover;
-
-    a {
-      @apply text-white hover:text-white;
-    }
-  }
-
-  // Style for the disabled prev/next arrows
-  .ant-pagination-disabled .ant-pagination-item-link {
-    @apply bg-surface-subtle text-text-secondary/50 cursor-not-allowed;
-    @apply hover:border-border hover:text-text-secondary/50;
-  }
-
-  // Style for the "..." jump icons
-  .ant-pagination-jump-next .ant-pagination-item-link-icon,
-  .ant-pagination-jump-prev .ant-pagination-item-link-icon {
-    @apply text-text-secondary/70;
-  }
-
-  // Style for the page size changer dropdown
-  .ant-pagination-options .ant-select-selector {
-    @apply bg-surface border border-border text-text-secondary rounded-md;
-    @apply hover:border-primary;
-  }
-}
-

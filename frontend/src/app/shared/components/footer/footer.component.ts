@@ -11,7 +11,6 @@ import { faGithub, faLinkedin, faTwitter } from '@fortawesome/free-brands-svg-ic
   standalone: true, // Explicitly define as standalone
   imports: [
     RouterLink,
-    NgOptimizedImage,
     FaIconComponent // Import for icons
   ],
   templateUrl: './footer.component.html',

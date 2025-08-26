@@ -1,1 +1,32 @@
-<p>settings-page works!</p>
+<div class="settings-container">
+  <div class="settings-card">
+    <h1 class="settings-title">Account Settings</h1>
+    <nz-tabset [nzTabPosition]="'top'" [nzType]="'line'">
+      
+      <nz-tab [nzTitle]="profileTabTitle">
+        <ng-template #profileTabTitle>
+          <span class="tab-title">
+            <span nz-icon nzType="user"></span>
+            Edit Profile
+          </span>
+        </ng-template>
+        <div class="tab-content">
+          <app-profile-edit-page></app-profile-edit-page>
+        </div>
+      </nz-tab>
+
+      <nz-tab [nzTitle]="securityTabTitle">
+        <ng-template #securityTabTitle>
+          <span class="tab-title">
+            <span nz-icon nzType="shield"></span>
+            Security
+          </span>
+        </ng-template>
+        <div class="tab-content">
+          <app-two-factor-auth-setup></app-two-factor-auth-setup>
+        </div>
+      </nz-tab>
+
+    </nz-tabset>
+  </div>
+</div>

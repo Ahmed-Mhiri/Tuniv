@@ -1,12 +1,13 @@
 package com.tuniv.backend.config.security.services;
 
 import java.util.Collection;
-import java.util.Collections;
+import java.util.List;
 
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import com.tuniv.backend.user.model.User;
+import com.tuniv.backend.user.model.User; // <-- Import List
 
 public class UserDetailsImpl implements UserDetails {
 
@@ -19,13 +20,11 @@ public class UserDetailsImpl implements UserDetails {
     public Integer getId() {
         return user.getUserId();
     }
-    
+
     public String getEmail() {
         return user.getEmail();
     }
 
-    // --- THIS IS THE FIX ---
-    // Added the missing getter for the profile photo URL.
     public String getProfilePhotoUrl() {
         return user.getProfilePhotoUrl();
     }
@@ -40,10 +39,12 @@ public class UserDetailsImpl implements UserDetails {
         return user.getPassword();
     }
 
+    // --- FIX #1: Grant a default role to every user ---
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // We can add roles here later if needed
-        return Collections.emptyList();
+        // This gives every authenticated user the "ROLE_USER" permission.
+        // Later, you can load specific roles from your database here.
+        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
     // --- Standard UserDetails methods ---
@@ -62,8 +63,10 @@ public class UserDetailsImpl implements UserDetails {
         return true;
     }
 
+    // --- FIX #2: Connect this to the user's verification status ---
     @Override
     public boolean isEnabled() {
-        return true;
+        // This now correctly checks the 'is_enabled' column from your database.
+        return user.isEnabled();
     }
 }

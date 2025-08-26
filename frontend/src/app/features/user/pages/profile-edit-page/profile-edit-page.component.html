@@ -1,1 +1,47 @@
-<p>profile-edit-page works!</p>
+@if (isLoading()) {
+  <div class="loading-container">
+    <app-spinner></app-spinner>
+    <p class="loading-text">Loading Your Profile...</p>
+  </div>
+} @else {
+  <div>
+    <h3 nz-typography class="form-section-title">Edit Your Profile</h3>
+    <p nz-typography nzType="secondary" class="form-section-subtitle">
+      Update your major and bio to keep your profile current.
+    </p>
+
+    <form nz-form [nzLayout]="'vertical'" [formGroup]="editForm" (ngSubmit)="submitForm()">
+      <nz-form-item>
+        <nz-form-label nzFor="major">Major</nz-form-label>
+        <nz-form-control nzErrorTip="Major cannot exceed 100 characters.">
+          <nz-input-group>
+            <input nz-input formControlName="major" id="major" placeholder="e.g., Computer Science" />
+          </nz-input-group>
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-label nzFor="bio">Bio</nz-form-label>
+        <nz-form-control nzErrorTip="Bio cannot exceed 500 characters.">
+          <nz-textarea-count [nzMaxCharacterCount]="500">
+            <textarea
+              nz-input
+              formControlName="bio"
+              id="bio"
+              placeholder="Tell us a little about yourself"
+              [nzAutosize]="{ minRows: 4, maxRows: 8 }"
+            ></textarea>
+          </nz-textarea-count>
+        </nz-form-control>
+      </nz-form-item>
+
+      <nz-form-item>
+        <nz-form-control class="flex justify-end">
+          <button nz-button nzType="primary" [nzLoading]="isSaving()" [disabled]="editForm.pristine || editForm.invalid">
+            Save Changes
+          </button>
+        </nz-form-control>
+      </nz-form-item>
+    </form>
+  </div>
+}

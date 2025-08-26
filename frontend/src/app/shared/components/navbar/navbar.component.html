@@ -1,27 +1,18 @@
 <nz-header class="bg-surface border-b border-border shadow-md">
   <div class="navbar-content">
-    
     <a routerLink="/" class="flex items-center gap-3">
-      <img 
-        ngSrc="assets/images/TunivLogo.svg" 
-        alt="Tuniv Logo" 
-        width="80" 
-        height="80"
-        class="h-10 w-auto"
-        priority
-      />
-    </a>
+  <span class="themed-logo"></span>
+</a>
 
     @if (isBrowser()) {
       <div class="flex items-center gap-4">
-        
         <div class="hidden md:flex">
           <ul nz-menu nzMode="horizontal" [nzTheme]="menuTheme()" class="main-menu">
-            <li nz-menu-item routerLink="/" routerLinkActive="active-link" [routerLinkActiveOptions]="{exact: true}">Home</li>
+            <li nz-menu-item routerLink="/" routerLinkActive="active-link" [routerLinkActiveOptions]="{ exact: true }">Home</li>
             <li nz-menu-item routerLink="/universities" routerLinkActive="active-link">Universities</li>
           </ul>
         </div>
-        
+
         <nz-switch
           class="hidden sm:inline-flex"
           [ngModel]="isDarkMode()"
@@ -40,11 +31,13 @@
             </a>
             <nz-dropdown-menu #userMenu="nzDropdownMenu">
               <ul nz-menu>
-                <li nz-menu-item [routerLink]="['/user/profile', currentUser()?.id]">My Profile</li>
+                <li nz-menu-item [routerLink]="['/users', currentUser()?.id]">My Profile</li>
+                <li nz-menu-item routerLink="/settings">Settings</li>
+                <li nz-menu-divider></li>
                 <li nz-menu-item (click)="logout()">Logout</li>
               </ul>
             </nz-dropdown-menu>
-            
+
             <a routerLink="/qa/ask">
               <button nz-button class="btn btn-accent">
                 <span nz-icon nzType="plus"></span>
@@ -67,13 +60,7 @@
           }
         </div>
         
-        <button 
-          nz-button 
-          nzType="text" 
-          (click)="openMobileDrawer()" 
-          class="md:hidden text-primary"
-          aria-label="Open menu"
-        >
+        <button nz-button nzType="text" (click)="openMobileDrawer()" class="md:hidden text-primary" aria-label="Open menu">
           <span nz-icon nzType="menu"></span>
         </button>
       </div>
@@ -81,11 +68,11 @@
   </div>
 </nz-header>
 
-<nz-drawer 
-  [nzClosable]="true"                       
-  [nzVisible]="isMobileDrawerVisible()" 
-  (nzOnClose)="closeMobileDrawer()" 
-  [nzWidth]="'85vw'"                        
+<nz-drawer
+  [nzClosable]="true"
+  [nzVisible]="isMobileDrawerVisible()"
+  (nzOnClose)="closeMobileDrawer()"
+  [nzWidth]="'85vw'"
   nzPlacement="right"
   nzTitle="Menu"
 >
@@ -96,9 +83,8 @@
       <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/qa/ask">Ask Question</li>
       <li nz-menu-divider></li>
       @if (isUserLoggedIn()) {
-        <li nz-menu-item (click)="closeMobileDrawer()" [routerLink]="['/user/profile', currentUser()?.id]">
-          My Profile
-        </li>
+        <li nz-menu-item (click)="closeMobileDrawer()" [routerLink]="['/users', currentUser()?.id]">My Profile</li>
+        <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/settings">Settings</li>
         <li nz-menu-item (click)="logout(); closeMobileDrawer()">Logout</li>
       } @else {
         <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/login">Login</li>

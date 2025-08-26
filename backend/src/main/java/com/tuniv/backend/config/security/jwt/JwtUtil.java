@@ -1,16 +1,18 @@
 package com.tuniv.backend.config.security.jwt;
 
-import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.io.Decoders;
-import io.jsonwebtoken.security.Keys;
+import java.security.Key;
+import java.util.Date;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Component;
 
-import java.security.Key;
-import java.util.Date;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 
 @Component
 public class JwtUtil {
@@ -25,6 +27,9 @@ public class JwtUtil {
 
         return Jwts.builder()
                 .setSubject(userPrincipal.getUsername())
+                // --- ADD THESE CLAIMS ---
+                .claim("id", userPrincipal.getId())
+                .claim("email", userPrincipal.getEmail())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date((new Date()).getTime() + EXPIRATION_MS))
                 .signWith(key(), SignatureAlgorithm.HS256)
@@ -45,7 +50,10 @@ public class JwtUtil {
             Jwts.parserBuilder().setSigningKey(key()).build().parse(authToken);
             return true;
         } catch (Exception e) {
-            // Log the error: e.getMessage()
+            // In a real application, you should log the specific exception type
+            // e.g., MalformedJwtException, ExpiredJwtException, etc.
+            // For now, logging the message is sufficient.
+            System.err.println("Invalid JWT token: " + e.getMessage());
         }
         return false;
     }

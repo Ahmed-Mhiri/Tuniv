@@ -50,5 +50,4 @@ public class UserService {
         return UserMapper.toUserProfileDto(updatedUser); // Use the central mapper
     }
 
-    // The private mapUserToProfileDto method has been REMOVED.
 }

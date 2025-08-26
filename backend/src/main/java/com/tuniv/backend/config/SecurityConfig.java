@@ -49,21 +49,20 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Allow public access to auth, websockets, and API docs
                 .requestMatchers(
-                    "/api/v1/auth/**",
+                    "/api/v1/auth/login",
+                    "/api/v1/auth/register",
+                    "/api/v1/auth/verify",
+                    "/api/v1/auth/forgot-password",
+                    "/api/v1/auth/reset-password",
                     "/ws/**",
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
-                // Allow public READ-ONLY access to main content
-                .requestMatchers(HttpMethod.GET, "/api/v1/universities/**", "/api/v1/modules/**", "/api/v1/questions/**", "/api/v1/users/**", "/api/v1/answers/**/comments").permitAll()
-                
                 // --- THIS IS THE FIX ---
-                // Explicitly permit all CORS preflight OPTIONS requests
+                // Changed /answers/**/comments to /answers/*/comments
+                .requestMatchers(HttpMethod.GET, "/api/v1/universities/**", "/api/v1/modules/**", "/api/v1/questions/**", "/api/v1/users/**", "/api/v1/answers/*/comments").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                
-                // Secure all other requests
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())

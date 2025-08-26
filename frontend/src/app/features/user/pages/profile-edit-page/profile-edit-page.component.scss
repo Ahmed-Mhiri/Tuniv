@@ -1,0 +1,32 @@
+:host {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 600px;
+}
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  height: 12rem;
+}
+
+.loading-text {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+}
+
+.form-section-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.form-section-subtitle {
+  margin-bottom: 2rem;
+  color: var(--color-text-secondary);
+}
