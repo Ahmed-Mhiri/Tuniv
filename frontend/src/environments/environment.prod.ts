@@ -1,4 +1,4 @@
 export const environment = {
-  production: false,
-  apiUrl: 'http://localhost:8080/api/v1' // The address of your local backend
+  production: true,
+  apiUrl: 'https://api.tuniv.com/api/v1' // The address of your LIVE backend
 };

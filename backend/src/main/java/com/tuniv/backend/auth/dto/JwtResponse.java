@@ -5,5 +5,6 @@ public record JwtResponse(
     Integer id,
     String username,
     String email,
-    String profilePhotoUrl // <-- ADD THIS LINE
+    String profilePhotoUrl,
+    boolean is2faRequired // <-- ADD THIS
 ) {}

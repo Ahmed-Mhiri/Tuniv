@@ -1,0 +1,43 @@
+:host {
+  display: block;
+}
+
+.tfa-setup-card {
+  max-width: 500px;
+  padding: 1.5rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+}
+
+.spinner-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  background-color: white; // QR codes are best on a white background
+  border-radius: 0.25rem;
+  margin: 1rem 0;
+  max-width: 200px;
+
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+.verification-controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+
+  input {
+    flex-grow: 1;
+  }
+}

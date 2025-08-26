@@ -4,10 +4,10 @@
 -- SECTION 1: USERS
 -- Passwords are pre-hashed with BCrypt. Plain text is 'password123'
 -- =================================================================
-INSERT INTO users (user_id, username, email, password, profile_photo_url, bio, major, reputation_score) VALUES
-(1, 'amine_dev', 'amine@test.com', '$2a$10$fS4a.x6g4s4Y9.L8A/Mi/..g97b.flRNCXoR.LzC1x9bB5g.Gv.yq', null, '2nd year CS student at INSAT, passionate about algorithms.', 'Computer Science', 25),
-(2, 'sarra_prof', 'sarra@test.com', '$2a$10$fS4a.x6g4s4Y9.L8A/Mi/..g97b.flRNCXoR.LzC1x9bB5g.Gv.yq', null, 'Professor of Database Systems at ENSI. Over 10 years of experience.', 'Database Systems', 150),
-(3, 'yassin_student', 'yassin@test.com', '$2a$10$fS4a.x6g4s4Y9.L8A/Mi/..g97b.flRNCXoR.LzC1x9bB5g.Gv.yq', null, 'Just trying to pass my exams at FST!', 'Physics', 10);
+INSERT INTO users (user_id, username, email, password, profile_photo_url, bio, major, reputation_score, is_2fa_enabled) VALUES
+(1, 'amine_dev', 'amine@test.com', '$2a$10$fS4a.x6g4s4Y9.L8A/Mi/..g97b.flRNCXoR.LzC1x9bB5g.Gv.yq', null, '2nd year CS student at INSAT, passionate about algorithms.', 'Computer Science', 25, false),
+(2, 'sarra_prof', 'sarra@test.com', '$2a$10$fS4a.x6g4s4Y9.L8A/Mi/..g97b.flRNCXoR.LzC1x9bB5g.Gv.yq', null, 'Professor of Database Systems at ENSI. Over 10 years of experience.', 'Database Systems', 150, false),
+(3, 'yassin_student', 'yassin@test.com', '$2a$10$fS4a.x6g4s4Y9.L8A/Mi/..g97b.flRNCXoR.LzC1x9bB5g.Gv.yq', null, 'Just trying to pass my exams at FST!', 'Physics', 10, false);
 
 
 -- =================================================================
@@ -62,6 +62,9 @@ INSERT INTO question_votes (user_id, question_id, "value") VALUES (2, 1, 1);
 INSERT INTO answer_votes (user_id, answer_id, "value") VALUES (1, 1, 1);
 INSERT INTO answer_votes (user_id, answer_id, "value") VALUES (3, 2, 1);
 
+
+-- Resynchronize the sequence to the highest current user_id
+SELECT setval('users_user_id_seq', (SELECT MAX(user_id) FROM users));
 -- To sync the auto-increment counters after manual inserts, you might need these in pure psql, but they are not needed for the app to start with a clean DB.
 -- They are also PostgreSQL-specific and will fail in H2, so they are commented out.
 -- SELECT setval('users_user_id_seq', (SELECT MAX(user_id) FROM users));

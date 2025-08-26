@@ -1,1 +1,77 @@
-<p>login-page works!</p>
+<div class="login-container">
+  <div class="login-form">
+    <div class="flex justify-center mb-4">
+      <img src="assets/images/TunivLogo.svg" alt="Tuniv Logo" class="h-12 w-12" />
+    </div>
+
+    @if (!authService.isTwoFactorStep()) {
+      <h2 class="form-title">Welcome Back!</h2>
+      <p class="form-subtitle">Sign in to continue to Tuniv</p>
+
+      <form nz-form [formGroup]="loginForm" (ngSubmit)="submitForm()">
+        <nz-form-item>
+          <nz-form-control nzErrorTip="Please input your username!">
+            <nz-input-group nzPrefixIcon="user">
+              <input type="text" nz-input formControlName="username" placeholder="Username" />
+            </nz-input-group>
+          </nz-form-control>
+        </nz-form-item>
+
+        <nz-form-item>
+          <nz-form-control nzErrorTip="Please input your Password!">
+            <nz-input-group [nzSuffix]="suffixTemplate" nzPrefixIcon="lock">
+              <input [type]="passwordVisible() ? 'text' : 'password'" nz-input formControlName="password" placeholder="Password" />
+            </nz-input-group>
+            <ng-template #suffixTemplate>
+              <span nz-icon [nzType]="passwordVisible() ? 'eye' : 'eye-invisible'" (click)="togglePasswordVisibility()"></span>
+            </ng-template>
+          </nz-form-control>
+        </nz-form-item>
+
+        <div class="flex items-center justify-between mb-4">
+          <label nz-checkbox formControlName="remember">Remember me</label>
+          <a routerLink="/forgot-password" class="font-medium text-primary hover:text-primary-hover">Forgot password?</a>
+        </div>
+
+        @if(errorMessage()) {
+          <nz-alert class="mb-4" nzType="error" [nzMessage]="errorMessage()" nzShowIcon></nz-alert>
+        }
+
+        <button nz-button class="w-full" nzType="primary" [nzLoading]="isLoading()" [disabled]="loginForm.get('username')?.invalid || loginForm.get('password')?.invalid">
+          Log In
+        </button>
+
+        <div class="mt-6 text-center text-text-secondary">
+          Don't have an account? 
+          <a routerLink="/register" class="font-medium text-primary hover:text-primary-hover">Sign up</a>
+        </div>
+      </form>
+    } @else {
+      <h2 class="form-title">Two-Factor Authentication</h2>
+      <p class="form-subtitle">Enter the 6-digit code from your authenticator app.</p>
+
+      <form nz-form [formGroup]="loginForm" (ngSubmit)="submitForm()">
+        <nz-form-item>
+          <nz-form-control nzErrorTip="Please enter a valid 6-digit code.">
+            <nz-input-group nzPrefixIcon="shield">
+              <input type="text" nz-input formControlName="code" placeholder="6-digit code" maxlength="6" />
+            </nz-input-group>
+          </nz-form-control>
+        </nz-form-item>
+
+        @if(errorMessage()) {
+          <nz-alert class="mb-4" nzType="error" [nzMessage]="errorMessage()" nzShowIcon></nz-alert>
+        }
+        
+        <div class="flex gap-2">
+            <button type="button" nz-button class="w-full" (click)="cancelTwoFactorAuth()">
+                Back
+            </button>
+            <button nz-button class="w-full" nzType="primary" [nzLoading]="isLoading()" [disabled]="loginForm.get('code')?.invalid">
+                Verify
+            </button>
+        </div>
+      </form>
+    }
+  </div>
+</div>

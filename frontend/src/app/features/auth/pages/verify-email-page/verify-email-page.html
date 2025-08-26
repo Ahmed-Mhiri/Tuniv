@@ -1,0 +1,40 @@
+<div class="auth-container">
+  <div class="auth-form">
+    <div class="flex justify-center mb-4">
+      <img src="assets/images/TunivLogo.svg" alt="Tuniv Logo" class="h-12 w-12" />
+    </div>
+
+    @if (isLoading()) {
+      <div class="status-container">
+        <nz-spin nzSimple nzSize="large"></nz-spin>
+        <p class="status-text">Verifying your account...</p>
+      </div>
+    } @else if (errorMessage()) {
+      <div class="status-container">
+        <h2 class="form-title">Verification Failed</h2>
+        <nz-alert
+          class="w-full text-left"
+          nzType="error"
+          [nzMessage]="errorMessage()"
+          nzShowIcon
+        ></nz-alert>
+        <a routerLink="/login" nz-button nzType="primary" class="mt-6 w-full"
+          >Return to Login</a
+        >
+      </div>
+    } @else {
+      <div class="status-container">
+        <h2 class="form-title">Account Verified!</h2>
+        <nz-alert
+          class="w-full text-left"
+          nzType="success"
+          [nzMessage]="successMessage()"
+          nzDescription="You may now log in with your credentials."
+          nzShowIcon
+        ></nz-alert> <a routerLink="/login" nz-button nzType="primary" class="mt-6 w-full"
+          >Proceed to Login</a
+        >
+      </div>
+    }
+  </div>
+</div>

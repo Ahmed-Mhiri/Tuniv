@@ -1,13 +1,14 @@
 package com.tuniv.backend.config;
 
-import com.tuniv.backend.config.security.jwt.JwtAuthFilter;
-import com.tuniv.backend.config.security.services.UserDetailsServiceImpl;
-import lombok.RequiredArgsConstructor;
+import java.util.Arrays;
+import java.util.List;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import static org.springframework.security.config.Customizer.withDefaults;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -20,10 +21,10 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
-import java.util.List;
+import com.tuniv.backend.config.security.jwt.JwtAuthFilter;
+import com.tuniv.backend.config.security.services.UserDetailsServiceImpl;
 
-import static org.springframework.security.config.Customizer.withDefaults;
+import lombok.RequiredArgsConstructor;
 
 @Configuration
 @EnableWebSecurity
@@ -40,11 +41,11 @@ public class SecurityConfig {
         authProvider.setPasswordEncoder(passwordEncoder());
         return authProvider;
     }
-    
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(withDefaults()) // <-- ENABLE CORS
+            .cors(withDefaults())
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
@@ -57,6 +58,11 @@ public class SecurityConfig {
                 ).permitAll()
                 // Allow public READ-ONLY access to main content
                 .requestMatchers(HttpMethod.GET, "/api/v1/universities/**", "/api/v1/modules/**", "/api/v1/questions/**", "/api/v1/users/**", "/api/v1/answers/**/comments").permitAll()
+                
+                // --- THIS IS THE FIX ---
+                // Explicitly permit all CORS preflight OPTIONS requests
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                
                 // Secure all other requests
                 .anyRequest().authenticated()
             )
@@ -66,11 +72,9 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // --- NEW BEAN FOR CORS CONFIGURATION ---
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // The origin of your frontend application (e.g., http://localhost:4200 for Angular)
         configuration.setAllowedOrigins(List.of("http://localhost:4200"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));

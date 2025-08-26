@@ -6,9 +6,15 @@ CREATE TABLE users (
     profile_photo_url VARCHAR(255),
     bio TEXT,
     major VARCHAR(255),
-    reputation_score INT NOT NULL DEFAULT 0
+    reputation_score INT NOT NULL DEFAULT 0,
+    reset_password_token VARCHAR(255),
+    -- Use the more robust timestamp with time zone
+    reset_password_token_expiry TIMESTAMP WITH TIME ZONE,
+    is_2fa_enabled BOOLEAN NOT NULL DEFAULT false,
+    two_factor_auth_secret VARCHAR(255),
+    verification_token VARCHAR(255),
+    is_enabled BOOLEAN NOT NULL DEFAULT false
 );
-
 CREATE TABLE universities (
     university_id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE

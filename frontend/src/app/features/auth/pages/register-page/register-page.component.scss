@@ -1,0 +1,65 @@
+/*
+  This SCSS file can be identical to login-page.component.scss
+  to ensure a consistent look and feel across authentication pages.
+*/
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 4rem; // 64px
+  min-height: 70vh;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 400px; // ~max-w-sm
+  padding: 2rem; // 32px
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem; // 8px
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.form-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem; // 24px
+  font-weight: 700;
+  text-align: center;
+  color: var(--color-text-primary);
+  margin-bottom: 0.5rem; // 8px
+}
+
+.form-subtitle {
+  text-align: center;
+  color: var(--color-text-secondary);
+  margin-bottom: 2rem; // 32px
+}
+
+::ng-deep .ant-input-suffix [nz-icon] {
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--color-text-primary);
+  }
+}
+
+::ng-deep button[nzType='primary'].ant-btn {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+
+  &:hover,
+  &:focus {
+    background-color: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
+
+  &[disabled] {
+    background-color: var(--color-surface-subtle);
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+  }
+}

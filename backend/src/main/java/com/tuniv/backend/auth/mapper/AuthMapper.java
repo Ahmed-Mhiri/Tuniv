@@ -4,16 +4,14 @@ import com.tuniv.backend.auth.dto.JwtResponse;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 
 public class AuthMapper {
-
-    // A static method for simple, stateless mapping.
-    public static JwtResponse toJwtResponse(String jwt, UserDetailsImpl userDetails) {
+    public static JwtResponse toJwtResponse(String jwt, UserDetailsImpl userDetails, boolean is2faRequired) {
         return new JwtResponse(
                 jwt,
                 userDetails.getId(),
                 userDetails.getUsername(),
                 userDetails.getEmail(),
-                userDetails.getProfilePhotoUrl() // <-- ADD THIS LINE
-
+                userDetails.getProfilePhotoUrl(),
+                is2faRequired // <-- ADD THIS
         );
     }
 }
