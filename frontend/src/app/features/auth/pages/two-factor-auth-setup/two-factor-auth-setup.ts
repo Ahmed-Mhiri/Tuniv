@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, model, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { AuthService } from '../../../../core/services/auth.service';
@@ -11,6 +11,8 @@ import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzDividerModule } from 'ng-zorro-antd/divider';
 import { NzTypographyModule } from 'ng-zorro-antd/typography';
+import { AuthResponse } from '../../../../shared/models/auth.model';
+import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 
 @Component({
   selector: 'app-two-factor-auth-setup',
@@ -22,33 +24,31 @@ import { NzTypographyModule } from 'ng-zorro-antd/typography';
     NzSpinModule,
     NzDividerModule,
     NzTypographyModule,
+    SpinnerComponent
   ],
   templateUrl: './two-factor-auth-setup.html',
   styleUrl: './two-factor-auth-setup.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class TwoFactorAuthSetupComponent implements OnInit {
+export class TwoFactorAuthSetupComponent {
   // --- Dependencies ---
   private readonly authService = inject(AuthService);
   private readonly message = inject(NzMessageService);
 
   // --- State Signals ---
-  readonly isLoading = signal(true); // Start in loading state
+  readonly isLoading = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly qrCodeUri = signal<string | null>(null);
-
-  // Use model() for two-way binding on the verification code input
   readonly verificationCode = model('');
 
-  ngOnInit(): void {
-    this.generateSecret();
-  }
+  // --- Computed Signal to check user's 2FA status from the AuthService ---
+  readonly is2faEnabled = computed(
+    () => this.authService.currentUser()?.is2faEnabled ?? false
+  );
 
-  // --- Logic ---
   generateSecret(): void {
     this.isLoading.set(true);
     this.errorMessage.set(null);
-
     this.authService.generate2faSecret().subscribe({
       next: (response) => {
         this.qrCodeUri.set(response.qrCodeUri);
@@ -56,7 +56,7 @@ export class TwoFactorAuthSetupComponent implements OnInit {
       },
       error: (err: HttpErrorResponse) => {
         this.errorMessage.set(
-          err.error?.message || 'Failed to generate a 2FA secret. Please try again.'
+          err.error?.message || 'Failed to generate a 2FA secret.'
         );
         this.isLoading.set(false);
       },
@@ -68,23 +68,35 @@ export class TwoFactorAuthSetupComponent implements OnInit {
       this.errorMessage.set('Please enter a valid 6-digit code.');
       return;
     }
-
     this.isLoading.set(true);
     this.errorMessage.set(null);
-
     this.authService.enable2fa(this.verificationCode()).subscribe({
-      next: () => {
+      next: (response: AuthResponse) => {
+        this.authService.currentUser.set(response); // Update global state
         this.isLoading.set(false);
-        this.message.success('Two-Factor Authentication has been enabled successfully!');
-        // Here you might want to update the user's state or redirect them.
-        // For now, we can hide the setup to prevent re-enabling.
-        this.qrCodeUri.set(null); 
+        this.message.success('Two-Factor Authentication enabled successfully!');
+        this.qrCodeUri.set(null);
       },
       error: (err: HttpErrorResponse) => {
         this.isLoading.set(false);
         this.errorMessage.set(
-          err.error || 'The verification code is incorrect. Please try again.'
+          err.error || 'The verification code is incorrect.'
         );
+      },
+    });
+  }
+
+  disable2fa(): void {
+    this.isLoading.set(true);
+    this.authService.disable2fa().subscribe({
+      next: (response: AuthResponse) => {
+        this.authService.currentUser.set(response); // Update global state
+        this.isLoading.set(false);
+        this.message.success('Two-Factor Authentication has been disabled.');
+      },
+      error: () => {
+        this.isLoading.set(false);
+        this.message.error('Failed to disable 2FA. Please try again.');
       },
     });
   }

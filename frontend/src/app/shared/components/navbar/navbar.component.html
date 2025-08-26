@@ -1,8 +1,8 @@
 <nz-header class="bg-surface border-b border-border shadow-md">
   <div class="navbar-content">
     <a routerLink="/" class="flex items-center gap-3">
-  <span class="themed-logo"></span>
-</a>
+      <span class="themed-logo"></span>
+    </a>
 
     @if (isBrowser()) {
       <div class="flex items-center gap-4">
@@ -31,7 +31,7 @@
             </a>
             <nz-dropdown-menu #userMenu="nzDropdownMenu">
               <ul nz-menu>
-                <li nz-menu-item [routerLink]="['/users', currentUser()?.id]">My Profile</li>
+                <li nz-menu-item [routerLink]="['/users', currentUser()?.userId]">My Profile</li>
                 <li nz-menu-item routerLink="/settings">Settings</li>
                 <li nz-menu-divider></li>
                 <li nz-menu-item (click)="logout()">Logout</li>
@@ -83,7 +83,7 @@
       <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/qa/ask">Ask Question</li>
       <li nz-menu-divider></li>
       @if (isUserLoggedIn()) {
-        <li nz-menu-item (click)="closeMobileDrawer()" [routerLink]="['/users', currentUser()?.id]">My Profile</li>
+        <li nz-menu-item (click)="closeMobileDrawer()" [routerLink]="['/users', currentUser()?.userId]">My Profile</li>
         <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/settings">Settings</li>
         <li nz-menu-item (click)="logout(); closeMobileDrawer()">Logout</li>
       } @else {

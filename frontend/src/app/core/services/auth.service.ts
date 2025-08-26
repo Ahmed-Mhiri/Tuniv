@@ -118,10 +118,15 @@ export class AuthService {
     const decoded: DecodedToken = jwtDecode(token);
     return {
       token: token,
-      id: decoded.id,
+      userId: decoded.id, // <-- Renamed from 'id'
       username: decoded.sub,
-      email: decoded.email
+      email: decoded.email,
+      // The other fields will be undefined here
+      bio: '',
+      major: '',
+      reputationScore: 0,
     };
+
   }
 
   hasRole(role: string): boolean {
@@ -141,4 +146,13 @@ export class AuthService {
       return true;
     }
   }
+  disable2fa(): Observable<AuthResponse> {
+    return this.http.post<AuthResponse>(`${this.apiUrl}/auth/2fa/disable`, {});
+  }
+  updateCurrentUser(updatedData: Partial<AuthResponse>): void {
+    this.currentUser.update(currentValue => {
+      if (!currentValue) return null;
+      return { ...currentValue, ...updatedData };
+    });
+}
 }

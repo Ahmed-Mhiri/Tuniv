@@ -1,64 +1,58 @@
 <div class="tfa-setup-card">
-  <h2 nz-typography>Set Up Two-Factor Authentication (2FA)</h2>
-  <p nz-typography nzType="secondary">
-    Add an extra layer of security to your account.
-  </p>
-  <nz-divider></nz-divider>
-
-  @if (isLoading()) {
-    <div class="spinner-container">
-      <nz-spin nzSimple nzSize="large"></nz-spin>
-    </div>
-  } @else if (errorMessage()) {
-    <nz-alert
-      nzType="error"
-      [nzMessage]="errorMessage()"
-      nzShowIcon
-    ></nz-alert>
-    <button nz-button nzType="link" (click)="generateSecret()">Try Again</button>
-  } @else if (qrCodeUri()) {
-    <div>
-      <p nz-typography>
-        <strong>1. Scan the QR Code</strong><br />
-        Use an authenticator app like Google Authenticator or Authy to scan the
-        image below.
-      </p>
-      <div class="qr-code-container">
-        <img [src]="qrCodeUri()" alt="2FA QR Code" />
-      </div>
-
-      <nz-divider></nz-divider>
-
-      <p nz-typography>
-        <strong>2. Enter Verification Code</strong><br />
-        Enter the 6-digit code from your authenticator app to complete the
-        setup.
-      </p>
-
-      <div class="verification-controls">
-        <input
-          nz-input
-          placeholder="6-digit code"
-          maxlength="6"
-          [(ngModel)]="verificationCode"
-          (ngModelChange)="errorMessage.set(null)"
-        />
-        <button
-          nz-button
-          nzType="primary"
-          [nzLoading]="isLoading()"
-          [disabled]="verificationCode().length !== 6"
-          (click)="enable2fa()"
-        >
-          Verify & Enable
-        </button>
-      </div>
-    </div>
-  } @else {
+  @if (is2faEnabled()) {
+    <h2 nz-typography>Manage Two-Factor Authentication</h2>
+    <p nz-typography nzType="secondary">
+      2FA is currently active on your account.
+    </p>
+    <nz-divider></nz-divider>
     <nz-alert
       nzType="success"
-      nzMessage="Two-Factor Authentication is enabled on your account."
+      nzMessage="Two-Factor Authentication is active."
+      nzDescription="Your account is protected with an extra layer of security."
       nzShowIcon
     ></nz-alert>
+    <div class="flex justify-end mt-4">
+      <button nz-button nzType="primary" nzDanger [nzLoading]="isLoading()" (click)="disable2fa()">
+        Disable 2FA
+      </button>
+    </div>
+
+  } @else {
+    <h2 nz-typography>Set Up Two-Factor Authentication (2FA)</h2>
+    <p nz-typography nzType="secondary">
+      Add an extra layer of security to your account.
+    </p>
+    <nz-divider></nz-divider>
+
+    @if (isLoading()) {
+      <div class="spinner-container">
+        <app-spinner></app-spinner>
+      </div>
+    } @else if (errorMessage()) {
+      <nz-alert nzType="error" [nzMessage]="errorMessage()" nzShowIcon></nz-alert>
+      <button nz-button nzType="link" (click)="generateSecret()">Try Again</button>
+    } @else if (qrCodeUri()) {
+      <div>
+        <p nz-typography><strong>1. Scan the QR Code</strong><br />Use an authenticator app to scan the image below.</p>
+        <div class="qr-code-container">
+          <img [src]="qrCodeUri()" alt="2FA QR Code" />
+        </div>
+        <nz-divider></nz-divider>
+        <p nz-typography><strong>2. Enter Verification Code</strong><br />Enter the 6-digit code from your app to complete setup.</p>
+        <div class="verification-controls">
+          <input nz-input placeholder="6-digit code" maxlength="6" [(ngModel)]="verificationCode" (ngModelChange)="errorMessage.set(null)" />
+          <button nz-button nzType="primary" [nzLoading]="isLoading()" [disabled]="verificationCode().length !== 6" (click)="enable2fa()">
+            Verify & Enable
+          </button>
+        </div>
+      </div>
+    } @else {
+      <div class="text-center">
+        <p class="mb-4">Your account is not currently protected by 2FA.</p>
+        <button nz-button nzType="primary" (click)="generateSecret()">
+          Setup 2FA Now
+        </button>
+      </div>
+    }
   }
 </div>

@@ -2,9 +2,13 @@ package com.tuniv.backend.auth.dto;
 
 public record JwtResponse(
     String token,
-    Integer id,
+    Integer userId, // <-- Renamed from 'id'
     String username,
     String email,
     String profilePhotoUrl,
-    boolean is2faRequired // <-- ADD THIS
+    String bio,             // <-- ADD
+    String major,           // <-- ADD
+    Integer reputationScore, // <-- ADD
+    boolean is2faRequired,
+    boolean is2faEnabled
 ) {}

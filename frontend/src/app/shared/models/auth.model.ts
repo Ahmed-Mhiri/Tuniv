@@ -6,12 +6,16 @@ export interface AuthRequest {
 }
 
 export interface AuthResponse {
-  token: string | null; // Token can be null if 2FA is required
-  id: number;
+  token: string | null;
+  userId: number; // <-- Renamed from 'id' to match UserProfile
   username: string;
   email: string;
   profilePhotoUrl?: string | null;
-  is2faRequired?: boolean; // The key flag from the backend
+  bio: string;             // <-- ADD
+  major: string;           // <-- ADD
+  reputationScore: number; // <-- ADD
+  is2faRequired?: boolean;
+  is2faEnabled?: boolean;
 }
 
 export interface DecodedToken {

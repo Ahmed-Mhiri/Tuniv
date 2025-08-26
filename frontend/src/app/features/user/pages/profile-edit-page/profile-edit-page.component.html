@@ -4,19 +4,39 @@
     <p class="loading-text">Loading Your Profile...</p>
   </div>
 } @else {
-  <div>
+  <div class="edit-profile-container">
     <h3 nz-typography class="form-section-title">Edit Your Profile</h3>
     <p nz-typography nzType="secondary" class="form-section-subtitle">
-      Update your major and bio to keep your profile current.
+      Update your profile picture, major, and bio.
     </p>
+
+    <div class="profile-picture-section">
+      <div class="avatar-container">
+        <nz-avatar [nzSize]="96" nzIcon="user" [nzSrc]="profilePhotoUrl()"></nz-avatar>
+        @if (isUploading()) {
+          <div class="upload-spinner-overlay">
+            <app-spinner></app-spinner>
+          </div>
+        }
+      </div>
+      <div class="uploader-container">
+        <app-file-upload
+          [multiple]="false"
+          [maxFileSize]="5"
+          uploadText="Click or drag a new photo here"
+          uploadHint="PNG, JPG, GIF up to 5MB. Recommended: 1:1 ratio."
+          (filesChanged)="onProfilePhotoChanged($event)"
+        ></app-file-upload>
+      </div>
+    </div>
+    
+    <nz-divider></nz-divider>
 
     <form nz-form [nzLayout]="'vertical'" [formGroup]="editForm" (ngSubmit)="submitForm()">
       <nz-form-item>
         <nz-form-label nzFor="major">Major</nz-form-label>
         <nz-form-control nzErrorTip="Major cannot exceed 100 characters.">
-          <nz-input-group>
-            <input nz-input formControlName="major" id="major" placeholder="e.g., Computer Science" />
-          </nz-input-group>
+          <input nz-input formControlName="major" id="major" placeholder="e.g., Computer Science" />
         </nz-form-control>
       </nz-form-item>
 
@@ -38,7 +58,7 @@
       <nz-form-item>
         <nz-form-control class="flex justify-end">
           <button nz-button nzType="primary" [nzLoading]="isSaving()" [disabled]="editForm.pristine || editForm.invalid">
-            Save Changes
+            Save Profile Details
           </button>
         </nz-form-control>
       </nz-form-item>

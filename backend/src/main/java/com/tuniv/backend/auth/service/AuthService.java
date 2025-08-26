@@ -45,7 +45,6 @@ public class AuthService {
 
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
 
-        // Check if the user's account has been verified via email
         if (!userDetails.isEnabled()) {
             throw new BadCredentialsException("User account is not yet verified. Please check your email.");
         }
@@ -57,7 +56,17 @@ public class AuthService {
             if (loginRequest.code() == null || loginRequest.code().isEmpty()) {
                 return AuthMapper.toJwtResponse(null, userDetails, true);
             }
-            if (!twoFactorAuthService.isOtpValid(user.getTwoFactorAuthSecret(), loginRequest.code())) {
+
+            // --- TEMPORARY DEBUG LOGS FOR 2FA ---
+            System.out.println("--- 2FA DEBUG ---");
+            String code = loginRequest.code();
+            boolean isValid = twoFactorAuthService.isOtpValid(user.getTwoFactorAuthSecret(), code);
+            System.out.println("Received Code: " + code);
+            System.out.println("Is Code Valid?: " + isValid);
+            System.out.println("-----------------");
+            // --- END DEBUG LOGS ---
+
+            if (!isValid) {
                 throw new BadCredentialsException("Invalid 2FA code");
             }
         }
@@ -167,4 +176,21 @@ public class AuthService {
 
         userRepository.save(user);
     }
+     @Transactional
+    public JwtResponse disable2fa(String username) { // <-- FIX: Return type is JwtResponse
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+            
+        user.set2faEnabled(false);
+        user.setTwoFactorAuthSecret(null);
+        userRepository.save(user);
+
+        // Re-create UserDetails to reflect the change
+        UserDetailsImpl userDetails = new UserDetailsImpl(user);
+        
+        // Return the updated state in a JwtResponse object
+        // The token can be null because the frontend only needs the updated flags.
+        return AuthMapper.toJwtResponse(null, userDetails, false);
+    }
+    
 }

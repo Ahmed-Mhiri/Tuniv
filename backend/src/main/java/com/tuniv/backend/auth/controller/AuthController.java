@@ -92,4 +92,10 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+    @PostMapping("/2fa/disable")
+    public ResponseEntity<?> disable2fa(Principal principal) {
+        // --- FIX: This now correctly returns a JwtResponse ---
+        JwtResponse updatedResponse = authService.disable2fa(principal.getName());
+        return ResponseEntity.ok(updatedResponse);
+    }
 }

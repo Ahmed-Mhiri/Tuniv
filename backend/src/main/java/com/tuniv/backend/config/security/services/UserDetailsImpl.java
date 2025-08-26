@@ -69,4 +69,22 @@ public class UserDetailsImpl implements UserDetails {
         // This now correctly checks the 'is_enabled' column from your database.
         return user.isEnabled();
     }
+
+    public boolean is2faEnabled() {
+        return user.is2faEnabled();
+    }
+
+     public String getBio() {
+        return user.getBio();
+    }
+
+    public String getMajor() {
+        return user.getMajor();
+    }
+
+    public Integer getReputationScore() {
+        return user.getReputationScore();
+    }
+
+
 }

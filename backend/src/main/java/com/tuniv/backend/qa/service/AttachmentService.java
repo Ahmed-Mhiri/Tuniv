@@ -6,7 +6,7 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.tuniv.backend.filestorage.FileStorageService;
+import com.tuniv.backend.filestorage.service.FileStorageService;
 import com.tuniv.backend.qa.model.Attachment;
 import com.tuniv.backend.qa.repository.AttachmentRepository;
 
