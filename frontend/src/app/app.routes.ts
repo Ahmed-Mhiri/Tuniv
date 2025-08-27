@@ -9,27 +9,45 @@ import { ResetPasswordPageComponent } from './features/auth/pages/reset-password
 import { VerifyEmailPageComponent } from './features/auth/pages/verify-email-page/verify-email-page';
 import { SettingsPageComponent } from './features/user/pages/settings-page/settings-page.component';
 import { ProfilePageComponent } from './features/user/pages/profile-page/profile-page.component';
+import { UniversityListPageComponent } from './features/university/pages/university-list-page/university-list-page.component'; // <-- Import
+import { ModuleListPageComponent } from './features/university/pages/module-list-page/module-list-page.component'; // <-- Import
 
 // --- Route Guards ---
 import { authGuard } from './core/guards/auth.guard';
 import { publicOnlyGuard } from './core/guards/public-only.guard';
+import { QuestionDetailPageComponent } from './features/qa/pages/question-detail-page/question-detail-page.component';
 
 export const routes: Routes = [
   // --- Public Routes ---
   { path: '', component: HomePageComponent },
   { path: 'verify-email', component: VerifyEmailPageComponent },
-  // FIX: Added placeholder route for universities. This should be accessible to everyone.
-  { path: 'universities', component: HomePageComponent }, // TODO: Create and replace with UniversitiesPageComponent
 
-  // --- Public-Only Routes (for logged-out users) ---
+  // --- Public-Only Routes ---
   { path: 'login', component: LoginPageComponent, canActivate: [publicOnlyGuard] },
   { path: 'register', component: RegisterPageComponent, canActivate: [publicOnlyGuard] },
   { path: 'forgot-password', component: ForgotPasswordPageComponent, canActivate: [publicOnlyGuard] },
   { path: 'reset-password', component: ResetPasswordPageComponent, canActivate: [publicOnlyGuard] },
 
-  // --- Private Routes (for logged-in users) ---
+  // --- Private Routes ---
   { path: 'settings', component: SettingsPageComponent, canActivate: [authGuard] },
   { path: 'users/:id', component: ProfilePageComponent, canActivate: [authGuard] },
-  // FIX: Added placeholder route for asking questions. This requires a user to be logged in.
-  { path: 'qa/ask', component: HomePageComponent, canActivate: [authGuard] }, // TODO: Create and replace with AskQuestionPageComponent
+  {
+    path: 'universities',
+    // --- FIX: Point to the correct component ---
+    component: UniversityListPageComponent,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'universities/:id/modules',
+    component: ModuleListPageComponent,
+    canActivate: [authGuard],
+  },
+  {
+    // Note: This is still a placeholder until you create the AskQuestionPageComponent
+    path: 'qa/ask',
+    component: HomePageComponent,
+    canActivate: [authGuard],
+  },
+  { path: 'questions/:id', component: QuestionDetailPageComponent },
+
 ];

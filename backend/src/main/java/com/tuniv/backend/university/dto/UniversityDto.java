@@ -5,5 +5,7 @@ import java.util.List;
 public record UniversityDto(
     Integer universityId,
     String name,
-    List<ModuleDto> modules
+    List<ModuleDto> modules,
+    boolean isMember // <-- ADD THIS
+
 ) {}

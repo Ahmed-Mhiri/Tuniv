@@ -9,5 +9,7 @@ public record QuestionResponseDto(
     String body,
     LocalDateTime createdAt,
     AuthorDto author,
-    List<AnswerResponseDto> answers
+    List<AnswerResponseDto> answers,
+    int score,
+    int currentUserVote
 ) {}

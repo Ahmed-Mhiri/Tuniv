@@ -63,10 +63,13 @@ INSERT INTO answer_votes (user_id, answer_id, "value") VALUES (1, 1, 1);
 INSERT INTO answer_votes (user_id, answer_id, "value") VALUES (3, 2, 1);
 
 
--- Resynchronize the sequence to the highest current user_id
+-- SECTION 8: SEQUENCE SYNCHRONIZATION
+-- =================================================================
+-- FIX: This is essential to prevent "duplicate key" errors after manual inserts.
+-- Synchronize the ID generators with the max ID from the manually inserted data.
 SELECT setval('users_user_id_seq', (SELECT MAX(user_id) FROM users));
--- To sync the auto-increment counters after manual inserts, you might need these in pure psql, but they are not needed for the app to start with a clean DB.
--- They are also PostgreSQL-specific and will fail in H2, so they are commented out.
--- SELECT setval('users_user_id_seq', (SELECT MAX(user_id) FROM users));
--- SELECT setval('universities_university_id_seq', (SELECT MAX(university_id) FROM universities));
--- etc. for all tables with SERIAL columns...
+SELECT setval('universities_university_id_seq', (SELECT MAX(university_id) FROM universities));
+SELECT setval('modules_module_id_seq', (SELECT MAX(module_id) FROM modules));
+SELECT setval('questions_question_id_seq', (SELECT MAX(question_id) FROM questions));
+SELECT setval('answers_answer_id_seq', (SELECT MAX(answer_id) FROM answers));
+-- Add setval for any other tables with manually inserted SERIAL IDs (e.g., comments)

@@ -1,9 +1,11 @@
 package com.tuniv.backend.university.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,8 +27,10 @@ public class UniversityController {
     private final UniversityService universityService;
 
     @GetMapping
-    public ResponseEntity<List<UniversityDto>> getAllUniversities() {
-        return ResponseEntity.ok(universityService.getAllUniversities());
+    public ResponseEntity<List<UniversityDto>> getAllUniversities(
+            @AuthenticationPrincipal UserDetailsImpl currentUser
+    ) {
+        return ResponseEntity.ok(universityService.getAllUniversities(currentUser));
     }
 
     @GetMapping("/{universityId}/modules")
@@ -35,9 +39,15 @@ public class UniversityController {
     }
 
     @PostMapping("/{universityId}/members")
-    public ResponseEntity<?> joinUniversity(@PathVariable Integer universityId,
-                                            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+    public ResponseEntity<?> joinUniversity(@PathVariable Integer universityId, @AuthenticationPrincipal UserDetailsImpl currentUser) {
         universityService.joinUniversity(universityId, currentUser);
-        return ResponseEntity.ok("Successfully joined the university.");
+        // --- FIX: Explicitly return a JSON object ---
+        return ResponseEntity.ok(Map.of("message", "Successfully joined university."));
+    }
+    @DeleteMapping("/{universityId}/members")
+    public ResponseEntity<?> unjoinUniversity(@PathVariable Integer universityId, @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        universityService.unjoinUniversity(universityId, currentUser);
+        // --- FIX: Explicitly return a JSON object ---
+        return ResponseEntity.ok(Map.of("message", "Successfully unjoined university."));
     }
 }

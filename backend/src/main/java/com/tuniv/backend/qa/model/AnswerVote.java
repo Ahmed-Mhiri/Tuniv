@@ -3,6 +3,7 @@ package com.tuniv.backend.qa.model;
 import java.io.Serializable;
 import java.util.Objects;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.Column;
@@ -27,7 +28,7 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AnswerVote {
+public class AnswerVote implements Vote {
 
     @EmbeddedId
     private AnswerVoteId id;
@@ -40,10 +41,11 @@ public class AnswerVote {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("answerId")
     @JoinColumn(name = "answer_id") // <-- ADDED THIS
+    @JsonBackReference("answer-votes") // Add this to match the Answer entity
     private Answer answer;
 
     @Column(nullable = false)
-    private int value;
+    private short value; // <-- FIX: Changed from int to short
 
     @Embeddable
     @Getter

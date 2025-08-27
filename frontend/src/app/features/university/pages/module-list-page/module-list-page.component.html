@@ -1,1 +1,32 @@
-<p>module-list-page works!</p>
+<div class="page-container">
+  <div class="page-header">
+    <div>
+      <a routerLink="/universities" nz-button nzType="text" class="back-link">
+        <span nz-icon nzType="arrow-left"></span>
+        Back to All Universities
+      </a>
+      <h1 nz-typography>Modules at {{ universityName() }}</h1>
+    </div>
+  </div>
+
+  @if (isLoading()) {
+    <div class="status-container">
+      <app-spinner></app-spinner>
+    </div>
+  } @else if (error()) {
+    <nz-alert nzType="error" [nzMessage]="error()"></nz-alert>
+  } @else {
+    <div class="module-grid">
+      @for (mod of modules(); track mod.moduleId) {
+        <a class="module-link"> <nz-card class="module-card" nzHoverable>
+            <span nz-icon nzType="book" class="card-icon"></span>
+            <h4 class="card-title">{{ mod.name }}</h4>
+          </nz-card>
+        </a>
+      }
+      @if (modules().length === 0) {
+        <p class="no-modules-message">No modules have been added for this university yet.</p>
+      }
+    </div>
+  }
+</div>

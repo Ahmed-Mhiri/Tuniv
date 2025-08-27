@@ -1,0 +1,78 @@
+.page-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+  gap: 1rem;
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 2.25rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+}
+
+.back-link {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  padding-left: 0;
+  margin-bottom: 0.5rem;
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}
+
+.status-container {
+  display: flex;
+  justify-content: center;
+  padding: 4rem;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.module-link {
+  text-decoration: none;
+}
+
+.module-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 1.5rem;
+
+  .card-icon {
+    font-size: 2rem;
+    color: var(--color-primary);
+    margin-bottom: 1rem;
+  }
+
+  .card-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+    // Prevents long titles from pushing cards out of alignment
+    min-height: 3rem; 
+  }
+}
+
+.no-modules-message {
+  color: var(--color-text-secondary);
+  grid-column: 1 / -1; // Span the full grid width
+  text-align: center;
+  padding: 3rem;
+}

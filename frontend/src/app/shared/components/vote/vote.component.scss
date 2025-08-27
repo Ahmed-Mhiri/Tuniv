@@ -1,60 +1,56 @@
-/* src/app/components/vote/vote.component.scss */
-
 :host {
   display: inline-flex;
+  align-items: center;
 }
 
-.vote-widget-horizontal {
+.vote-container {
   display: flex;
-  flex-direction: row; /* The key change for horizontal layout */
   align-items: center;
-  gap: 4px; /* Space between buttons and score */
-  background-color: var(--color-surface, #f0f2f5); /* A subtle background */
-  border-radius: 999px; /* Pill shape */
-  padding: 2px 4px;
+  gap: 0.25rem; /* 4px */
+
+  /* Default vertical layout for questions/answers */
+  &.is-vertical {
+    flex-direction: column;
+    width: 40px;
+  }
 }
 
 .score {
-  font-size: 0.875rem; /* 14px */
+  font-size: 1rem; /* 16px */
   font-weight: 600;
   color: var(--color-text-primary);
-  min-width: 12px;
+  min-width: 24px;
   text-align: center;
-  padding: 0 4px;
 }
 
 .vote-button {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  color: var(--color-text-secondary);
+  padding: 0.5rem; /* 8px */
+  border-radius: 9999px; /* Full circle */
+  border: none;
   background-color: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary);
   transition: color 0.2s, background-color 0.2s;
 
   span[nz-icon] {
-    font-size: 16px;
+    font-size: 1.125rem; /* 18px */
   }
 
   &:hover {
-    background-color: var(--color-surface-hover, rgba(0, 0, 0, 0.05));
+    background-color: var(--color-surface-subtle);
+    color: var(--color-text-primary);
   }
 
+  /* Style for an active upvote */
   &.voted-up {
     color: var(--color-success);
-    &:hover {
-      color: var(--color-success);
-      background-color: rgba(40, 167, 69, 0.1); /* Greenish hover */
-    }
   }
 
+  /* Style for an active downvote */
   &.voted-down {
     color: var(--color-accent);
-    &:hover {
-      color: var(--color-accent);
-      background-color: rgba(220, 53, 69, 0.1); /* Reddish hover */
-    }
   }
 }

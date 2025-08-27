@@ -1,7 +1,10 @@
 package com.tuniv.backend.qa.service;
 
+import java.io.Serializable;
 import java.util.Optional;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,6 +15,7 @@ import com.tuniv.backend.qa.model.Comment;
 import com.tuniv.backend.qa.model.CommentVote;
 import com.tuniv.backend.qa.model.Question;
 import com.tuniv.backend.qa.model.QuestionVote;
+import com.tuniv.backend.qa.model.Vote;
 import com.tuniv.backend.qa.repository.AnswerRepository;
 import com.tuniv.backend.qa.repository.AnswerVoteRepository;
 import com.tuniv.backend.qa.repository.CommentRepository;
@@ -42,105 +46,107 @@ public class VoteService {
     private static final int DOWNVOTE_REP = -2;
 
     @Transactional
-    public void voteOnQuestion(Integer questionId, UserDetailsImpl currentUser, int value) {
-        User voter = userRepository.findById(currentUser.getId()).orElseThrow(() -> new ResourceNotFoundException("Voter not found"));
-        Question question = questionRepository.findById(questionId).orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + questionId));
-        User author = question.getAuthor();
+    @CacheEvict(value = "questions", key = "#questionId")
 
-        if (voter.getUserId().equals(author.getUserId())) {
+    public void voteOnQuestion(Integer questionId, UserDetailsImpl currentUser, short value) {
+        User voter = findVoter(currentUser);
+        Question question = questionRepository.findById(questionId)
+            .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+        
+        if (voter.getUserId().equals(question.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
         }
-
+        
         QuestionVote.QuestionVoteId voteId = new QuestionVote.QuestionVoteId(voter.getUserId(), questionId);
-        Optional<QuestionVote> existingVoteOpt = questionVoteRepository.findById(voteId);
+        Optional<QuestionVote> existingVote = questionVoteRepository.findById(voteId);
+        
+        QuestionVote newVote = QuestionVote.builder().id(voteId).user(voter).question(question).value(value).build();
 
-        int reputationChange = 0;
-        if (existingVoteOpt.isPresent()) {
-            QuestionVote existingVote = existingVoteOpt.get();
-            if (existingVote.getValue() == value) {
-                reputationChange = (existingVote.getValue() == 1) ? -QUESTION_UPVOTE_REP : -DOWNVOTE_REP;
-                questionVoteRepository.delete(existingVote);
-            } else {
-                reputationChange = calculateReputationChange(existingVote.getValue(), value, QUESTION_UPVOTE_REP);
-                existingVote.setValue(value);
-                questionVoteRepository.save(existingVote);
-            }
-        } else {
-            QuestionVote newVote = new QuestionVote(voteId, voter, question, value);
-            questionVoteRepository.save(newVote);
-            reputationChange = (value == 1) ? QUESTION_UPVOTE_REP : DOWNVOTE_REP;
-        }
-
-        author.setReputationScore(author.getReputationScore() + reputationChange);
-        userRepository.save(author);
+        processVote(question.getAuthor(), existingVote, newVote, value, QUESTION_UPVOTE_REP, questionVoteRepository);
     }
 
     @Transactional
-    public void voteOnAnswer(Integer answerId, UserDetailsImpl currentUser, int value) {
-        User voter = userRepository.findById(currentUser.getId()).orElseThrow(() -> new ResourceNotFoundException("Voter not found"));
-        Answer answer = answerRepository.findById(answerId).orElseThrow(() -> new ResourceNotFoundException("Answer not found with id: " + answerId));
-        User author = answer.getAuthor();
+    @CacheEvict(value = "questions", allEntries = true)
 
-        if (voter.getUserId().equals(author.getUserId())) {
+    public void voteOnAnswer(Integer answerId, UserDetailsImpl currentUser, short value) {
+        User voter = findVoter(currentUser);
+        Answer answer = answerRepository.findById(answerId)
+            .orElseThrow(() -> new ResourceNotFoundException("Answer not found"));
+
+        if (voter.getUserId().equals(answer.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
         }
-
+        
         AnswerVote.AnswerVoteId voteId = new AnswerVote.AnswerVoteId(voter.getUserId(), answerId);
-        Optional<AnswerVote> existingVoteOpt = answerVoteRepository.findById(voteId);
+        Optional<AnswerVote> existingVote = answerVoteRepository.findById(voteId);
 
-        int reputationChange = 0;
-        if (existingVoteOpt.isPresent()) {
-            AnswerVote existingVote = existingVoteOpt.get();
-            if (existingVote.getValue() == value) {
-                reputationChange = (existingVote.getValue() == 1) ? -ANSWER_UPVOTE_REP : -DOWNVOTE_REP;
-                answerVoteRepository.delete(existingVote);
-            } else {
-                reputationChange = calculateReputationChange(existingVote.getValue(), value, ANSWER_UPVOTE_REP);
-                existingVote.setValue(value);
-                answerVoteRepository.save(existingVote);
-            }
-        } else {
-            AnswerVote newVote = new AnswerVote(voteId, voter, answer, value);
-            answerVoteRepository.save(newVote);
-            reputationChange = (value == 1) ? ANSWER_UPVOTE_REP : DOWNVOTE_REP;
-        }
-
-        author.setReputationScore(author.getReputationScore() + reputationChange);
-        userRepository.save(author);
+        AnswerVote newVote = AnswerVote.builder().id(voteId).user(voter).answer(answer).value(value).build();
+        
+        processVote(answer.getAuthor(), existingVote, newVote, value, ANSWER_UPVOTE_REP, answerVoteRepository);
     }
 
     @Transactional
-    public void voteOnComment(Integer commentId, UserDetailsImpl currentUser, int value) {
-        User voter = userRepository.findById(currentUser.getId()).orElseThrow(() -> new ResourceNotFoundException("Voter not found"));
-        Comment comment = commentRepository.findById(commentId).orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
-        User author = comment.getAuthor();
+    @CacheEvict(value = "questions", allEntries = true)
+    public void voteOnComment(Integer commentId, UserDetailsImpl currentUser, short value) {
+        User voter = findVoter(currentUser);
+        Comment comment = commentRepository.findById(commentId)
+            .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
-        if (voter.getUserId().equals(author.getUserId())) {
+        if (voter.getUserId().equals(comment.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
         }
 
         CommentVote.CommentVoteId voteId = new CommentVote.CommentVoteId(voter.getUserId(), commentId);
-        Optional<CommentVote> existingVoteOpt = commentVoteRepository.findById(voteId);
-        
+        Optional<CommentVote> existingVote = commentVoteRepository.findById(voteId);
+
+        CommentVote newVote = new CommentVote(voteId, voter, comment, value);
+
+        processVote(comment.getAuthor(), existingVote, newVote, value, COMMENT_UPVOTE_REP, commentVoteRepository);
+    }
+
+    /**
+     * --- NEW: A generic, reusable method to handle all voting logic ---
+     */
+    private <V extends Vote, ID extends Serializable> void processVote(
+            User author,
+            Optional<V> existingVoteOpt,
+            V newVote,
+            short value,
+            int upvoteReputation,
+            JpaRepository<V, ID> voteRepository
+    ) {
         int reputationChange = 0;
+
         if (existingVoteOpt.isPresent()) {
-            CommentVote existingVote = existingVoteOpt.get();
+            V existingVote = existingVoteOpt.get();
             if (existingVote.getValue() == value) {
-                reputationChange = (existingVote.getValue() == 1) ? -COMMENT_UPVOTE_REP : -DOWNVOTE_REP;
-                commentVoteRepository.delete(existingVote);
+                // User is retracting their vote
+                reputationChange = (existingVote.getValue() == 1) ? -upvoteReputation : -DOWNVOTE_REP;
+                voteRepository.delete(existingVote);
             } else {
-                reputationChange = calculateReputationChange(existingVote.getValue(), value, COMMENT_UPVOTE_REP);
-                existingVote.setValue(value);
-                commentVoteRepository.save(existingVote);
+                // User is changing their vote (e.g., from up to down)
+                reputationChange = calculateReputationChange(existingVote.getValue(), value, upvoteReputation);
+                // We must update the value on the existing entity, not create a new one.
+                // This requires vote entities to have a setValue method.
+                // Assuming your @Setter from Lombok provides this.
+                if (existingVote instanceof QuestionVote) ((QuestionVote) existingVote).setValue(value);
+                if (existingVote instanceof AnswerVote) ((AnswerVote) existingVote).setValue(value);
+                if (existingVote instanceof CommentVote) ((CommentVote) existingVote).setValue(value);
+                voteRepository.save(existingVote);
             }
         } else {
-            CommentVote newVote = new CommentVote(voteId, voter, comment, value);
-            commentVoteRepository.save(newVote);
-            reputationChange = (value == 1) ? COMMENT_UPVOTE_REP : DOWNVOTE_REP;
+            // This is a new vote
+            voteRepository.save(newVote);
+            reputationChange = (value == 1) ? upvoteReputation : DOWNVOTE_REP;
         }
 
         author.setReputationScore(author.getReputationScore() + reputationChange);
         userRepository.save(author);
+    }
+
+    private User findVoter(UserDetailsImpl currentUser) {
+        return userRepository.findById(currentUser.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("Voter not found"));
     }
 
     private int calculateReputationChange(int oldValue, int newValue, int upvoteRep) {

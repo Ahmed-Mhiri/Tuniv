@@ -34,7 +34,7 @@ public class QuestionController {
     private final QuestionService questionService;
 
     @PostMapping(value = "/modules/{moduleId}/questions", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
-    public ResponseEntity<QuestionResponseDto> createQuestion( // <-- RETURN TYPE CHANGED
+    public ResponseEntity<QuestionResponseDto> createQuestion(
             @PathVariable Integer moduleId,
             @RequestPart("question") @Valid QuestionCreateRequest request,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
@@ -46,19 +46,25 @@ public class QuestionController {
 
     @GetMapping("/modules/{moduleId}/questions")
     public ResponseEntity<Page<QuestionResponseDto>> getQuestionsByModule(
-            @PathVariable Integer moduleId, Pageable pageable) {
+            @PathVariable Integer moduleId,
+            Pageable pageable,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
         
-        return ResponseEntity.ok(questionService.getQuestionsByModule(moduleId, pageable));
+        return ResponseEntity.ok(questionService.getQuestionsByModule(moduleId, pageable, currentUser));
     }
 
-
+    // --- THIS IS THE FIX ---
     @GetMapping("/questions/{questionId}")
-    public ResponseEntity<QuestionResponseDto> getQuestionById(@PathVariable Integer questionId) {
-        return ResponseEntity.ok(questionService.getQuestionDtoById(questionId));
+    public ResponseEntity<QuestionResponseDto> getQuestionById(
+            @PathVariable Integer questionId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) { // <-- ADD THIS PARAMETER
+        
+        // Pass the currentUser to the service method
+        return ResponseEntity.ok(questionService.getQuestionById(questionId, currentUser));
     }
 
     @PostMapping(value = "/questions/{questionId}/answers", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
-    public ResponseEntity<AnswerResponseDto> addAnswer( // <-- RETURN TYPE CHANGED
+    public ResponseEntity<AnswerResponseDto> addAnswer(
             @PathVariable Integer questionId,
             @RequestPart("answer") @Valid AnswerCreateRequest request,
             @AuthenticationPrincipal UserDetailsImpl currentUser,

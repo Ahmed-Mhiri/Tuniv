@@ -1,11 +1,130 @@
-import { Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { switchMap } from 'rxjs';
+
+// Models
+import { Question } from '../../../../shared/models/qa.model'; // <-- TYPE CHANGED
+
+// Services
+import { QuestionService } from '../../services/question.service';
+import { AuthService } from '../../../../core/services/auth.service';
+
+// Shared Components & Pipes
+import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
+import { TimeAgoPipe } from '../../../../shared/pipes/time-ago.pipe';
+import { AnswerItemComponent } from '../../components/answer-item/answer-item.component';
+import { VoteComponent } from '../../../../shared/components/vote/vote.component';
+
+// NG-ZORRO
+import { NzAvatarModule } from 'ng-zorro-antd/avatar';
+import { NzDividerModule } from 'ng-zorro-antd/divider';
+import { NzEmptyModule } from 'ng-zorro-antd/empty';
+import { NzAlertComponent, NzAlertModule } from 'ng-zorro-antd/alert';
+import { AnswerFormComponent, AnswerSubmitEvent } from '../../components/answer-form/answer-form';
+import { NzMessageService } from 'ng-zorro-antd/message';
+import { VoteService } from '../../services/vote.service';
 
 @Component({
   selector: 'app-question-detail-page',
-  imports: [],
+  standalone: true,
+  imports: [
+    RouterLink,
+    SpinnerComponent,
+    TimeAgoPipe,
+    AnswerItemComponent,
+    VoteComponent,
+    NzAvatarModule,
+    NzDividerModule,
+    NzEmptyModule,
+    NzAlertComponent,
+    NzAlertModule, // <-- Import NzAlertModule
+    AnswerFormComponent, // <-- Add the new form component
+  ],
   templateUrl: './question-detail-page.component.html',
-  styleUrl: './question-detail-page.component.scss'
+  styleUrl: './question-detail-page.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class QuestionDetailPageComponent {
+export class QuestionDetailPageComponent implements OnInit {
+  // --- Injections ---
+  private route = inject(ActivatedRoute);
+  private questionService = inject(QuestionService);
+  public readonly authService = inject(AuthService);
+  private message = inject(NzMessageService); // <-- Inject message service
+  private readonly voteService = inject(VoteService); // <-- INJECT VoteService
+
+
+
+  // --- State ---
+  isLoading = signal(true);
+  question = signal<Question | null>(null); // <-- TYPE CHANGED
+  isSubmittingAnswer = signal(false); // <-- Add loading state for answer submission
+
+
+  // --- Computed State ---
+  isCurrentUserQuestionAuthor = computed(() => {
+    const questionAuthorId = this.question()?.author?.userId;
+    const currentUserId = this.authService.currentUser()?.userId;
+    
+    // --- THIS IS THE FIX ---
+    // The '!!' converts the result to a strict boolean (true or false).
+    return !!(questionAuthorId && currentUserId && questionAuthorId === currentUserId);
+  });
+
+
+  ngOnInit(): void {
+    this.route.paramMap.pipe(
+      switchMap(params => {
+        this.isLoading.set(true);
+        const questionId = Number(params.get('id'));
+        return this.questionService.getQuestionById(questionId); // <-- METHOD NAME CHANGED
+      })
+    ).subscribe(data => {
+      this.question.set(data);
+      this.isLoading.set(false);
+    });
+  }
+  
+  refreshData(): void {
+    const questionId = this.question()?.questionId;
+    if (questionId) {
+      this.isLoading.set(true);
+      this.questionService.getQuestionById(questionId).subscribe(data => { // <-- METHOD NAME CHANGED
+        this.question.set(data);
+        this.isLoading.set(false);
+      });
+    }
+  }
+  handleAnswerSubmit(event: AnswerSubmitEvent): void {
+    const questionId = this.question()?.questionId;
+    if (!questionId) return;
+
+    this.isSubmittingAnswer.set(true);
+    this.questionService.addAnswer(questionId, event.body, event.files).subscribe({
+      next: () => {
+        this.message.success('Your answer has been posted!');
+        this.refreshData(); // Refresh all data to show the new answer
+      },
+      error: () => {
+        this.message.error('Failed to post your answer. Please try again.');
+      },
+      complete: () => {
+        this.isSubmittingAnswer.set(false);
+      }
+    });
+  }
+   handleQuestionVote(voteValue: 1 | -1): void {
+    const questionId = this.question()?.questionId;
+    if (!questionId) return;
+
+    this.voteService.voteOnQuestion(questionId, voteValue).subscribe({
+      next: () => {
+        this.message.success('Vote registered!');
+        this.refreshData(); // Refresh to get new score
+      },
+      error: (err) => {
+        this.message.error(err.error?.message || 'Failed to register vote.');
+      }
+    });
+  }
 
 }

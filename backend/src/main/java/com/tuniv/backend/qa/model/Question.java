@@ -1,6 +1,7 @@
 package com.tuniv.backend.qa.model;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
@@ -52,5 +53,10 @@ public class Question {
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("question-answers")
-    private Set<Answer> answers;
+    private Set<Answer> answers = new HashSet<>(); // <-- Initialize the Set
+
+    // --- FIX: Add relationship to votes ---
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("question-votes")
+    private Set<QuestionVote> votes = new HashSet<>();
 }

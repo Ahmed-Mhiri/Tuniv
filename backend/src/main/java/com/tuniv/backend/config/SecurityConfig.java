@@ -56,6 +56,7 @@ public class SecurityConfig {
                     "/api/v1/auth/forgot-password",
                     "/api/v1/auth/reset-password",
                     "/ws/**",
+                    "/uploads/**", // <-- Make the uploads directory public
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()

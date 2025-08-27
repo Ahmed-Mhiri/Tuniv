@@ -52,5 +52,10 @@ public class Answer {
 
     @OneToMany(mappedBy = "answer", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("answer-comments")
-    private Set<Comment> comments = new HashSet<>(); // <-- INITIALIZED SET
+    private Set<Comment> comments = new HashSet<>();
+
+    // --- FIX: Add relationship to votes ---
+    @OneToMany(mappedBy = "answer", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("answer-votes")
+    private Set<AnswerVote> votes = new HashSet<>();
 }

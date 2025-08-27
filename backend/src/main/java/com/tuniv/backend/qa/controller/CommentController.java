@@ -42,7 +42,10 @@ public class CommentController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CommentResponseDto>> getCommentsByAnswer(@PathVariable Integer answerId) {
-        return ResponseEntity.ok(commentService.getCommentsByAnswer(answerId));
+    public ResponseEntity<List<CommentResponseDto>> getCommentsByAnswer(
+            @PathVariable Integer answerId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) { // <-- ADD THIS
+                
+        return ResponseEntity.ok(commentService.getCommentsByAnswer(answerId, currentUser));
     }
 }

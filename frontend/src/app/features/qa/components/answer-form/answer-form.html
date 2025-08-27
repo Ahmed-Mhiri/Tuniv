@@ -1,0 +1,48 @@
+<div class="answer-form-container">
+  <h3 nz-typography class="form-title">Your Answer</h3>
+  <form [formGroup]="answerForm" (ngSubmit)="submit()">
+    <nz-form-item>
+      <nz-form-control [nzErrorTip]="bodyErrorTpl">
+        <textarea
+          nz-input
+          formControlName="body"
+          placeholder="Write your detailed answer here..."
+          [nzAutosize]="{ minRows: 5, maxRows: 15 }"
+        ></textarea>
+        <ng-template #bodyErrorTpl let-control>
+          @if (control.hasError('required')) { Answer body cannot be empty. }
+          @if (control.hasError('minlength')) { Answer must be at least 20 characters long. }
+        </ng-template>
+      </nz-form-control>
+    </nz-form-item>
+    
+    <div class="actions-footer">
+      <nz-upload
+        [nzBeforeUpload]="beforeUpload"
+        [nzShowUploadList]="false"
+        [nzMultiple]="true"
+      >
+        <button nz-button nzType="text" nz-tooltip nzTooltipTitle="Attach files">
+          <span nz-icon nzType="paper-clip"></span> Attach
+        </button>
+      </nz-upload>
+      <button nz-button nzType="primary" [disabled]="answerForm.invalid" [nzLoading]="isSubmitting()">
+        Post Your Answer
+      </button>
+    </div>
+    
+    @if (fileList().length > 0) {
+      <nz-space class="file-list-preview" [nzWrap]="true">
+        @for (file of fileList(); track file.uid) {
+          <div *nzSpaceItem class="file-item">
+            <span nz-icon nzType="file-text"></span>
+            <span>{{ file.name }}</span>
+            <button nz-button nzType="text" nzShape="circle" (click)="removeFile(file)">
+              <span nz-icon nzType="close"></span>
+            </button>
+          </div>
+        }
+      </nz-space>
+    }
+  </form>
+</div>

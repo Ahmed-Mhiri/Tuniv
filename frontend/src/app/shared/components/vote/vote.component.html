@@ -1,27 +1,21 @@
-<div class="vote-widget-horizontal">
+<div class="vote-container" [class.is-vertical]="isVertical()">
   <button
-    nz-button
-    nzType="text"
     class="vote-button"
-    [class.voted-up]="userVote() === 1"
-    (click)="onVote(1)"
     aria-label="Upvote"
-    [attr.aria-pressed]="userVote() === 1"
+    (click)="upvote()"
+    [class.voted-up]="userVote() === 1"
   >
-    <span nz-icon [nzType]="userVote() === 1 ? 'arrow-up' : 'arrow-up'"></span>
+    <span nz-icon nzType="arrow-up"></span>
   </button>
 
   <span class="score">{{ score() }}</span>
 
   <button
-    nz-button
-    nzType="text"
     class="vote-button"
-    [class.voted-down]="userVote() === -1"
-    (click)="onVote(-1)"
     aria-label="Downvote"
-    [attr.aria-pressed]="userVote() === -1"
+    (click)="downvote()"
+    [class.voted-down]="userVote() === -1"
   >
-    <span nz-icon [nzType]="userVote() === 1 ? 'arrow-down' : 'arrow-down'"></span>
+    <span nz-icon nzType="arrow-down"></span>
   </button>
 </div>

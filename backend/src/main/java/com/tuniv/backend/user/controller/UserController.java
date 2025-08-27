@@ -40,4 +40,5 @@ public class UserController {
     public ResponseEntity<UserProfileDto> getUserProfileById(@PathVariable Integer userId) {
         return ResponseEntity.ok(userService.getUserProfileById(userId));
     }
+    
 }

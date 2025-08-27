@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, EventEmitter, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 
@@ -12,18 +12,23 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 })
 export class VoteComponent {
   // --- INPUTS ---
-  // The parent component will provide these values.
-  score = input.required<number>(); // The total score of the post
-  userVote = input<number>(0);     // The current user's vote (-1, 0, or 1)
+  score = input.required<number>();
+  userVote = input.required<number>(); // -1, 0, or 1
+  isVertical = input<boolean>(true); // Default to vertical layout
 
-  // --- OUTPUT ---
-  // This emits an event when the user clicks a vote button.
-  vote = output<number>();
+  // --- OUTPUTS ---
+  vote = output<1 | -1>();
 
-  onVote(newVote: number): void {
-    // If the user clicks the same button again, it's a "cancel" vote (0).
-    // Otherwise, it's the new vote value.
-    const voteValue = this.userVote() === newVote ? 0 : newVote;
-    this.vote.emit(voteValue);
+  // --- LOGIC ---
+  upvote(): void {
+    // If user has already upvoted, clicking again retracts the vote (sends an upvote to be undone)
+    // Otherwise, it's a new upvote.
+    this.vote.emit(1);
+  }
+
+  downvote(): void {
+    // If user has already downvoted, clicking again retracts the vote
+    // Otherwise, it's a new downvote.
+    this.vote.emit(-1);
   }
 }

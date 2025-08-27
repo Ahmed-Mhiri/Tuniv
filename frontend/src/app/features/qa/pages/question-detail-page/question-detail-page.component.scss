@@ -1,0 +1,115 @@
+:host {
+  display: block;
+}
+
+/* ==========================================================================
+   Base Layout (Mobile First)
+   - This is the default for all screen sizes.
+   - The layout is a simple, single column.
+   ========================================================================== */
+.page-container-reddit {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1rem; // Less padding for smaller screens
+}
+
+.sidebar-col {
+  // On mobile, the sidebar stacks at the bottom
+  margin-top: 2rem;
+}
+
+.sidebar-widget {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+  p {
+    font-size: 0.875rem;
+    color: var(--color-text-secondary);
+  }
+}
+
+.status-container {
+  display: flex;
+  justify-content: center;
+  padding: 4rem;
+}
+
+.question-container {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.question-header {
+  .question-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem; // Smaller title for mobile
+    font-weight: 700;
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+  }
+}
+
+.meta-info, .author-link {
+  /* Style definitions from previous turn are fine */
+}
+
+.question-body-wrapper {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.vote-container, .content-container, .answers-container, .answers-section {
+  /* Style definitions from previous turn are fine */
+}
+
+/* ==========================================================================
+   Tablet & Desktop Overrides
+   - These styles only apply on larger screens.
+   ========================================================================== */
+
+@media (min-width: 768px) {
+  // Use more padding on tablets and up
+  .page-container-reddit {
+    padding: 2rem;
+  }
+  .question-container {
+    padding: 1.5rem;
+  }
+  .question-header .question-title {
+    font-size: 1.75rem; // Larger title for tablets
+  }
+}
+
+@media (min-width: 1024px) {
+  // On large screens, switch to the two-column grid layout
+  .page-container-reddit {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 1.5rem;
+  }
+  
+  .sidebar-col {
+    // Sidebar no longer needs top margin in grid layout
+    margin-top: 0;
+  }
+  
+  .sidebar-widget {
+    // Make the sidebar sticky so it stays in view on scroll
+    position: sticky;
+    top: 88px; // 72px header height + 16px margin
+  }
+  
+  .question-header .question-title {
+    font-size: 2.25rem; // Full size title for desktop
+  }
+}

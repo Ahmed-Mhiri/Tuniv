@@ -26,7 +26,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CommentVote {
+public class CommentVote implements Vote {
 
     @EmbeddedId
     private CommentVoteId id;
@@ -44,7 +44,7 @@ public class CommentVote {
     private Comment comment;
 
     @Column(nullable = false)
-    private int value;
+    private short value; // <-- FIX: Changed from int to short
 
     @Embeddable
     @Getter

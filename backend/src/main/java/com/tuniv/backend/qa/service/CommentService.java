@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service; // <-- IMPORT ADDED
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
@@ -30,6 +32,9 @@ public class CommentService {
     private final UserRepository userRepository;
     private final AttachmentService attachmentService;
 
+    @Transactional
+    @CacheEvict(value = "questions", allEntries = true)
+
     public CommentResponseDto createComment(
             Integer answerId,
             CommentCreateRequest request,
@@ -48,23 +53,31 @@ public class CommentService {
         comment.setAuthor(author);
         comment.setCreatedAt(LocalDateTime.now());
 
+        // --- FIX: Handle replies to other comments ---
+        if (request.parentCommentId() != null) {
+            Comment parent = commentRepository.findById(request.parentCommentId())
+                .orElseThrow(() -> new ResourceNotFoundException("Parent comment to reply to not found"));
+            comment.setParentComment(parent);
+        }
+
         Comment savedComment = commentRepository.save(comment);
 
         attachmentService.saveAttachments(files, savedComment.getCommentId(), "COMMENT");
 
-        // Use the central mapper
-        return QAMapper.toCommentResponseDto(savedComment);
+        // FIX: Pass the currentUser to the mapper
+        return QAMapper.toCommentResponseDto(savedComment, currentUser);
     }
 
-    public List<CommentResponseDto> getCommentsByAnswer(Integer answerId) {
+    @Transactional(readOnly = true)
+    public List<CommentResponseDto> getCommentsByAnswer(Integer answerId, UserDetailsImpl currentUser) {
         if (!answerRepository.existsById(answerId)) {
             throw new ResourceNotFoundException("Answer not found with id: " + answerId);
         }
-        return commentRepository.findByAnswerAnswerIdOrderByCreatedAtAsc(answerId)
+        
+        // --- FIX: Fetch only top-level comments; the mapper will handle nesting ---
+        return commentRepository.findByAnswerAnswerIdAndParentCommentIsNullOrderByCreatedAtAsc(answerId)
                 .stream()
-                .map(QAMapper::toCommentResponseDto) // Use the central mapper
+                .map(comment -> QAMapper.toCommentResponseDto(comment, currentUser))
                 .collect(Collectors.toList());
     }
-    
-    // The private mapToDto method has been removed.
 }

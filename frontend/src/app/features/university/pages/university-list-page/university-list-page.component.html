@@ -1,1 +1,61 @@
-<p>university-list-page works!</p>
+<div class="page-container">
+  <div class="page-header">
+    <h1 nz-typography>Explore Universities</h1>
+    <p nz-typography nzType="secondary">
+      Join a university to participate in its modules and discussions.
+    </p>
+  </div>
+
+  @if (isLoading()) {
+    <div class="status-container">
+      <app-spinner></app-spinner>
+    </div>
+  } @else if (error()) {
+    <nz-alert nzType="error" [nzMessage]="error()"></nz-alert>
+  } @else {
+    <div class="university-grid">
+      @for (uni of universities(); track uni.universityId) {
+        <nz-card class="university-card">
+          <div class="card-header">
+            <a [routerLink]="['/universities', uni.universityId, 'modules']" [state]="{ universityName: uni.name }">
+              <h3 class="card-title">{{ uni.name }}</h3>
+            </a>
+            @if (uni.isMember) {
+              <nz-badge nzStatus="success" nzText="Joined" class="joined-badge"></nz-badge>
+            }
+          </div>
+
+          <a [routerLink]="['/universities', uni.universityId, 'modules']" [state]="{ universityName: uni.name }">
+            <p class="card-subtitle">{{ uni.modules.length }} modules available</p>
+          </a>
+          
+          <div class="card-actions">
+            @if (uni.isMember) {
+              <button
+                nz-button
+                nzType="default"
+                nzDanger
+                [nzLoading]="actionInProgress() === uni.universityId"
+                nz-popconfirm
+                nzPopconfirmTitle="Are you sure you want to unjoin?"
+                (nzOnConfirm)="unjoin(uni)"
+              >
+                Unjoin
+              </button>
+            } @else {
+              <button
+                nz-button
+                nzType="primary"
+                [nzLoading]="actionInProgress() === uni.universityId"
+                (click)="join(uni)"
+              >
+                <span nz-icon nzType="plus"></span>
+                Join
+              </button>
+            }
+          </div>
+        </nz-card>
+      }
+    </div>
+  }
+</div>

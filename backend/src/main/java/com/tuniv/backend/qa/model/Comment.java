@@ -46,8 +46,18 @@ public class Comment {
     @JoinColumn(name = "user_id", nullable = false)
     @JsonBackReference("user-comments")
     private User author;
-    
+
     @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("comment-votes")
-    private Set<CommentVote> votes = new HashSet<>(); // <-- INITIALIZED SET
+    private Set<CommentVote> votes = new HashSet<>();
+
+    // --- FIX: Add self-referencing relationship for nesting ---
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_comment_id")
+    @JsonBackReference("comment-children")
+    private Comment parentComment;
+
+    @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference("comment-children")
+    private Set<Comment> children = new HashSet<>();
 }

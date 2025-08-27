@@ -1,16 +1,18 @@
 package com.tuniv.backend.university.service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.tuniv.backend.config.security.services.UserDetailsImpl; // <-- IMPORT ADDED
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.university.dto.ModuleDto;
-import com.tuniv.backend.university.dto.UniversityDto;
+import com.tuniv.backend.university.dto.UniversityDto; // <-- IMPORT ADDED
 import com.tuniv.backend.university.mapper.UniversityMapper;
 import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.university.model.UniversityMembership;
@@ -31,10 +33,25 @@ public class UniversityService {
     private final UserRepository userRepository;
     private final UniversityMembershipRepository membershipRepository;
     
+    // --- THIS IS THE FIX ---
+    @Transactional(readOnly = true) // Keep the database session open for this method
     @Cacheable("universities")
-    public List<UniversityDto> getAllUniversities() {
+    public List<UniversityDto> getAllUniversities(UserDetailsImpl currentUserDetails) {
+        // First, fetch the full user object to access its relationships
+        User currentUser = userRepository.findById(currentUserDetails.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Get the set of IDs for universities the user is a member of, directly from the user object
+        Set<Integer> memberUniversityIds = currentUser.getMemberships().stream()
+                .map(membership -> membership.getUniversity().getUniversityId())
+                .collect(Collectors.toSet());
+
+        // Now, map all universities and apply the membership status
         return universityRepository.findAll().stream()
-                .map(UniversityMapper::toUniversityDto) // Use the central mapper
+                .map(university -> UniversityMapper.toUniversityDto(
+                    university,
+                    memberUniversityIds.contains(university.getUniversityId())
+                ))
                 .collect(Collectors.toList());
     }
 
@@ -48,6 +65,7 @@ public class UniversityService {
     }
 
     @Transactional
+    @CacheEvict(value = "universities", allEntries = true)
     public void joinUniversity(Integer universityId, UserDetailsImpl currentUser) {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + currentUser.getId()));
@@ -71,6 +89,14 @@ public class UniversityService {
 
         membershipRepository.save(membership);
     }
+
+    @Transactional
+    @CacheEvict(value = "universities", allEntries = true)
+    public void unjoinUniversity(Integer universityId, UserDetailsImpl currentUser) {
+        // --- FIX: Use the more robust custom delete query ---
+        membershipRepository.deleteByUserIdAndUniversityId(currentUser.getId(), universityId);
+    }
     
-    // The private mapUniversityToDto and mapModuleToDto methods have been REMOVED.
+    
+    
 }

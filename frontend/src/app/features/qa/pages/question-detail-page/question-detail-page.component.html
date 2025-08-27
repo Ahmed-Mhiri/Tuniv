@@ -1,1 +1,71 @@
-<p>question-detail-page works!</p>
+<div class="page-container-reddit">
+  <div class="content-col">
+    @if (isLoading()) {
+      <div class="status-container">
+        <app-spinner></app-spinner>
+      </div>
+    } @else if (question(); as q) {
+      <div class="question-container">
+        <div class="question-header">
+          <h1 nz-typography class="question-title">{{ q.title }}</h1>
+          <div class="meta-info">
+            <span>Asked {{ q.createdAt | timeAgo }} by </span>
+            <a [routerLink]="['/users', q.author.userId]" class="author-link">{{ q.author.username }}</a>
+          </div>
+        </div>
+        <nz-divider></nz-divider>
+        <div class="question-body-wrapper">
+          <div class="vote-container">
+            <app-vote
+              [score]="q.score"
+              [userVote]="q.currentUserVote"
+              (vote)="handleQuestionVote($event)"
+            ></app-vote>
+          </div>
+          <div class="content-container prose dark:prose-invert max-w-none" [innerHTML]="q.body"></div>
+        </div>
+      </div>
+
+      <div class="answers-container">
+        @if (authService.isUserLoggedIn()) {
+          <app-answer-form (answerSubmit)="handleAnswerSubmit($event)"></app-answer-form>
+        }
+        
+        <div class="answers-section">
+          <h2 nz-typography class="answers-title">{{ q.answers.length }} Answers</h2>
+          @for (answer of q.answers; track answer.answerId) {
+            <app-answer-item
+              [answer]="answer"
+              [isQuestionAuthor]="isCurrentUserQuestionAuthor()"
+              (updateRequired)="refreshData()"
+            ></app-answer-item>
+          } @empty {
+            <div class="py-8">
+              @if(!authService.isUserLoggedIn()){
+                <nz-alert
+                  nzType="info"
+                  nzMessage="You must be logged in to post an answer."
+                  [nzAction]="loginAction"
+                  nzShowIcon
+                ></nz-alert>
+                <ng-template #loginAction>
+                  <a routerLink="/login" nz-button nzType="primary" nzSize="small">Login</a>
+                </ng-template>
+              } @else {
+                <nz-empty nzNotFoundContent="No answers yet. Be the first to help!"></nz-empty>
+              }
+            </div>
+          }
+        </div>
+      </div>
+    } @else {
+      }
+  </div>
+
+  <div class="sidebar-col">
+    <div class="sidebar-widget">
+      <h4>About this Module</h4>
+      <p>Module-related information, rules, or related questions could go here.</p>
+    </div>
+  </div>
+</div>

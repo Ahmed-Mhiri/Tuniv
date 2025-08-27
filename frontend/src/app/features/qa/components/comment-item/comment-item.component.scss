@@ -1,0 +1,130 @@
+:host {
+  display: block;
+  padding-top: 1rem;
+}
+
+.comment-thread-item {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.indentation-col {
+  flex-shrink: 0;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.thread-line {
+  width: 2px;
+  background-color: var(--color-border);
+  flex-grow: 1;
+  margin-top: 0.5rem;
+  transition: background-color 0.2s;
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--color-primary);
+  }
+}
+
+.content-col {
+  flex-grow: 1;
+  min-width: 0; // Prevents flexbox overflow
+}
+
+/* --- Expanded View Styles --- */
+.comment-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+.author-link {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  text-decoration: none;
+  &:hover { 
+    text-decoration: underline; 
+  }
+}
+.meta-info {
+  color: var(--color-text-secondary);
+}
+.comment-body {
+  padding: 0.25rem 0;
+  p {
+    margin: 0.5rem 0;
+    color: var(--color-text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+}
+.action-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+.action-button {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 0.25rem 0.5rem;
+  &:hover {
+    background-color: var(--color-surface-subtle);
+  }
+}
+.reply-form-wrapper {
+  margin-top: 1rem;
+}
+.reply-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.nested-comments {
+  // Indentation is created by the recursive structure
+}
+
+/* --- Collapsed View Styles --- */
+.is-collapsed {
+  .thread-line {
+    display: none;
+  }
+  .content-col {
+    padding-top: 0.5rem;
+  }
+}
+.collapsed-view {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  
+  &:hover .author-link {
+    text-decoration: underline;
+  }
+}
+
+// Unified style for the [+] and [-] buttons
+.toggle-button {
+  font-weight: bold;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0 0.25rem;
+  line-height: 1; // Ensure it aligns nicely with text
+  
+  // Make the [-] button less visually jarring
+  margin-left: -0.25rem;
+  margin-right: 0.25rem;
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}
