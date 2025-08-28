@@ -1,12 +1,15 @@
 package com.tuniv.backend.qa.service;
 
-import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.tuniv.backend.filestorage.service.FileStorageService;
+import com.tuniv.backend.filestorage.model.FileStorage;
 import com.tuniv.backend.qa.model.Attachment;
 import com.tuniv.backend.qa.repository.AttachmentRepository;
 
@@ -16,18 +19,26 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AttachmentService {
 
-    private final FileStorageService fileStorageService;
+    private final FileStorage fileStorageService;
     private final AttachmentRepository attachmentRepository;
 
-    public void saveAttachments(List<MultipartFile> files, Integer postId, String postType) {
+    // --- FIX: Change the return type from void to List<Attachment> ---
+    public List<Attachment> saveAttachments(List<MultipartFile> files, Integer postId, String postType) {
         if (files == null || files.isEmpty()) {
-            return;
+            return Collections.emptyList();
         }
+        
+        List<Attachment> savedAttachments = new ArrayList<>();
 
-        for (MultipartFile file : files) {
-            if (file.isEmpty()) continue;
+        List<MultipartFile> validFiles = files.stream()
+            .filter(Objects::nonNull)
+            .filter(file -> !file.isEmpty())
+            .collect(Collectors.toList());
+
+        for (MultipartFile file : validFiles) {
             try {
-                String fileUrl = fileStorageService.uploadFile(file.getBytes(), file.getOriginalFilename());
+                String subDirectory = postType.toLowerCase() + "s";
+                String fileUrl = fileStorageService.storeFile(file, subDirectory);
 
                 Attachment attachment = new Attachment();
                 attachment.setFileName(file.getOriginalFilename());
@@ -37,11 +48,11 @@ public class AttachmentService {
                 attachment.setPostId(postId);
                 attachment.setPostType(postType);
 
-                attachmentRepository.save(attachment);
-            } catch (IOException e) {
-                // In a real app, you might want a more specific exception
-                throw new RuntimeException("Failed to upload file: " + e.getMessage());
+                savedAttachments.add(attachmentRepository.save(attachment));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to store file: " + file.getOriginalFilename(), e);
             }
         }
+        return savedAttachments;
     }
 }

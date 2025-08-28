@@ -24,7 +24,28 @@
           </div>
           <div class="content-container prose dark:prose-invert max-w-none" [innerHTML]="q.body"></div>
         </div>
-      </div>
+        <div class="content-container prose dark:prose-invert max-w-none" [innerHTML]="q.body"></div>
+</div>
+
+@if (q.attachments && q.attachments.length > 0) {
+  <div class="attachments-section">
+    <h4 class="attachments-title">Attachments</h4>
+    <div class="attachments-list">
+      @for (att of q.attachments; track att.fileUrl) {
+        <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
+          @if (att.fileType.startsWith('image/')) {
+            <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
+          } @else {
+            <span nz-icon nzType="file-text" class="file-icon"></span>
+            <span class="file-name">{{ att.fileName }}</span>
+          }
+        </a>
+      }
+    </div>
+  </div>
+}
+
+<nz-divider></nz-divider>      
 
       <div class="answers-container">
         @if (authService.isUserLoggedIn()) {

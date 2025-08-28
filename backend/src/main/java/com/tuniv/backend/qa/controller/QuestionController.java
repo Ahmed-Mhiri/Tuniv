@@ -69,7 +69,18 @@ public class QuestionController {
             @RequestPart("answer") @Valid AnswerCreateRequest request,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
             @RequestPart(value = "files", required = false) List<MultipartFile> files) {
-                
+        
+        // --- ADD THIS DEBUG LOG ---
+        System.out.println("--- ADD ANSWER DEBUG ---");
+        if (files != null && !files.isEmpty()) {
+            System.out.println("Received " + files.size() + " file(s).");
+            files.forEach(file -> System.out.println("File: " + file.getOriginalFilename() + " | Size: " + file.getSize()));
+        } else {
+            System.out.println("Received no files or the files list was null/empty.");
+        }
+        System.out.println("----------------------");
+        // --- END DEBUG LOG ---
+
         AnswerResponseDto newAnswerDto = questionService.addAnswer(request, questionId, currentUser, files);
         return new ResponseEntity<>(newAnswerDto, HttpStatus.CREATED);
     }

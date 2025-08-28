@@ -11,5 +11,7 @@ public record QuestionResponseDto(
     AuthorDto author,
     List<AnswerResponseDto> answers,
     int score,
-    int currentUserVote
+    int currentUserVote,
+    List<AttachmentDto> attachments // <-- ADD THIS
+
 ) {}

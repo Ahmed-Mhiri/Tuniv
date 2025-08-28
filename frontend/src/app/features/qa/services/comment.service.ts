@@ -12,7 +12,7 @@ export class CommentService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = environment.apiUrl;
 
-  createComment(answerId: number, request: CommentCreateRequest, files: File[]): Observable<Comment> {
+  createComment(answerId: string, request: CommentCreateRequest, files: File[]): Observable<Comment> {
     const formData = new FormData();
     formData.append('comment', new Blob([JSON.stringify(request)], { type: 'application/json' }));
     

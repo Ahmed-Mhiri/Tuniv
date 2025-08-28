@@ -1,6 +1,5 @@
 package com.tuniv.backend.filestorage.controller;
 
-import java.io.IOException;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
@@ -11,7 +10,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.tuniv.backend.filestorage.model.FileStorage;
-import com.tuniv.backend.filestorage.service.FileStorageService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,7 +18,6 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FileUploadController {
 
-    // --- FIX: Inject the interface, not a concrete class ---
     private final FileStorage fileStorageService;
 
     @PostMapping("/upload")
@@ -29,13 +26,11 @@ public class FileUploadController {
             return ResponseEntity.badRequest().body(Map.of("error", "File cannot be empty."));
         }
         try {
-            // --- FIX: Call the simpler interface method ---
-            String fileUrl = fileStorageService.storeFile(file);
+            // --- FIX: Provide a default subdirectory for generic uploads ---
+            String fileUrl = fileStorageService.storeFile(file, "general");
             
-            // Return a JSON object with the URL
             return ResponseEntity.ok(Map.of("url", fileUrl));
         } catch (Exception e) {
-            // Catch a more generic Exception as the service might throw a RuntimeException
             return ResponseEntity.internalServerError().body(Map.of("error", "Failed to upload file: " + e.getMessage()));
         }
     }

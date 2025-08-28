@@ -14,16 +14,16 @@ export class VoteService {
 
   voteOnQuestion(questionId: number, value: 1 | -1): Observable<unknown> {
     const payload: VoteRequest = { value };
-    return this.http.post(`${this.apiUrl}/questions/${questionId}/vote`, payload);
+    return this.http.post(`${this.apiUrl}/questions/${questionId}/vote`, payload, { responseType: 'text' });
   }
 
   voteOnAnswer(answerId: number, value: 1 | -1): Observable<unknown> {
     const payload: VoteRequest = { value };
-    return this.http.post(`${this.apiUrl}/answers/${answerId}/vote`, payload);
+    return this.http.post(`${this.apiUrl}/answers/${answerId}/vote`, payload, { responseType: 'text' });
   }
   
   voteOnComment(commentId: number, value: 1 | -1): Observable<unknown> {
     const payload: VoteRequest = { value };
-    return this.http.post(`${this.apiUrl}/comments/${commentId}/vote`, payload);
+    return this.http.post(`${this.apiUrl}/comments/${commentId}/vote`, payload, { responseType: 'text' });
   }
 }

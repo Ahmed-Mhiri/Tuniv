@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { switchMap } from 'rxjs';
+import { of, switchMap } from 'rxjs';
 
 // Models
 import { Question } from '../../../../shared/models/qa.model'; // <-- TYPE CHANGED
@@ -46,37 +46,37 @@ import { VoteService } from '../../services/vote.service';
 })
 export class QuestionDetailPageComponent implements OnInit {
   // --- Injections ---
-  private route = inject(ActivatedRoute);
-  private questionService = inject(QuestionService);
+  private readonly route = inject(ActivatedRoute);
+  private readonly questionService = inject(QuestionService);
   public readonly authService = inject(AuthService);
-  private message = inject(NzMessageService); // <-- Inject message service
-  private readonly voteService = inject(VoteService); // <-- INJECT VoteService
-
-
+  private readonly message = inject(NzMessageService);
+  private readonly voteService = inject(VoteService);
 
   // --- State ---
-  isLoading = signal(true);
-  question = signal<Question | null>(null); // <-- TYPE CHANGED
-  isSubmittingAnswer = signal(false); // <-- Add loading state for answer submission
-
+  readonly isLoading = signal(true);
+  readonly isSubmittingAnswer = signal(false);
+  readonly question = signal<Question | null>(null);
 
   // --- Computed State ---
-  isCurrentUserQuestionAuthor = computed(() => {
+  readonly isCurrentUserQuestionAuthor = computed(() => {
     const questionAuthorId = this.question()?.author?.userId;
     const currentUserId = this.authService.currentUser()?.userId;
-    
-    // --- THIS IS THE FIX ---
-    // The '!!' converts the result to a strict boolean (true or false).
     return !!(questionAuthorId && currentUserId && questionAuthorId === currentUserId);
   });
-
 
   ngOnInit(): void {
     this.route.paramMap.pipe(
       switchMap(params => {
         this.isLoading.set(true);
         const questionId = Number(params.get('id'));
-        return this.questionService.getQuestionById(questionId); // <-- METHOD NAME CHANGED
+
+        // A robust check for invalid IDs in the URL
+        if (isNaN(questionId)) {
+          this.question.set(null);
+          this.isLoading.set(false);
+          return of(null);
+        }
+        return this.questionService.getQuestionById(questionId);
       })
     ).subscribe(data => {
       this.question.set(data);
@@ -87,13 +87,13 @@ export class QuestionDetailPageComponent implements OnInit {
   refreshData(): void {
     const questionId = this.question()?.questionId;
     if (questionId) {
-      this.isLoading.set(true);
-      this.questionService.getQuestionById(questionId).subscribe(data => { // <-- METHOD NAME CHANGED
+      // This refresh happens silently in the background without a main spinner
+      this.questionService.getQuestionById(questionId).subscribe(data => {
         this.question.set(data);
-        this.isLoading.set(false);
       });
     }
   }
+
   handleAnswerSubmit(event: AnswerSubmitEvent): void {
     const questionId = this.question()?.questionId;
     if (!questionId) return;
@@ -102,7 +102,8 @@ export class QuestionDetailPageComponent implements OnInit {
     this.questionService.addAnswer(questionId, event.body, event.files).subscribe({
       next: () => {
         this.message.success('Your answer has been posted!');
-        this.refreshData(); // Refresh all data to show the new answer
+        // --- FIX: This call ensures the page updates with the new answer ---
+        this.refreshData();
       },
       error: () => {
         this.message.error('Failed to post your answer. Please try again.');
@@ -112,19 +113,18 @@ export class QuestionDetailPageComponent implements OnInit {
       }
     });
   }
-   handleQuestionVote(voteValue: 1 | -1): void {
+
+  handleQuestionVote(voteValue: 1 | -1): void {
     const questionId = this.question()?.questionId;
     if (!questionId) return;
-
     this.voteService.voteOnQuestion(questionId, voteValue).subscribe({
       next: () => {
         this.message.success('Vote registered!');
-        this.refreshData(); // Refresh to get new score
+        this.refreshData();
       },
       error: (err) => {
         this.message.error(err.error?.message || 'Failed to register vote.');
       }
     });
   }
-
 }

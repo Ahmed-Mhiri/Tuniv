@@ -1,3 +1,5 @@
+@import '../attachments'; // <-- ADD THIS
+// ... rest of your existing styles
 :host {
   display: block;
   padding-top: 1rem;
@@ -31,16 +33,18 @@
 
 .content-col {
   flex-grow: 1;
-  min-width: 0; // Prevents flexbox overflow
+  min-width: 0;
 }
 
 /* --- Expanded View Styles --- */
-.comment-header {
+.comment-header,
+.collapsed-view {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   font-size: 0.875rem;
 }
+
 .author-link {
   font-weight: 600;
   color: var(--color-text-primary);
@@ -49,9 +53,11 @@
     text-decoration: underline; 
   }
 }
+
 .meta-info {
   color: var(--color-text-secondary);
 }
+
 .comment-body {
   padding: 0.25rem 0;
   p {
@@ -61,12 +67,14 @@
     word-break: break-word;
   }
 }
+
 .action-bar {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin-top: 0.25rem;
 }
+
 .action-button {
   color: var(--color-text-secondary);
   font-weight: 600;
@@ -76,41 +84,42 @@
     background-color: var(--color-surface-subtle);
   }
 }
+
 .reply-form-wrapper {
   margin-top: 1rem;
 }
+
 .reply-form-actions {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
   gap: 0.5rem;
   margin-top: 0.5rem;
 }
+
+.submit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .nested-comments {
-  // Indentation is created by the recursive structure
+  // Indentation is handled by the component structure
 }
 
 /* --- Collapsed View Styles --- */
-.is-collapsed {
-  .thread-line {
-    display: none;
-  }
-  .content-col {
-    padding-top: 0.5rem;
-  }
+.is-collapsed .thread-line {
+  display: none;
 }
+
 .collapsed-view {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
   cursor: pointer;
+  padding-top: 0.5rem; // Align text with avatar
   
   &:hover .author-link {
     text-decoration: underline;
   }
 }
 
-// Unified style for the [+] and [-] buttons
 .toggle-button {
   font-weight: bold;
   color: var(--color-text-secondary);
@@ -118,13 +127,40 @@
   border: none;
   cursor: pointer;
   padding: 0 0.25rem;
-  line-height: 1; // Ensure it aligns nicely with text
-  
-  // Make the [-] button less visually jarring
-  margin-left: -0.25rem;
+  line-height: 1;
   margin-right: 0.25rem;
 
   &:hover {
     color: var(--color-primary);
+  }
+}
+
+/* --- File Preview Styles --- */
+.file-list-preview {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--color-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.file-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+
+  button {
+    color: var(--color-text-secondary);
+    &:hover {
+      color: var(--color-text-primary);
+      background-color: transparent;
+    }
   }
 }

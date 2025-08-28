@@ -4,14 +4,16 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.hibernate.annotations.Where;
+
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity; // <-- IMPORT ADDED
-import jakarta.persistence.FetchType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType; // <-- IMPORT ADDED
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -29,6 +31,8 @@ import lombok.Setter;
 public class Comment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    // --- FIX: Add explicit column mapping to the primary key ---
+    @Column(name = "comment_id")
     private Integer commentId;
 
     @Column(nullable = false, columnDefinition = "TEXT")
@@ -60,4 +64,11 @@ public class Comment {
     @OneToMany(mappedBy = "parentComment", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("comment-children")
     private Set<Comment> children = new HashSet<>();
+
+    // --- FIX: Add relationship to the central attachments table ---
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "post_id", referencedColumnName = "comment_id", insertable = false, updatable = false)
+    @Where(clause = "post_type = 'COMMENT'")
+    private Set<Attachment> attachments = new HashSet<>();
+    
 }

@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+import org.hibernate.annotations.Where;
+
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.tuniv.backend.university.model.Module;
@@ -30,6 +32,8 @@ import lombok.Setter;
 public class Question {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    // --- FIX: Add explicit column mapping to the primary key ---
+    @Column(name = "question_id")
     private Integer questionId;
 
     @Column(nullable = false)
@@ -59,4 +63,11 @@ public class Question {
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("question-votes")
     private Set<QuestionVote> votes = new HashSet<>();
+
+    // --- FIX: Add relationship to the central attachments table ---
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @JoinColumn(name = "post_id", referencedColumnName = "question_id", insertable = false, updatable = false)
+    @Where(clause = "post_type = 'QUESTION'")
+    private Set<Attachment> attachments = new HashSet<>();
+
 }

@@ -3,32 +3,29 @@
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1.5rem;
-  color: var(--color-text-primary);
 }
 
-.editor-wrapper {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  overflow: hidden;
-  transition: border-color 0.3s;
-
-  &:focus-within {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 2px hsla(var(--color-primary-hsl), 0.2);
-  }
+textarea[nz-input] {
+  resize: vertical;
 }
 
-.editor-footer {
+.actions-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  padding: 0.5rem 0.75rem;
-  background-color: var(--color-surface-subtle);
+  margin-top: 0.5rem;
+}
+
+.actions-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 
 .file-list-preview {
   margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--color-border);
 }
 
 .file-item {
@@ -41,54 +38,12 @@
   border-radius: 4px;
   font-size: 0.875rem;
   color: var(--color-text-secondary);
-}
 
-/* ==========================================================================
-   Theming for the ngx-quill rich text editor
-   ========================================================================== */
-:host ::ng-deep {
-  /* --- The Toolbar --- */
-  .ql-toolbar.ql-snow {
-    border: none !important;
-    border-bottom: 1px solid var(--color-border) !important;
-    background-color: var(--color-surface-subtle);
-    padding: 8px !important;
-  }
-  
-  /* --- Toolbar Buttons --- */
-  .ql-snow .ql-formats button {
+  button {
     color: var(--color-text-secondary);
-    border-radius: 4px;
-    transition: color 0.2s, background-color 0.2s;
-    
     &:hover {
-      background-color: var(--color-border);
       color: var(--color-text-primary);
+      background-color: transparent;
     }
-  }
-
-  /* Style for an active toolbar button (e.g., when 'Bold' is toggled on) */
-  .ql-snow .ql-active .ql-stroke {
-    stroke: var(--color-primary);
-  }
-  .ql-snow .ql-active .ql-fill {
-    fill: var(--color-primary);
-  }
-  .ql-snow .ql-active {
-    color: var(--color-primary);
-  }
-  
-  /* --- The Text Editing Area --- */
-  .ql-container.ql-snow {
-    border: none !important;
-    min-height: 200px;
-    font-size: 1rem;
-    color: var(--color-text-primary);
-  }
-  
-  /* --- Placeholder Text --- */
-  .ql-editor.ql-blank::before {
-    color: var(--color-text-secondary) !important;
-    font-style: normal;
   }
 }

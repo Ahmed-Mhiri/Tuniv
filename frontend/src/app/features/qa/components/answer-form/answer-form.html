@@ -17,18 +17,22 @@
     </nz-form-item>
     
     <div class="actions-footer">
-      <nz-upload
-        [nzBeforeUpload]="beforeUpload"
-        [nzShowUploadList]="false"
-        [nzMultiple]="true"
-      >
-        <button nz-button nzType="text" nz-tooltip nzTooltipTitle="Attach files">
-          <span nz-icon nzType="paper-clip"></span> Attach
+      <div class="actions-group">
+        <nz-upload
+          [nzFileList]="fileList()"
+          (nzChange)="handleFileChange($event)"
+          [nzShowUploadList]="false"
+          [nzMultiple]="true"
+        >
+          <button nz-button nzType="text" type="button" nz-tooltip nzTooltipTitle="Attach files">
+            <span nz-icon nzType="paper-clip"></span> Attach
+          </button>
+        </nz-upload>
+
+        <button nz-button nzType="primary" [disabled]="answerForm.invalid" [nzLoading]="isSubmitting()">
+          Post Your Answer
         </button>
-      </nz-upload>
-      <button nz-button nzType="primary" [disabled]="answerForm.invalid" [nzLoading]="isSubmitting()">
-        Post Your Answer
-      </button>
+      </div>
     </div>
     
     @if (fileList().length > 0) {
@@ -37,7 +41,7 @@
           <div *nzSpaceItem class="file-item">
             <span nz-icon nzType="file-text"></span>
             <span>{{ file.name }}</span>
-            <button nz-button nzType="text" nzShape="circle" (click)="removeFile(file)">
+            <button nz-button nzType="text" nzShape="circle" type="button" (click)="removeFile(file)">
               <span nz-icon nzType="close"></span>
             </button>
           </div>

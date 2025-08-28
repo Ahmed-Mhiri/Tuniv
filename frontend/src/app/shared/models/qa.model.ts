@@ -1,20 +1,32 @@
 // src/app/shared/models/qa.model.ts
 
-import { UserProfile } from './user.model';
+// Represents the author of any post.
+export interface Author {
+  userId: number;
+  username: string;
+  profilePhotoUrl: string | null;
+}
 
-// Re-using UserProfile as the Author model is a good practice
-export type Author = Pick<UserProfile, 'userId' | 'username' | 'profilePhotoUrl'>;
+// Represents an uploaded file attachment.
+export interface Attachment {
+  fileName: string;
+  fileUrl: string;
+  fileType: string;
+}
 
+// Represents a single comment, which can have child comments.
 export interface Comment {
   commentId: number;
   body: string;
-  createdAt: string; // Dates are strings over HTTP
+  createdAt: string; // Dates are transferred as strings
   author: Author;
   score: number;
-  currentUserVote: number; // -1 for downvote, 0 for no vote, 1 for upvote
+  currentUserVote: number; // -1, 0, or 1
+  attachments: Attachment[];
   children: Comment[]; // For nested replies
 }
 
+// Represents a single answer to a question.
 export interface Answer {
   answerId: number;
   body: string;
@@ -23,9 +35,11 @@ export interface Answer {
   author: Author;
   score: number;
   currentUserVote: number;
+  attachments: Attachment[];
   comments: Comment[]; // Top-level comments for this answer
 }
 
+// Represents the entire question page data structure.
 export interface Question {
   questionId: number;
   title: string;
@@ -34,16 +48,19 @@ export interface Question {
   author: Author;
   score: number;
   currentUserVote: number;
+  attachments: Attachment[];
   answers: Answer[];
 }
 
 // --- Request Models ---
 
+// For creating a new comment or a reply.
 export interface CommentCreateRequest {
   body: string;
-  parentCommentId?: number | null; // Optional for replying to another comment
+  parentCommentId?: number | null;
 }
 
+// For casting a vote.
 export interface VoteRequest {
   value: 1 | -1;
 }
