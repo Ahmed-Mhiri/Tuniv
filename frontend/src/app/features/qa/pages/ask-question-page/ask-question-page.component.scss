@@ -1,47 +1,43 @@
 :host {
   display: block;
   background-color: var(--color-background);
-  min-height: calc(100vh - 64px); // Assumes a 64px tall navbar
-}
-
-.ask-question-container {
-  max-width: 1200px;
-  margin: 0 auto;
+  min-height: calc(100vh - 64px);
   padding: 2rem 1rem;
 }
 
 .form-wrapper {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  padding: 2rem;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-}
-
-.header-section {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  padding-bottom: 1.5rem;
-  border-bottom: 1px solid var(--color-border);
+  padding: 2rem 2.5rem;
 
   h1 {
     font-family: var(--font-display);
-    font-size: 1.875rem; // 30px
+    font-size: 1.5rem; // 24px
     font-weight: 700;
-    margin: 0;
+    margin-bottom: 2rem;
   }
 }
 
-// Ensure form items have consistent spacing
-::ng-deep .ant-form-item {
+// Style for the header shown in "Contextual Post" mode
+.context-header {
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 1rem;
   margin-bottom: 1.5rem;
 }
 
-// Style the submit button
-button[nzType='primary'] {
-  min-width: 150px;
+.context-label {
+  display: block;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.context-value {
+  font-weight: 600;
+  color: var(--color-text-primary);
 }

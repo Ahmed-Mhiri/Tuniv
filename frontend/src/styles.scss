@@ -274,3 +274,109 @@ button[disabled],
   // This uses the theme color we defined earlier
   background-color: var(--color-success) !important;
 }
+/* Add this to your src/styles.scss file */
+
+/* --- 1. The Main Selector Box --- */
+
+// --- Style for the selector when it is ENABLED ---
+.ant-select:not(.ant-select-disabled) .ant-select-selector {
+  background-color: var(--color-background) !important;
+  border-color: var(--color-border) !important;
+
+  &:hover {
+    border-color: var(--color-primary) !important;
+  }
+
+  // The placeholder text inside an enabled selector
+  .ant-select-selection-placeholder {
+    color: var(--color-text-secondary) !important;
+  }
+
+  // The selected item text inside an enabled selector
+  .ant-select-selection-item {
+    color: var(--color-text-primary) !important;
+  }
+}
+
+// --- Style for the selector when it is FOCUSED ---
+.ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
+   border-color: var(--color-primary) !important;
+}
+
+// --- Style for the selector when it is DISABLED ---
+.ant-select-disabled .ant-select-selector {
+  background-color: var(--color-surface-subtle) !important;
+  border-color: var(--color-border) !important;
+  cursor: not-allowed;
+
+  // Make placeholder and selected item text look disabled
+  .ant-select-selection-placeholder,
+  .ant-select-selection-item {
+    color: var(--color-text-secondary) !important;
+    opacity: 0.75;
+  }
+}
+
+/* --- 2. The Dropdown Panel & Options --- */
+
+// --- Style for the dropdown arrow icon ---
+.ant-select-arrow .anticon {
+    color: var(--color-text-secondary) !important;
+}
+
+// --- Style for the panel that opens ---
+.ant-select-dropdown {
+  background-color: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+// --- Style for the individual items in the dropdown ---
+.ant-select-item-option {
+  color: var(--color-text-primary) !important;
+  
+  // Style for an item on hover
+  &.ant-select-item-option-active {
+    background-color: var(--color-surface-subtle) !important;
+  }
+  
+  // Style for the currently selected item
+  &.ant-select-item-option-selected {
+    background-color: var(--color-surface-subtle) !important;
+    color: var(--color-primary) !important;
+    font-weight: 600;
+  }
+}
+/* --- Alert --- */
+// This themes the nz-alert component for a consistent look.
+.ant-alert {
+  background-color: var(--color-surface-subtle) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 8px; /* Optional: adds a soft radius to match other elements */
+}
+
+// Theme the text inside the alert
+.ant-alert-message {
+  color: var(--color-text-primary) !important;
+}
+
+.ant-alert-description {
+  color: var(--color-text-secondary) !important;
+}
+
+// Theme the icons based on the alert type
+.ant-alert-info .ant-alert-icon {
+  color: var(--color-primary) !important;
+}
+
+.ant-alert-success .ant-alert-icon {
+  color: var(--color-success) !important;
+}
+
+.ant-alert-warning .ant-alert-icon {
+  color: var(--color-warning) !important;
+}
+
+.ant-alert-error .ant-alert-icon {
+  color: var(--color-accent) !important; /* Uses your theme's accent color for errors */
+}

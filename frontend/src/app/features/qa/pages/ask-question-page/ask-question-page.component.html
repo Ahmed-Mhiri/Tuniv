@@ -1,30 +1,100 @@
-<form [formGroup]="questionForm" (ngSubmit)="submitQuestion()" nz-form nzLayout="vertical">
-    <nz-form-item>
-        <nz-form-label nzRequired nzFor="universityId">Select a University</nz-form-label>
-        <nz-form-control nzErrorTip="Please select a university.">
-            <nz-select id="universityId" formControlName="universityId" nzPlaceHolder="Choose a university..." [nzLoading]="isLoadingUniversities()">
-                @for (uni of universities(); track uni.universityId) {
-                    <nz-option [nzValue]="uni.universityId" [nzLabel]="uni.name"></nz-option>
-                }
-            </nz-select>
-        </nz-form-control>
-    </nz-form-item>
+<div class="ask-question-container">
+  <div class="form-wrapper">
+    <h1 nz-typography>Ask a Question</h1>
 
-    <nz-form-item>
-        <nz-form-label nzRequired nzFor="moduleId">Select a Module</nz-form-label>
-        <nz-form-control nzErrorTip="Please select the relevant module.">
-            <nz-select 
-                id="moduleId" 
-                formControlName="moduleId" 
-                nzPlaceHolder="Choose a module..." 
-                [nzLoading]="isLoadingModules()"
-                [nzDisabled]="!questionForm.get('universityId')?.value"
-            >
-                @for (module of modules(); track module.moduleId) {
+    @if (isLoading()) {
+      <app-spinner></app-spinner>
+    } @else {
+      @if (userMustJoin() && universityToJoin(); as uni) {
+        <nz-alert
+          nzType="info"
+          nzShowIcon
+          nzMessage="Join the Community to Post"
+          [nzDescription]="descriptionTpl"
+          [nzAction]="actionTpl"
+        ></nz-alert>
+        <ng-template #descriptionTpl>
+          You must be a member of <strong>{{ uni.name }}</strong> to post a question in this module.
+        </ng-template>
+        <ng-template #actionTpl>
+          <button nz-button nzType="primary" (click)="joinUniversity()" [nzLoading]="isJoining()">
+            <span nz-icon nzType="plus"></span>
+            Join University
+          </button>
+        </ng-template>
+
+      } @else {
+        <form [formGroup]="questionForm" (ngSubmit)="submitQuestion()" nz-form nzLayout="vertical">
+          @if (isContextualPost() && contextInfo(); as ctx) {
+            <div class="context-header">
+              <span class="context-label">You are posting in:</span>
+              <span class="context-value">{{ ctx.uniName }} / {{ ctx.modName }}</span>
+            </div>
+          } @else {
+            <nz-form-item>
+              <nz-form-label nzRequired>Choose a community (University)</nz-form-label>
+              <nz-form-control nzErrorTip="Please select a university.">
+                <nz-select formControlName="universityId" nzPlaceHolder="Select a university you've joined...">
+                  @for (uni of universities(); track uni.universityId) {
+                    <nz-option [nzValue]="uni.universityId" [nzLabel]="uni.name"></nz-option>
+                  }
+                </nz-select>
+              </nz-form-control>
+            </nz-form-item>
+            <nz-form-item>
+              <nz-form-label nzRequired>Choose a topic (Module)</nz-form-label>
+              <nz-form-control nzErrorTip="Please select the relevant module.">
+                <nz-select formControlName="moduleId" nzPlaceHolder="Select a module..." [nzLoading]="isLoadingModules()" [nzDisabled]="!questionForm.get('universityId')?.value">
+                  @for (module of modules(); track module.moduleId) {
                     <nz-option [nzValue]="module.moduleId" [nzLabel]="module.name"></nz-option>
-                }
-            </nz-select>
-        </nz-form-control>
-    </nz-form-item>
-    
-    </form>
+                  }
+                </nz-select>
+              </nz-form-control>
+            </nz-form-item>
+          }
+
+          <nz-divider></nz-divider>
+
+          <nz-form-item>
+            <nz-form-label nzRequired>Title</nz-form-label>
+            <nz-form-control nzHasFeedback [nzErrorTip]="titleErrorTpl">
+              <input nz-input formControlName="title" placeholder="Be specific and imagine you’re asking a question to another person" />
+              <ng-template #titleErrorTpl let-control>
+                @if (control.hasError('required')) { Title is required. }
+                @if (control.hasError('minlength')) { Title must be at least 10 characters. }
+              </ng-template>
+            </nz-form-control>
+          </nz-form-item>
+
+          <nz-form-item>
+            <nz-form-label nzRequired>Body</nz-form-label>
+            <nz-form-control nzHasFeedback [nzErrorTip]="bodyErrorTpl">
+              <textarea nz-input formControlName="body" placeholder="Include all the information someone would need to answer your question" [nzAutosize]="{ minRows: 10, maxRows: 20 }"></textarea>
+              <ng-template #bodyErrorTpl let-control>
+                @if (control.hasError('required')) { Body is required. }
+                @if (control.hasError('minlength')) { Body must be at least 20 characters. }
+              </ng-template>
+            </nz-form-control>
+          </nz-form-item>
+
+          <nz-form-item>
+            <nz-form-label>Attachments</nz-form-label>
+            <nz-form-control>
+              <nz-upload [nzFileList]="fileList()" (nzChange)="handleFileChange($event)" [nzMultiple]="true" [nzBeforeUpload]="beforeUpload">
+                <button nz-button type="button"><span nz-icon nzType="upload"></span> Select Files</button>
+              </nz-upload>
+            </nz-form-control>
+          </nz-form-item>
+          
+          <nz-form-item>
+            <nz-form-control>
+              <button nz-button nzType="primary" class="btn-accent" [nzLoading]="isSubmitting()" [disabled]="questionForm.invalid">
+                Post Your Question
+              </button>
+            </nz-form-control>
+          </nz-form-item>
+        </form>
+      }
+    }
+  </div>
+</div>

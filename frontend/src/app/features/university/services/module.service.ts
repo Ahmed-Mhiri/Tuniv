@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { Module } from '../../../shared/models/university.model';
+import { Module, ModuleDetail } from '../../../shared/models/university.model';
 
 @Injectable({
   providedIn: 'root'
@@ -27,4 +27,8 @@ export class ModuleService {
   getModulesByUniversity(universityId: number): Observable<Module[]> {
     return this.http.get<Module[]>(`${this.apiUrl}/universities/${universityId}/modules`);
   }
+  getModuleById(moduleId: number): Observable<ModuleDetail> {
+  return this.http.get<ModuleDetail>(`${this.apiUrl}/modules/${moduleId}`);
+}
+
 }

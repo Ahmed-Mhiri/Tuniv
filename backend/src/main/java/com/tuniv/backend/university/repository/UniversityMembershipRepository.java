@@ -14,4 +14,6 @@ public interface UniversityMembershipRepository
     @Modifying
     @Query("DELETE FROM UniversityMembership m WHERE m.user.userId = :userId AND m.university.universityId = :universityId")
     void deleteByUserIdAndUniversityId(@Param("userId") Integer userId, @Param("universityId") Integer universityId);
+     boolean existsByUser_UserIdAndUniversity_UniversityId(Integer userId, Integer universityId);
+
 }

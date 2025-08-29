@@ -3,11 +3,14 @@ package com.tuniv.backend.university.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.university.dto.ModuleDetailDto;
 import com.tuniv.backend.university.dto.ModuleDto;
 import com.tuniv.backend.university.service.ModuleService;
 
@@ -34,5 +37,12 @@ public class ModuleController {
     @GetMapping("/modules")
     public ResponseEntity<List<ModuleDto>> getAllModules() {
         return ResponseEntity.ok(moduleService.getAllModules());
+    }
+    @GetMapping("/modules/{moduleId}")
+    public ResponseEntity<ModuleDetailDto> getModuleById(
+        @PathVariable Integer moduleId,
+        @AuthenticationPrincipal UserDetailsImpl currentUser
+    ) {
+        return ResponseEntity.ok(moduleService.getModuleDetails(moduleId, currentUser));
     }
 }

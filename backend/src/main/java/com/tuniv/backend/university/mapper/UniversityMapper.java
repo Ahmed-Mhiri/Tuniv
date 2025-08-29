@@ -3,18 +3,19 @@ package com.tuniv.backend.university.mapper;
 import java.util.Collections;
 import java.util.stream.Collectors;
 
+import com.tuniv.backend.university.dto.ModuleDetailDto;
 import com.tuniv.backend.university.dto.ModuleDto;
+import com.tuniv.backend.university.dto.UniversityBasicDto;
 import com.tuniv.backend.university.dto.UniversityDto;
 import com.tuniv.backend.university.model.Module;
 import com.tuniv.backend.university.model.University;
 
-public class UniversityMapper {
+public final class UniversityMapper { // Use 'final' for utility classes with only static methods
 
-    /**
-     * --- NEW: The primary mapping method ---
-     * Maps a University entity to a DTO, including the user's membership status.
-     * This is the method your updated UniversityService will call.
-     */
+    private UniversityMapper() {
+        // Private constructor to prevent instantiation
+    }
+
     public static UniversityDto toUniversityDto(University university, boolean isMember) {
         if (university == null) {
             return null;
@@ -28,22 +29,14 @@ public class UniversityMapper {
                     .map(UniversityMapper::toModuleDto)
                     .collect(Collectors.toList()) :
                 Collections.emptyList(),
-            isMember // <-- FIX: Pass the new 'isMember' flag to the constructor
+            isMember
         );
     }
 
-    /**
-     * --- MODIFIED: An overloaded method for convenience ---
-     * Maps a University entity to a DTO, defaulting isMember to false.
-     * This makes the mapper flexible for other parts of the app that don't need to check membership.
-     */
     public static UniversityDto toUniversityDto(University university) {
         return toUniversityDto(university, false);
     }
 
-    /**
-     * Maps a Module entity to a DTO. (Unchanged)
-     */
     public static ModuleDto toModuleDto(Module module) {
         if (module == null) {
             return null;
@@ -51,6 +44,26 @@ public class UniversityMapper {
         return new ModuleDto(
             module.getModuleId(),
             module.getName()
+        );
+    }
+    
+    public static ModuleDetailDto toModuleDetailDto(Module module, boolean isMember) {
+        if (module == null) {
+            return null;
+        }
+
+        // Create the nested University DTO, now including the isMember flag
+        UniversityBasicDto universityDto = new UniversityBasicDto(
+            module.getUniversity().getUniversityId(),
+            module.getUniversity().getName(),
+            isMember // <-- Pass the calculated status here
+        );
+
+        // Create the main Module Detail DTO
+        return new ModuleDetailDto(
+            module.getModuleId(),
+            module.getName(),
+            universityDto
         );
     }
 }

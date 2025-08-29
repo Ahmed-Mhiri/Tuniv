@@ -18,7 +18,8 @@
   } @else {
     <div class="module-grid">
       @for (mod of modules(); track mod.moduleId) {
-        <a class="module-link"> <nz-card class="module-card" nzHoverable>
+        <a class="module-link" [routerLink]="['/modules', mod.moduleId, 'questions']">
+          <nz-card class="module-card" nzHoverable>
             <span nz-icon nzType="book" class="card-icon"></span>
             <h4 class="card-title">{{ mod.name }}</h4>
           </nz-card>

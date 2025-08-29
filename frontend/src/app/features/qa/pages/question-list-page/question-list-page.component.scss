@@ -8,14 +8,37 @@
   padding: 1rem;
 }
 
-// Style the header provided by ng-zorro
+// =========================================================================
+// ✅ PAGE HEADER THEMING
+// =========================================================================
+// We use ::ng-deep to pierce the component's style encapsulation and
+// theme the internal elements of the nz-page-header.
 ::ng-deep .ant-page-header {
+  // Styles for the header's container card
   background-color: var(--color-surface);
   border-radius: 8px;
   border: 1px solid var(--color-border);
   margin-bottom: 2rem;
+
+  // Style for the main title text
+  .ant-page-header-heading-title {
+    color: var(--color-text-primary) !important; // Use primary text color
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+
+  // Style for the subtitle text
+  .ant-page-header-heading-sub-title {
+    color: var(--color-text-secondary) !important; // Use secondary text color
+  }
+
+  // Style for the divider line inside the header
+  .ant-page-header-heading-bottom {
+    border-top: 1px solid var(--color-border);
+  }
 }
 
+// Styles for the loading spinner
 .spinner-container {
   display: flex;
   justify-content: center;
@@ -23,6 +46,7 @@
   min-height: 300px;
 }
 
+// Styles for the list of question items
 .question-list {
   display: flex;
   flex-direction: column;

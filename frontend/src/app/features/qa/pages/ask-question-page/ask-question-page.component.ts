@@ -1,8 +1,8 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, OnInit, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { Observable } from 'rxjs';
+import { map, Observable, of } from 'rxjs';
 
 import { QuestionService } from '../../services/question.service'; // Use your existing QuestionService
 
@@ -16,10 +16,12 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzSelectModule } from 'ng-zorro-antd/select';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
-import { Module, University } from '../../../../shared/models/university.model';
+import { Module, ModuleDetail, University } from '../../../../shared/models/university.model';
 import { QuestionCreateRequest } from '../../../../shared/models/qa.model';
 import { ModuleService } from '../../../university/services/module.service';
 import { UniversityService } from '../../../university/services/university.service';
+import { NzDividerComponent } from 'ng-zorro-antd/divider';
+import { NzAlertComponent } from 'ng-zorro-antd/alert';
 
 @Component({
   selector: 'app-ask-question-page',
@@ -27,7 +29,7 @@ import { UniversityService } from '../../../university/services/university.servi
   imports: [
     CommonModule, ReactiveFormsModule, RouterLink, SpinnerComponent,
     NzButtonModule, NzFormModule, NzInputModule, NzTypographyModule,
-    NzUploadModule, NzIconModule, NzSelectModule
+    NzUploadModule, NzIconModule, NzSelectModule,NzDividerComponent,NzAlertComponent
   ],
   templateUrl: './ask-question-page.component.html',
   styleUrl: './ask-question-page.component.scss',
@@ -37,44 +39,116 @@ export class AskQuestionPageComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly questionService = inject(QuestionService);
   private readonly moduleService = inject(ModuleService);
-  private readonly universityService = inject(UniversityService); // For fetching universities
+  private readonly universityService = inject(UniversityService);
   private readonly router = inject(Router);
-  private readonly route = inject(ActivatedRoute); // For reading query params
+  private readonly route = inject(ActivatedRoute);
   private readonly message = inject(NzMessageService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
+  // --- State Signals ---
   readonly universities = signal<University[]>([]);
   readonly modules = signal<Module[]>([]);
-  readonly isLoadingUniversities = signal(true);
+  readonly isLoading = signal(true);
   readonly isLoadingModules = signal(false);
   readonly fileList = signal<NzUploadFile[]>([]);
   readonly filesToUpload = signal<File[]>([]);
   readonly isSubmitting = signal(false);
+  
+  // --- Contextual Posting State ---
+  readonly isContextualPost = signal(false);
+  readonly contextInfo = signal<{ uniName: string, modName: string } | null>(null);
+  readonly userMustJoin = signal(false);
+  readonly isJoining = signal(false);
+  readonly universityToJoin = signal<{ id: number; name: string } | null>(null);
+
+  // =========================================================================
+  // ✅ FIX 1: Add a signal to "remember" the module ID from the URL
+  // =========================================================================
+  private readonly contextualModuleId = signal<number | null>(null);
 
   readonly questionForm = this.fb.group({
-    universityId: [null as number | null, [Validators.required]], // New field for university
+    universityId: [null as number | null, [Validators.required]],
     moduleId: [null as number | null, [Validators.required]],
     title: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(150)]],
     body: ['', [Validators.required, Validators.minLength(20)]],
   });
 
   ngOnInit(): void {
-    this.loadUniversities();
-    this.setupUniversitySelectionListener();
-    this.checkRouteForPreselection();
+    const moduleIdParam = this.route.snapshot.queryParamMap.get('module');
+    if (moduleIdParam) {
+      const moduleId = Number(moduleIdParam);
+      // ✅ FIX 2: Store the module ID as soon as the page loads
+      this.contextualModuleId.set(moduleId);
+      this.handleContextualPost(moduleId);
+    } else {
+      this.handleGlobalPost();
+    }
   }
 
-  private loadUniversities(): void {
-    this.universityService.getAllUniversities().subscribe({
-      next: (data) => this.universities.set(data),
-      error: () => this.message.error('Failed to load universities.'),
-      complete: () => this.isLoadingUniversities.set(false),
+  private handleContextualPost(moduleId: number): void {
+    this.isContextualPost.set(true);
+    this.isLoading.set(true);
+    this.userMustJoin.set(false); // Reset join state on each check
+
+    this.moduleService.getModuleById(moduleId).subscribe({
+      next: (moduleDetails: ModuleDetail) => {
+        if (moduleDetails.university.isMember) {
+          this.questionForm.get('universityId')?.disable();
+          this.questionForm.get('moduleId')?.disable();
+          this.questionForm.patchValue({
+            universityId: moduleDetails.university.universityId,
+            moduleId: moduleDetails.moduleId
+          });
+          this.contextInfo.set({
+            uniName: moduleDetails.university.name,
+            modName: moduleDetails.name,
+          });
+        } else {
+          this.userMustJoin.set(true);
+          this.universityToJoin.set({
+            id: moduleDetails.university.universityId,
+            name: moduleDetails.university.name
+          });
+        }
+        this.isLoading.set(false);
+      },
+      error: () => this.message.error('Could not load module information.')
     });
   }
   
-  // When a university is selected, load its modules
-  private setupUniversitySelectionListener(): void {
+  joinUniversity(): void {
+    const uni = this.universityToJoin();
+    // ✅ FIX 3: Get the remembered module ID from our signal
+    const modId = this.contextualModuleId();
+    if (!uni || !modId) return;
+
+    this.isJoining.set(true);
+    this.universityService.joinUniversity(uni.id).subscribe({
+      next: () => {
+        this.message.success(`Successfully joined ${uni.name}!`);
+        // Re-run the logic using the correct, remembered module ID
+        this.handleContextualPost(modId);
+      },
+      error: (err) => this.message.error(err.error?.message || 'Failed to join university.'),
+      complete: () => this.isJoining.set(false),
+    });
+  }
+  
+  // ... handleGlobalPost, file handling, and submitQuestion methods are unchanged ...
+
+  private handleGlobalPost(): void {
+    this.isContextualPost.set(false);
+    this.universityService.getAllUniversities().pipe(
+      map(universities => universities.filter(u => u.isMember))
+    ).subscribe({
+      next: (joinedUniversities) => this.universities.set(joinedUniversities),
+      error: () => this.message.error('Failed to load your universities.'),
+      complete: () => this.isLoading.set(false),
+    });
+
     this.questionForm.get('universityId')?.valueChanges.subscribe(universityId => {
-      this.questionForm.get('moduleId')?.reset(); // Reset module when uni changes
+      this.questionForm.get('moduleId')?.reset();
+      this.modules.set([]);
       if (universityId) {
         this.isLoadingModules.set(true);
         this.moduleService.getModulesByUniversity(universityId).subscribe({
@@ -85,43 +159,40 @@ export class AskQuestionPageComponent implements OnInit {
       }
     });
   }
-  
-  // If we came from a module page, pre-select the module
-  private checkRouteForPreselection(): void {
-    const moduleId = this.route.snapshot.queryParamMap.get('module');
-    if (moduleId) {
-      // In a full implementation, you'd fetch the module's details
-      // to find its parent universityId and set both form controls.
-      this.questionForm.patchValue({ moduleId: Number(moduleId) });
+
+  beforeUpload = (file: NzUploadFile): Observable<boolean> => {
+    this.filesToUpload.update(list => [...list, file as unknown as File]);
+    this.fileList.update(list => [...list, file]);
+    this.cdr.detectChanges();
+    return of(false);
+  };
+
+  handleFileChange(info: NzUploadChangeParam): void {
+    if (info.type === 'removed') {
+      this.removeFile(info.file);
     }
   }
 
-  handleFileChange({ fileList }: NzUploadChangeParam): void {
-    // We use a slice to create a new array, which helps with change detection
-    this.fileList.set(fileList.slice());
-    this.filesToUpload.set(
-      fileList.map(f => f.originFileObj as File).filter(f => !!f)
-    );
+  removeFile(fileToRemove: NzUploadFile): void {
+    this.fileList.update(list => list.filter(f => f.uid !== fileToRemove.uid));
+    this.filesToUpload.update(list => (list as unknown as NzUploadFile[]).filter(f => f.uid !== fileToRemove.uid) as unknown as File[]);
+    this.cdr.detectChanges();
   }
-
+  
   submitQuestion(): void {
     if (this.questionForm.invalid) {
-      // Mark all fields as touched to display validation errors
       Object.values(this.questionForm.controls).forEach(control => {
         control.markAsDirty();
         control.updateValueAndValidity({ onlySelf: true });
       });
       return;
     }
-
     this.isSubmitting.set(true);
-    const formValue = this.questionForm.value;
-
+    const formValue = this.questionForm.getRawValue();
     const questionData: QuestionCreateRequest = {
       title: formValue.title!,
       body: formValue.body!
     };
-
     this.questionService.createQuestion(
       formValue.moduleId!,
       questionData,
@@ -138,7 +209,4 @@ export class AskQuestionPageComponent implements OnInit {
       }
     });
   }
-
-
 }
-
