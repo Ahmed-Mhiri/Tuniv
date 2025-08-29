@@ -11,6 +11,7 @@ import { NzAlertModule } from 'ng-zorro-antd/alert';
 import { NzTypographyModule } from 'ng-zorro-antd/typography';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzButtonModule } from 'ng-zorro-antd/button';
+import { ModuleService } from '../../services/module.service';
 
 @Component({
   selector: 'app-module-list-page',
@@ -29,7 +30,8 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 })
 export class ModuleListPageComponent implements OnInit {
   // --- Dependencies ---
-  private readonly universityService = inject(UniversityService);
+  // --- FIX: Inject ModuleService instead of UniversityService ---
+  private readonly moduleService = inject(ModuleService);
   private readonly route = inject(ActivatedRoute);
 
   // --- State Signals ---
@@ -52,7 +54,8 @@ export class ModuleListPageComponent implements OnInit {
         switchMap((params) => {
           const universityId = Number(params.get('id'));
           this.isLoading.set(true);
-          return this.universityService.getModulesByUniversity(universityId);
+          // --- FIX: Call the method on the correct service ---
+          return this.moduleService.getModulesByUniversity(universityId);
         })
       )
       .subscribe({

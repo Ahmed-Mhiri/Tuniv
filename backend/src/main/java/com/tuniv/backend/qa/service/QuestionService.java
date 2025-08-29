@@ -2,7 +2,6 @@ package com.tuniv.backend.qa.service;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -11,13 +10,13 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable; // <-- IMPORT ADDED
-import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service; // <-- IMPORT ADDED
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.tuniv.backend.config.security.services.UserDetailsImpl; // <-- IMPORT ADDED
-import com.tuniv.backend.qa.dto.AnswerCreateRequest;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.qa.dto.AnswerCreateRequest; // <-- IMPORT ADDED
 import com.tuniv.backend.qa.dto.AnswerResponseDto;
 import com.tuniv.backend.qa.dto.QuestionCreateRequest;
 import com.tuniv.backend.qa.dto.QuestionResponseDto;
@@ -64,51 +63,62 @@ public class QuestionService {
         question.setAuthor(author);
 
         Question savedQuestion = questionRepository.save(question);
-        
-        List<Attachment> savedAttachments = attachmentService.saveAttachments(files, savedQuestion.getQuestionId(), "QUESTION");
-        savedQuestion.setAttachments(new HashSet<>(savedAttachments));
+        attachmentService.saveAttachments(files, savedQuestion.getQuestionId(), "QUESTION");
 
-        Map<Integer, List<Attachment>> questionAttachments = savedAttachments.stream()
-            .collect(Collectors.groupingBy(Attachment::getPostId));
-        
-        return QAMapper.toQuestionResponseDto(savedQuestion, currentUser, questionAttachments, Collections.emptyMap(), Collections.emptyMap());
+        Question finalQuestion = questionRepository.findById(savedQuestion.getQuestionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch question"));
+
+        Map<Integer, List<Attachment>> questionAttachments = finalQuestion.getAttachments().stream()
+                .collect(Collectors.groupingBy(Attachment::getPostId));
+
+        return QAMapper.toQuestionResponseDto(finalQuestion, currentUser, questionAttachments, Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Transactional
-    @CacheEvict(value = "questions", key = "#questionId")
-    public AnswerResponseDto addAnswer(AnswerCreateRequest request, Integer questionId, UserDetailsImpl currentUser, List<MultipartFile> files) {
-        User author = userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Error: User not found."));
-        Question question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Error: Question not found with id: " + questionId));
+@CacheEvict(value = "questions", key = "#questionId")
+public AnswerResponseDto addAnswer(AnswerCreateRequest request, Integer questionId, UserDetailsImpl currentUser, List<MultipartFile> files) {
+    // =========================================================================
+    // ✅ FINAL VALIDATION: Ensure the submission is not completely empty.
+    // =========================================================================
+    boolean isBodyEmpty = request.body() == null || request.body().trim().isEmpty();
+    boolean hasFiles = files != null && !files.stream().allMatch(MultipartFile::isEmpty);
 
-        Answer answer = new Answer();
-        answer.setBody(request.body());
-        answer.setQuestion(question);
-        answer.setAuthor(author);
-        question.getAnswers().add(answer);
+    if (isBodyEmpty && !hasFiles) {
+        throw new IllegalArgumentException("Cannot create an empty answer. Please provide text or attach a file.");
+    }
+    // =========================================================================
 
-        Answer savedAnswer = answerRepository.save(answer);
+    User author = userRepository.findById(currentUser.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("Error: User not found."));
+    Question question = questionRepository.findById(questionId)
+            .orElseThrow(() -> new ResourceNotFoundException("Error: Question not found with id: " + questionId));
 
-        List<Attachment> savedAttachments = attachmentService.saveAttachments(files, savedAnswer.getAnswerId(), "ANSWER");
-        savedAnswer.setAttachments(new HashSet<>(savedAttachments));
-        
-        NewAnswerEvent event = new NewAnswerEvent(this, question.getTitle(), question.getAuthor().getEmail(), author.getUsername());
-        eventPublisher.publishEvent(event);
+    Answer answer = new Answer();
+    answer.setBody(request.body());
+    answer.setQuestion(question);
+    answer.setAuthor(author);
+    question.getAnswers().add(answer);
 
-        Map<Integer, List<Attachment>> answerAttachments = savedAttachments.stream()
+    Answer savedAnswer = answerRepository.save(answer);
+    attachmentService.saveAttachments(files, savedAnswer.getAnswerId(), "ANSWER");
+    
+    NewAnswerEvent event = new NewAnswerEvent(this, question.getTitle(), question.getAuthor().getEmail(), author.getUsername());
+    eventPublisher.publishEvent(event);
+
+    Answer finalAnswer = answerRepository.findById(savedAnswer.getAnswerId())
+            .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch answer"));
+
+    Map<Integer, List<Attachment>> answerAttachments = finalAnswer.getAttachments().stream()
             .collect(Collectors.groupingBy(Attachment::getPostId));
 
-        return QAMapper.toAnswerResponseDto(savedAnswer, currentUser, answerAttachments, Collections.emptyMap());
-    }
+    return QAMapper.toAnswerResponseDto(finalAnswer, currentUser, answerAttachments, Collections.emptyMap());
+}
 
     @Transactional(readOnly = true)
     public Page<QuestionResponseDto> getQuestionsByModule(Integer moduleId, Pageable pageable, UserDetailsImpl currentUser) {
         Page<Question> questionPage = questionRepository.findByModuleModuleId(moduleId, pageable);
-        // NOTE: For performance, this list view does not fetch attachments.
-        // They are fetched in the detailed getQuestionById view.
-        return questionPage.map(question -> QAMapper.toQuestionResponseDto(question, currentUser, 
-            Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap()));
+        return questionPage.map(question -> QAMapper.toQuestionResponseDto(question, currentUser,
+                Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap()));
     }
     
     @Transactional(readOnly = true)

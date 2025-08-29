@@ -3,7 +3,9 @@
 :host {
   display: block;
 }
-
+.hidden-uploader {
+  display: none;
+}
 .answer-wrapper {
   display: flex;
   gap: 1rem;

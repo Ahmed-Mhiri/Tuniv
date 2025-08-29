@@ -1,9 +1,17 @@
 // src/app/features/qa/services/question.service.ts
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { Question, Answer } from '../../../shared/models/qa.model';
+// --- FIX: Import the DTOs needed for creating questions and answers ---
+import { 
+  Answer, 
+  AnswerCreateRequest, 
+  Question, 
+  QuestionCreateRequest, 
+  QuestionResponseDto 
+} from '../../../shared/models/qa.model';
+import { Page } from '../../../shared/models/pagination.model';
 
 @Injectable({
   providedIn: 'root',
@@ -16,9 +24,43 @@ export class QuestionService {
     return this.http.get<Question>(`${this.apiUrl}/questions/${questionId}`);
   }
 
-  addAnswer(questionId: number, body: string, files: File[]): Observable<Answer> {
+  // ===============================================================
+  // ✅ NEW METHOD ADDED
+  // ===============================================================
+  /**
+   * Fetches a paginated list of questions for a specific module.
+   * Corresponds to: GET /api/v1/modules/{moduleId}/questions
+   */
+  getQuestionsByModule(moduleId: number, page: number = 0, size: number = 10): Observable<Page<Question>> {
+    // Use HttpParams to safely add URL query parameters for pagination and sorting
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('size', size.toString())
+      .set('sort', 'createdAt,desc'); // Default sort: newest questions first
+
+    const url = `${this.apiUrl}/modules/${moduleId}/questions`;
+    return this.http.get<Page<Question>>(url, { params });
+  }
+
+  createQuestion(
+    moduleId: number,
+    questionData: QuestionCreateRequest,
+    files: File[]
+  ): Observable<QuestionResponseDto> {
     const formData = new FormData();
-    formData.append('answer', new Blob([JSON.stringify({ body })], { type: 'application/json' }));
+    formData.append('question', new Blob([JSON.stringify(questionData)], { type: 'application/json' }));
+
+    files.forEach(file => {
+      formData.append('files', file, file.name);
+    });
+    
+    const url = `${this.apiUrl}/modules/${moduleId}/questions`;
+    return this.http.post<QuestionResponseDto>(url, formData);
+  }
+
+  addAnswer(questionId: number, answerData: AnswerCreateRequest, files: File[]): Observable<Answer> {
+    const formData = new FormData();
+    formData.append('answer', new Blob([JSON.stringify(answerData)], { type: 'application/json' }));
     
     files.forEach(file => {
       formData.append('files', file, file.name);

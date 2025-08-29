@@ -1,1 +1,28 @@
-<p>question-list-page works!</p>
+<div class="page-container">
+  <nz-page-header [nzTitle]="moduleName()" nzSubtitle="Browse questions or ask your own">
+    <nz-page-header-extra>
+      <a [routerLink]="['/qa/ask']" [queryParams]="{ module: moduleId() }" nz-button nzType="primary" class="btn-accent">
+        <span nz-icon nzType="plus"></span>
+        Ask Question
+      </a>
+    </nz-page-header-extra>
+  </nz-page-header>
+
+  <div class="content-container" nz-row nzGutter="16">
+    <div nz-col nzSpan="24">
+      @if (isLoading()) {
+        <div class="spinner-container">
+          <nz-spin nzSimple nzSize="large"></nz-spin>
+        </div>
+      } @else {
+        <div class="question-list">
+          @for (question of questions(); track question.questionId) {
+            <app-question-list-item [question]="question"></app-question-list-item>
+          } @empty {
+            <nz-empty nzNotFoundContent="No questions in this module yet. Be the first to ask!"></nz-empty>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

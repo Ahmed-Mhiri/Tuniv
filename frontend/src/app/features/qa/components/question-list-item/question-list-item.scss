@@ -1,0 +1,122 @@
+:host {
+  display: block;
+}
+
+.question-item-container {
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left-width: 4px; // For status indication
+  border-radius: 8px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  }
+}
+
+// Stats column on the left
+.stats-col {
+  flex-shrink: 0;
+  width: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.stat-count {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+// Content column on the right
+.content-col {
+  flex-grow: 1;
+  min-width: 0; // Prevents text overflow issues in flexbox
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.question-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+
+  a {
+    color: var(--color-text-primary);
+    text-decoration: none;
+    transition: color 0.2s;
+
+    &:hover {
+      color: var(--color-primary);
+    }
+  }
+}
+
+.meta-info {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+
+  .author-link {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-decoration: none;
+
+    &:hover {
+      color: var(--color-primary);
+      text-decoration: underline;
+    }
+  }
+}
+
+// --- Dynamic Styling based on Answer Status ---
+
+// Default (no answers)
+.no-answers {
+  border-left-color: var(--color-border);
+  .answer-stat {
+    opacity: 0.6;
+  }
+}
+
+// Has answers, but none accepted
+.has-answers {
+  border-left-color: var(--color-primary);
+  .answer-stat {
+    color: var(--color-primary);
+    .stat-count {
+      color: var(--color-primary);
+    }
+  }
+}
+
+// Has an accepted solution
+.has-solution {
+  border-left-color: var(--color-success);
+  .answer-stat {
+    // Make the answer count stand out with a background
+    background-color: var(--color-success);
+    color: var(--color-on-primary);
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    .stat-count, .stat-label {
+      color: var(--color-on-primary);
+    }
+  }
+}

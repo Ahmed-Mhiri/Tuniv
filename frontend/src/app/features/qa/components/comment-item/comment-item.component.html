@@ -53,45 +53,43 @@
           </div>
         }
 
-        @if (isReplyFormVisible()) {
-          <div class="reply-form-wrapper">
-            <form [formGroup]="replyForm" (ngSubmit)="submitReply()">
-              <textarea nz-input formControlName="body" placeholder="Write your reply..." [nzAutosize]="{ minRows: 2, maxRows: 5 }"></textarea>
+        <div class="reply-form-wrapper" [hidden]="!isReplyFormVisible()">
+          <form [formGroup]="replyForm" (ngSubmit)="submitReply()">
+            <textarea nz-input formControlName="body" placeholder="Write your reply..." [nzAutosize]="{ minRows: 2, maxRows: 5 }"></textarea>
+            
+            <div class="reply-form-actions">
+              <nz-upload
+                [nzFileList]="replyFileList()"
+                (nzChange)="handleReplyFileChange($event)"
+                [nzShowUploadList]="false"
+                [nzMultiple]="true"
+                [nzBeforeUpload]="beforeUpload" >
+                <button nz-button nzType="text" nzShape="circle" type="button" nz-tooltip nzTooltipTitle="Attach files">
+                  <span nz-icon nzType="paper-clip"></span>
+                </button>
+              </nz-upload>
               
-              <div class="reply-form-actions">
-                <nz-upload
-                  [nzFileList]="replyFileList()"
-                  (nzChange)="handleReplyFileChange($event)"
-                  [nzShowUploadList]="false"
-                  [nzMultiple]="true"
-                  [nzBeforeUpload]="preventAutoUpload"
-                >
-                  <button nz-button nzType="text" nzShape="circle" type="button" nz-tooltip nzTooltipTitle="Attach files">
-                    <span nz-icon nzType="paper-clip"></span>
-                  </button>
-                </nz-upload>
-                <div class="submit-actions">
-                  <button nz-button nzType="text" type="button" (click)="isReplyFormVisible.set(false)">Cancel</button>
-                  <button nz-button nzType="primary" [disabled]="replyForm.invalid">Reply</button>
-                </div>
+              <div class="submit-actions">
+                <button nz-button nzType="text" type="button" (click)="isReplyFormVisible.set(false)">Cancel</button>
+                <button nz-button nzType="primary" [disabled]="replyForm.invalid">Reply</button>
               </div>
+            </div>
 
-              @if (replyFileList().length > 0) {
-                <div class="file-list-preview">
-                  @for (file of replyFileList(); track file.uid) {
-                    <div class="file-item">
-                      <span nz-icon nzType="file-text"></span>
-                      <span>{{ file.name }}</span>
-                      <button nz-button nzType="text" nzShape="circle" type="button" (click)="removeReplyFile(file)">
-                        <span nz-icon nzType="close"></span>
-                      </button>
-                    </div>
-                  }
-                </div>
-              }
-            </form>
-          </div>
-        }
+            @if (replyFileList().length > 0) {
+              <div class="file-list-preview">
+                @for (file of replyFileList(); track file.uid) {
+                  <div class="file-item">
+                    <span nz-icon nzType="file-text"></span>
+                    <span>{{ file.name }}</span>
+                    <button nz-button nzType="text" nzShape="circle" type="button" (click)="removeReplyFile(file)">
+                      <span nz-icon nzType="close"></span>
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+          </form>
+        </div>
 
         <div class="nested-comments">
           @for (child of comment().children; track child.commentId) {

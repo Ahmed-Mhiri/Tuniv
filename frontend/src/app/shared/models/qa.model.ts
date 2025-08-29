@@ -40,6 +40,7 @@ export interface Answer {
 }
 
 // Represents the entire question page data structure.
+// This interface can also be used for the QuestionResponseDto.
 export interface Question {
   questionId: number;
   title: string;
@@ -54,6 +55,17 @@ export interface Question {
 
 // --- Request Models ---
 
+// For creating a new question.
+export interface QuestionCreateRequest {
+  title: string;
+  body: string;
+}
+
+// For creating a new answer.
+export interface AnswerCreateRequest {
+  body: string;
+}
+
 // For creating a new comment or a reply.
 export interface CommentCreateRequest {
   body: string;
@@ -64,3 +76,8 @@ export interface CommentCreateRequest {
 export interface VoteRequest {
   value: 1 | -1;
 }
+
+// --- Response Models (Often the same as the main models) ---
+
+// The response for a created question is the full question object.
+export type QuestionResponseDto = Question;

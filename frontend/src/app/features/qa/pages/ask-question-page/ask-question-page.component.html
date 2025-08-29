@@ -1,1 +1,30 @@
-<p>ask-question-page works!</p>
+<form [formGroup]="questionForm" (ngSubmit)="submitQuestion()" nz-form nzLayout="vertical">
+    <nz-form-item>
+        <nz-form-label nzRequired nzFor="universityId">Select a University</nz-form-label>
+        <nz-form-control nzErrorTip="Please select a university.">
+            <nz-select id="universityId" formControlName="universityId" nzPlaceHolder="Choose a university..." [nzLoading]="isLoadingUniversities()">
+                @for (uni of universities(); track uni.universityId) {
+                    <nz-option [nzValue]="uni.universityId" [nzLabel]="uni.name"></nz-option>
+                }
+            </nz-select>
+        </nz-form-control>
+    </nz-form-item>
+
+    <nz-form-item>
+        <nz-form-label nzRequired nzFor="moduleId">Select a Module</nz-form-label>
+        <nz-form-control nzErrorTip="Please select the relevant module.">
+            <nz-select 
+                id="moduleId" 
+                formControlName="moduleId" 
+                nzPlaceHolder="Choose a module..." 
+                [nzLoading]="isLoadingModules()"
+                [nzDisabled]="!questionForm.get('universityId')?.value"
+            >
+                @for (module of modules(); track module.moduleId) {
+                    <nz-option [nzValue]="module.moduleId" [nzLabel]="module.name"></nz-option>
+                }
+            </nz-select>
+        </nz-form-control>
+    </nz-form-item>
+    
+    </form>

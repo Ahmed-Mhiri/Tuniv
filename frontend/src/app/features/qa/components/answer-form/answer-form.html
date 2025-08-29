@@ -9,9 +9,8 @@
           placeholder="Write your detailed answer here..."
           [nzAutosize]="{ minRows: 5, maxRows: 15 }"
         ></textarea>
-        <ng-template #bodyErrorTpl let-control>
-          @if (control.hasError('required')) { Answer body cannot be empty. }
-          @if (control.hasError('minlength')) { Answer must be at least 20 characters long. }
+        <ng-template #bodyErrorTpl>
+          @if (answerForm.hasError('atLeastOneRequired')) { You must provide an answer or attach a file. }
         </ng-template>
       </nz-form-control>
     </nz-form-item>

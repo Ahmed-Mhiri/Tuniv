@@ -1,7 +1,6 @@
 package com.tuniv.backend.qa.dto;
 
-import jakarta.validation.constraints.NotBlank;
-
 public record AnswerCreateRequest(
-    @NotBlank String body
+    // No validation annotation here
+    String body
 ) {}

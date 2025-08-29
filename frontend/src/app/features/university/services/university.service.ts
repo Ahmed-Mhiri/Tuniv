@@ -1,3 +1,4 @@
+// src/app/features/universities/services/university.service.ts
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
@@ -19,24 +20,21 @@ export class UniversityService {
     return this.http.get<University[]>(`${this.apiUrl}/universities`);
   }
 
-  /**
-   * Fetches all modules for a specific university.
-   * Corresponds to: GET /api/v1/universities/{universityId}/modules
-   */
-  getModulesByUniversity(universityId: number): Observable<Module[]> {
-    return this.http.get<Module[]>(`${this.apiUrl}/universities/${universityId}/modules`);
-  }
+  // --- METHOD REMOVED ---
+  // The getModulesByUniversity method has been moved to ModuleService.
 
   /**
    * Allows the currently logged-in user to join a university.
    * Corresponds to: POST /api/v1/universities/{universityId}/members
    */
   joinUniversity(universityId: number): Observable<unknown> {
-    // This POST request sends no body, as the backend identifies
-    // the user from the JWT token provided by the interceptor.
     return this.http.post(`${this.apiUrl}/universities/${universityId}/members`, {});
   }
 
+  /**
+   * Allows the currently logged-in user to unjoin a university.
+   * Corresponds to: DELETE /api/v1/universities/{universityId}/members
+   */
   unjoinUniversity(universityId: number): Observable<unknown> {
     return this.http.delete(`${this.apiUrl}/universities/${universityId}/members`);
   }

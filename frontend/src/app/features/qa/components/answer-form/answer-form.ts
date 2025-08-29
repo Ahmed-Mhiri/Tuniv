@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, output, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+// IMPORTANT: AbstractControl and ValidationErrors are needed for the custom validator
+import { FormBuilder, ReactiveFormsModule, Validators, FormGroup, AbstractControl, ValidationErrors } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzTypographyModule } from 'ng-zorro-antd/typography';
@@ -36,12 +37,39 @@ export class AnswerFormComponent {
   readonly filesToUpload = signal<File[]>([]);
   readonly isSubmitting = signal(false);
 
+  // ===============================================================
+  // START OF FIX
+  // ===============================================================
+
+  // 1. Define the custom validator as a class property (using an arrow function).
+  // This validator checks if either the body has text or if files have been uploaded.
+  private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
+    const body = control.get('body')?.value;
+    const hasFiles = this.fileList().length > 0;
+
+    // If the body is empty AND there are no files, return an error.
+    if (!body?.trim() && !hasFiles) {
+      return { atLeastOneRequired: true };
+    }
+    
+    // Otherwise, the form is valid.
+    return null; 
+  };
+
+  // 2. Update the form definition.
   readonly answerForm = this.fb.group({
-    body: ['', [Validators.required, Validators.minLength(20)]],
+    // Remove the old validators from the 'body' control.
+    body: [''],
+  }, {
+    // Add our new custom validator to the entire form group.
+    validators: this.atLeastOneFieldValidator
   });
-  
+
+  // ===============================================================
+  // END OF FIX
+  // ===============================================================
+
   handleFileChange({ fileList }: NzUploadChangeParam): void {
-    // This method validates and updates the file lists when files are added or removed by the component.
     const validatedList = fileList.filter(f => {
       const isLt5M = (f.size ?? 0) / 1024 / 1024 < 5;
       if (!isLt5M) {
@@ -55,14 +83,14 @@ export class AnswerFormComponent {
     this.filesToUpload.set(
       validatedList.map(f => f.originFileObj as File).filter(f => !!f)
     );
+
+    // 3. We need to re-validate the form whenever the file list changes.
+    this.answerForm.updateValueAndValidity();
   }
 
-  // --- THIS IS THE FIX ---
-  // This method is called by the 'x' button on the file preview.
   removeFile(fileToRemove: NzUploadFile): void {
-    // We manually trigger the nzChange event by creating a new filtered list,
-    // which ensures our handleFileChange logic is the single source of truth.
     const newFileList = this.fileList().filter(f => f.uid !== fileToRemove.uid);
+    // handleFileChange already re-validates, so we are covered here.
     this.handleFileChange({ file: fileToRemove, fileList: newFileList });
   }
 

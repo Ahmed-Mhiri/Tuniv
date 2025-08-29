@@ -99,7 +99,8 @@ export class QuestionDetailPageComponent implements OnInit {
     if (!questionId) return;
 
     this.isSubmittingAnswer.set(true);
-    this.questionService.addAnswer(questionId, event.body, event.files).subscribe({
+    this.questionService.addAnswer(questionId, { body: event.body }, event.files).subscribe({
+
       next: () => {
         this.message.success('Your answer has been posted!');
         // --- FIX: This call ensures the page updates with the new answer ---

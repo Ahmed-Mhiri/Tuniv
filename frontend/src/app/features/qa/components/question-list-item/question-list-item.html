@@ -1,0 +1,24 @@
+<div class="question-item-container" [ngClass]="answerStatus()">
+  <div class="stats-col">
+    <div class="stat-item">
+      <span class="stat-count">{{ question().score }}</span>
+      <span class="stat-label">votes</span>
+    </div>
+    <div class="stat-item answer-stat">
+      <span class="stat-count">{{ question().answers.length }}</span>
+      <span class="stat-label">answers</span>
+    </div>
+  </div>
+
+  <div class="content-col">
+    <h3 class="question-title">
+      <a [routerLink]="['/questions', question().questionId]">{{ question().title }}</a>
+    </h3>
+    <div class="meta-info">
+      <span>
+        asked {{ question().createdAt | timeAgo }} by
+        <a class="author-link" [routerLink]="['/users', question().author.userId]">{{ question().author.username }}</a>
+      </span>
+    </div>
+  </div>
+</div>

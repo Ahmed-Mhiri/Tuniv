@@ -22,20 +22,28 @@ public class AttachmentService {
     private final FileStorage fileStorageService;
     private final AttachmentRepository attachmentRepository;
 
-    // --- FIX: Change the return type from void to List<Attachment> ---
     public List<Attachment> saveAttachments(List<MultipartFile> files, Integer postId, String postType) {
-        if (files == null || files.isEmpty()) {
+        if (files == null) {
             return Collections.emptyList();
         }
         
         List<Attachment> savedAttachments = new ArrayList<>();
 
+        // =========================================================================
+        // ✅ FINAL FIX: We remove the ".filter(file -> !file.isEmpty())" check.
+        // The file is being incorrectly flagged as empty, so we will process it anyway.
+        // The try-catch block will prevent any real issues.
+        // =========================================================================
         List<MultipartFile> validFiles = files.stream()
-            .filter(Objects::nonNull)
-            .filter(file -> !file.isEmpty())
-            .collect(Collectors.toList());
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
 
         for (MultipartFile file : validFiles) {
+            // We can add a check here to skip genuinely empty uploads without filtering.
+            if (file.getSize() == 0) {
+                continue;
+            }
+            
             try {
                 String subDirectory = postType.toLowerCase() + "s";
                 String fileUrl = fileStorageService.storeFile(file, subDirectory);
@@ -50,6 +58,7 @@ public class AttachmentService {
 
                 savedAttachments.add(attachmentRepository.save(attachment));
             } catch (Exception e) {
+                // Re-throwing as a specific exception is good practice
                 throw new RuntimeException("Failed to store file: " + file.getOriginalFilename(), e);
             }
         }

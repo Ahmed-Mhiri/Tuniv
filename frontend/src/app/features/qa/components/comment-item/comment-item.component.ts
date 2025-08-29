@@ -1,6 +1,7 @@
-import { ChangeDetectionStrategy, Component, inject, input, output, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject, input, output, signal } from '@angular/core';
+import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
+import { Observable, of } from 'rxjs';
 import { AuthService } from '../../../../core/services/auth.service';
 import { Comment, CommentCreateRequest } from '../../../../shared/models/qa.model';
 import { CommentService } from '../../services/comment.service';
@@ -23,19 +24,9 @@ import { NzSpaceModule } from 'ng-zorro-antd/space';
   selector: 'app-comment-item',
   standalone: true,
   imports: [
-    CommentItemComponent, // For recursive nesting of comments
-    ReactiveFormsModule, 
-    RouterLink, 
-    TimeAgoPipe,
-    VoteComponent, 
-    NzAvatarModule, 
-    NzButtonModule,
-    NzFormModule, 
-    NzInputModule, 
-    NzIconModule, 
-    NzUploadModule,
-    NzToolTipModule, 
-    NzSpaceModule
+    CommentItemComponent, ReactiveFormsModule, RouterLink, TimeAgoPipe, VoteComponent,
+    NzAvatarModule, NzButtonModule, NzFormModule, NzInputModule, NzIconModule,
+    NzUploadModule, NzToolTipModule, NzSpaceModule
   ],
   templateUrl: './comment-item.component.html',
   styleUrl: './comment-item.component.scss',
@@ -47,6 +38,7 @@ export class CommentItemComponent {
   private readonly commentService = inject(CommentService);
   private readonly message = inject(NzMessageService);
   public readonly authService = inject(AuthService);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   comment = input.required<Comment>();
   answerId = input.required<number>();
@@ -54,22 +46,60 @@ export class CommentItemComponent {
 
   isReplyFormVisible = signal(false);
   isCollapsed = signal(false);
-  replyForm = this.fb.group({
-    body: ['', [Validators.required, Validators.minLength(2)]],
-  });
-  
-  readonly replyFileList = signal<NzUploadFile[]>([]);
+   readonly replyFileList = signal<NzUploadFile[]>([]);
   readonly replyFilesToUpload = signal<File[]>([]);
 
-  preventAutoUpload = () => false;
+  private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
+    const body = control.get('body')?.value;
+    const hasFiles = this.replyFileList().length > 0;
+    // Return an error if the body is empty AND there are no files.
+    return !body?.trim() && !hasFiles ? { atLeastOneRequired: true } : null;
+  };
+  
+  replyForm = this.fb.group({
+    body: [''], // Validators removed from here...
+  }, {
+    validators: this.atLeastOneFieldValidator // ...and added to the group.
+  });
 
-  toggleCollapse(): void { 
-    this.isCollapsed.set(!this.isCollapsed()); 
+ 
+
+  // =========================================================================
+  // ✅ THE FINAL FIX
+  // =========================================================================
+  beforeUpload = (file: NzUploadFile): Observable<boolean> => {
+    // We use the 'file' object itself, as it is the File instance we need.
+    // The `as unknown as File` cast is needed to satisfy TypeScript.
+    this.replyFilesToUpload.update(list => [...list, file as unknown as File]);
+    
+    // We also add it to the list that controls the UI preview.
+    this.replyFileList.update(list => [...list, file]);
+
+    this.cdr.detectChanges();
+    return of(false); // Prevent automatic upload
+  };
+
+  handleReplyFileChange(info: NzUploadChangeParam): void {
+    // This is now only needed to handle removal from the UI.
+    if (info.type === 'removed') {
+      this.removeReplyFile(info.file);
+    }
+  }
+
+  removeReplyFile(fileToRemove: NzUploadFile): void {
+    // We remove the file from both lists using its unique ID (uid).
+    this.replyFileList.update(list => list.filter(f => f.uid !== fileToRemove.uid));
+    this.replyFilesToUpload.update(list => (list as unknown as NzUploadFile[]).filter(f => f.uid !== fileToRemove.uid) as unknown as File[]);
+    this.cdr.detectChanges();
+  }
+  // =========================================================================
+
+  toggleCollapse(): void {
+    this.isCollapsed.set(!this.isCollapsed());
   }
 
   handleVote(voteValue: number): void {
     const valueToSubmit = voteValue >= 0 ? 1 : -1;
-    // Assuming voteOnComment service expects a number for commentId
     this.voteService.voteOnComment(this.comment().commentId, valueToSubmit).subscribe({
       next: () => {
         this.message.success('Vote registered');
@@ -79,36 +109,6 @@ export class CommentItemComponent {
     });
   }
 
-  handleReplyFileChange({ file, fileList }: NzUploadChangeParam): void {
-    console.log('--- 1. File Change Event Triggered ---');
-    console.log('File that changed:', file);
-    console.log('Full list of files from uploader:', fileList);
-
-    // This is a critical step for manual uploads.
-    // We ensure the file status is 'done' so it's treated as a stable item in the list.
-    const processedList = fileList.map(f => ({ ...f, status: 'done' as const }));
-    console.log('2. List after setting status to "done":', processedList);
-    
-    this.replyFileList.set(processedList);
-    console.log('3. UI File List signal has been updated. The preview should now appear.');
-    
-    const filesToSubmit = processedList
-      .map(f => f.originFileObj as File)
-      .filter(f => !!f);
-
-    this.replyFilesToUpload.set(filesToSubmit);
-    console.log('4. Raw files for submission have been updated:', filesToSubmit);
-    console.log('--- File Handling Complete ---');
-  }
-  
-  
-  removeReplyFile(fileToRemove: NzUploadFile): void {
-    console.log('--- Remove File Clicked ---', fileToRemove.name);
-    const newFileList = this.replyFileList().filter(f => f.uid !== fileToRemove.uid);
-    this.handleReplyFileChange({ file: fileToRemove, fileList: newFileList });
-  }
-
-
   submitReply(): void {
     if (this.replyForm.invalid) {
       Object.values(this.replyForm.controls).forEach(control => {
@@ -117,13 +117,10 @@ export class CommentItemComponent {
       });
       return;
     }
-
     const request: CommentCreateRequest = {
       body: this.replyForm.value.body!,
       parentCommentId: this.comment().commentId,
     };
-
-    // Convert answerId from number to string for the service call
     this.commentService.createComment(this.answerId().toString(), request, this.replyFilesToUpload()).subscribe({
       next: () => {
         this.replyForm.reset();

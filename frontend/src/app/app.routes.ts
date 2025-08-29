@@ -16,6 +16,7 @@ import { ModuleListPageComponent } from './features/university/pages/module-list
 import { authGuard } from './core/guards/auth.guard';
 import { publicOnlyGuard } from './core/guards/public-only.guard';
 import { QuestionDetailPageComponent } from './features/qa/pages/question-detail-page/question-detail-page.component';
+import { AskQuestionPageComponent } from './features/qa/pages/ask-question-page/ask-question-page.component';
 
 export const routes: Routes = [
   // --- Public Routes ---
@@ -42,12 +43,31 @@ export const routes: Routes = [
     component: ModuleListPageComponent,
     canActivate: [authGuard],
   },
-  {
-    // Note: This is still a placeholder until you create the AskQuestionPageComponent
+   {
     path: 'qa/ask',
-    component: HomePageComponent,
+    // Lazy-load the AskQuestionPageComponent when the user navigates to this path.
+    loadComponent: () => 
+      import('./features/qa/pages/ask-question-page/ask-question-page.component').then(c => c.AskQuestionPageComponent),
     canActivate: [authGuard],
   },
+  // =========================================================================
   { path: 'questions/:id', component: QuestionDetailPageComponent },
+  {
+    path: 'modules/:moduleId/questions',
+    loadComponent: () => 
+      import('./features/qa/pages/question-list-page/question-list-page.component').then(c => c.QuestionListPageComponent),
+    canActivate: [authGuard],
+  },
+  // =========================================================================
+  {
+    path: 'qa/ask',
+    loadComponent: () => 
+      import('./features/qa/pages/ask-question-page/ask-question-page.component').then(c => c.AskQuestionPageComponent),
+    canActivate: [authGuard],
+  },
+  { 
+    path: 'questions/:id', 
+    component: QuestionDetailPageComponent 
+  },
 
 ];
