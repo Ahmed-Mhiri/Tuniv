@@ -15,5 +15,6 @@ export interface University {
   universityId: number;
   name: string;
   modules: Module[];
-  isMember: boolean; // <-- ADD THIS
+  isMember: boolean;
+  memberCount: number; // <-- ADD THIS PROPERTY
 }

@@ -17,21 +17,24 @@ public final class UniversityMapper { // Use 'final' for utility classes with on
     }
 
     public static UniversityDto toUniversityDto(University university, boolean isMember) {
-        if (university == null) {
-            return null;
-        }
-
-        return new UniversityDto(
-            university.getUniversityId(),
-            university.getName(),
-            university.getModules() != null ?
-                university.getModules().stream()
-                    .map(UniversityMapper::toModuleDto)
-                    .collect(Collectors.toList()) :
-                Collections.emptyList(),
-            isMember
-        );
+    if (university == null) {
+        return null;
     }
+
+    return new UniversityDto(
+        university.getUniversityId(),
+        university.getName(),
+        university.getModules() != null ?
+            university.getModules().stream()
+                .map(UniversityMapper::toModuleDto)
+                .collect(Collectors.toList()) :
+            Collections.emptyList(),
+        isMember,
+        // ✅ ADD THIS LINE: Calculate the size of the members set
+        university.getMembers() != null ? university.getMembers().size() : 0
+    );
+}
+
 
     public static UniversityDto toUniversityDto(University university) {
         return toUniversityDto(university, false);

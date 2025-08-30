@@ -10,6 +10,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ChatMessageDto {
+    private Integer messageId; // <-- ADD THIS
     private String content;
     private String senderUsername;
     private String sentAt;

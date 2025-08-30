@@ -1,0 +1,69 @@
+<div class="chat-container">
+  @if (isLoading()) {
+    <div class="loading-overlay">
+      <nz-spin nzSimple nzSize="large"></nz-spin>
+    </div>
+  }
+
+  <div class="message-container" #messageContainer>
+    @for (msg of messages(); track msg.messageId) {
+      <div class="message-wrapper" [class.is-mine]="msg.senderUsername === currentUser()?.username">
+        <div class="message-bubble">
+          <div class="sender-name">{{ msg.senderUsername }}</div>
+          @if (msg.content) {
+            <p class="message-content" [innerHTML]="sanitizer.bypassSecurityTrustHtml(msg.content)"></p>
+          }
+
+          @if (msg.attachments && msg.attachments.length > 0) {
+            <div class="attachments">
+              @for (att of msg.attachments; track att.fileUrl) {
+                <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
+                  @if (att.fileType.startsWith('image/')) {
+                    <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
+                  } @else {
+                    <span nz-icon nzType="file-text" class="file-icon"></span>
+                    <span class="file-name">{{ att.fileName }}</span>
+                  }
+                </a>
+              }
+            </div>
+          }
+          <div class="timestamp">{{ msg.sentAt | timeAgo }}</div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="message-input-area">
+    @if (fileList().length > 0) {
+      <div class="file-preview-list">
+        @for (file of fileList(); track file.uid) {
+          <div class="file-item">
+            <span nz-icon nzType="file-text"></span>
+            <span>{{ file.name }}</span>
+            <button nz-button nzType="text" nzShape="circle" (click)="removeFile(file)">
+              <span nz-icon nzType="close"></span>
+            </button>
+          </div>
+        }
+      </div>
+    }
+    
+    <form class="input-form" [formGroup]="messageForm" (ngSubmit)="sendMessage()">
+      <nz-upload [nzFileList]="fileList()" [nzBeforeUpload]="beforeUpload" [nzShowUploadList]="false">
+        <button nz-button nzType="text" nzShape="circle" type="button" class="attach-btn" nz-tooltip="Attach files">
+          <span nz-icon nzType="paper-clip"></span>
+        </button>
+      </nz-upload>
+      <textarea
+        nz-input
+        formControlName="content"
+        placeholder="Type a message..."
+        [nzAutosize]="{ minRows: 1, maxRows: 4 }"
+        (keydown.enter)="handleEnterPress($event)" ></textarea>
+      <button nz-button nzType="primary" nzShape="circle" class="send-btn" [disabled]="isSending() || messageForm.invalid">
+        <span nz-icon nzType="send"></span>
+      </button>
+    </form>
+  </div>
+</div>

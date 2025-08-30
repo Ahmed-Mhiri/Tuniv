@@ -32,11 +32,10 @@
   justify-content: space-between;
 }
 
-// --- FIX: New styles for the card header ---
 .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start; // Align to the top
+  align-items: flex-start;
   gap: 0.5rem;
 }
 
@@ -46,24 +45,48 @@
   font-weight: 600;
   color: var(--color-text-primary);
   margin-bottom: 0.25rem;
-  // Let the title wrap if needed, flexbox will handle the rest
 }
 
-.card-subtitle {
+// --- REMOVED: The .card-subtitle class is no longer in use ---
+
+// =========================================================================
+// ✅ NEW STYLES ADDED for the metadata section
+// =========================================================================
+.card-meta {
+  display: flex;
+  gap: 1.5rem;
   color: var(--color-text-secondary);
-  // Add some space between the subtitle and the actions
-  margin-bottom: 1rem; 
+  font-size: 0.875rem; /* 14px */
+  margin-top: 0.75rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--color-border);
 }
+
+.meta-item,
+.meta-item-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.meta-item-link {
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--color-primary);
+  }
+}
+// =========================================================================
 
 .card-actions {
   margin-top: auto; // Push actions to the bottom
-  border-top: 1px solid var(--color-border);
-  padding-top: 1rem;
+  padding-top: 1.25rem; // Spacing from the border above
   text-align: right;
+  // border-top has been removed as .card-meta now provides the separator
 }
 
-// --- FIX: Badge is no longer absolutely positioned ---
 .joined-badge {
-  // It no longer needs special positioning
-  white-space: nowrap; // Prevent "Joined" text from wrapping
+  white-space: nowrap;
 }

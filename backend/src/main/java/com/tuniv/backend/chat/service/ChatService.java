@@ -31,14 +31,39 @@ public class ChatService {
     private final UserRepository userRepository;
     private final ConversationRepository conversationRepository;
     private final SimpMessageSendingOperations messagingTemplate;
-    private final AttachmentService attachmentService; // <-- INJECT
+    private final AttachmentService attachmentService;
 
-    @Transactional
+    /**
+     * This is the main public method. It is NOT transactional.
+     * Its job is to orchestrate saving and then broadcasting.
+     */
     public void sendMessage(
             Integer conversationId,
             ChatMessageDto chatMessageDto,
             String senderUsername,
-            List<MultipartFile> files // <-- ADD files parameter
+            List<MultipartFile> files
+    ) {
+        // Step 1: Call the transactional method to save everything to the database.
+        // When this method returns, the transaction is complete and the data is committed.
+        Message messageWithAttachments = saveMessageAndAttachments(conversationId, chatMessageDto, senderUsername, files);
+
+        // Step 2: Now that the data is saved, map the complete entity to a DTO.
+        ChatMessageDto dtoToSend = ChatMapper.toChatMessageDto(messageWithAttachments);
+        
+        // Step 3: Broadcast the final, complete DTO over the WebSocket.
+        String destination = "/topic/conversation/" + conversationId;
+        messagingTemplate.convertAndSend(destination, dtoToSend);
+    }
+
+    /**
+     * This new, private method handles ALL database interactions in its own transaction.
+     */
+    @Transactional
+    public Message saveMessageAndAttachments(
+            Integer conversationId,
+            ChatMessageDto chatMessageDto,
+            String senderUsername,
+            List<MultipartFile> files
     ) {
         User sender = userRepository.findByUsername(senderUsername)
                 .orElseThrow(() -> new ResourceNotFoundException("Sender not found: " + senderUsername));
@@ -52,10 +77,8 @@ public class ChatService {
         message.setContent(chatMessageDto.getContent());
         message.setSentAt(LocalDateTime.now());
         
-        // Save the message first to get an ID
         Message savedMessage = messageRepository.save(message);
 
-        // --- FIX: Use the AttachmentService to handle files ---
         if (files != null && !files.isEmpty()) {
             attachmentService.saveAttachments(
                 files.stream().filter(Objects::nonNull).collect(Collectors.toList()),
@@ -64,15 +87,15 @@ public class ChatService {
             );
         }
 
-        // Fetch the message again to get it with the newly saved attachments
-        Message messageWithAttachments = messageRepository.findById(savedMessage.getMessageId()).get();
-        ChatMessageDto dtoToSend = ChatMapper.toChatMessageDto(messageWithAttachments);
-        
-        String destination = "/topic/conversation/" + conversationId;
-        messagingTemplate.convertAndSend(destination, dtoToSend);
+        // Re-fetch the message to ensure it includes the attachments before returning.
+        return messageRepository.findById(savedMessage.getMessageId())
+            .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch message after saving attachments"));
     }
 
-    // --- NEW METHOD ---
+    /**
+     * Fetches the historical messages for a conversation.
+     */
+    @Transactional(readOnly = true)
     public List<ChatMessageDto> getMessagesByConversation(Integer conversationId) {
         if (!conversationRepository.existsById(conversationId)) {
             throw new ResourceNotFoundException("Conversation not found with id: " + conversationId);
@@ -80,7 +103,7 @@ public class ChatService {
         
         return messageRepository.findByConversationConversationIdOrderBySentAtAsc(conversationId)
                 .stream()
-                .map(ChatMapper::toChatMessageDto) // Use the mapper
+                .map(ChatMapper::toChatMessageDto)
                 .collect(Collectors.toList());
     }
 }

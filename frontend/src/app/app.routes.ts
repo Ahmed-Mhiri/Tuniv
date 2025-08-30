@@ -69,5 +69,13 @@ export const routes: Routes = [
     path: 'questions/:id', 
     component: QuestionDetailPageComponent 
   },
-
+  {
+    path: 'chat/conversation/:id', // e.g., /chat/conversation/123
+    loadComponent: () => 
+      import('./features/chat/pages/conversation-page.component/conversation-page.component').then(c => c.ConversationPageComponent),
+    canActivate: [authGuard],
+  },
 ];
+
+
+

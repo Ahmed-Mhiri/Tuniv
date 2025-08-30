@@ -8,7 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable; // <-- IMPORT ADDED
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.tuniv.backend.chat.dto.ChatMessageDto;
 import com.tuniv.backend.chat.service.ChatService;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -39,14 +40,19 @@ public class ChatController {
     }
     
     // --- NEW: A dedicated REST endpoint for sending messages with files ---
-    @PostMapping(value = "/api/v1/chat/{conversationId}/message", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
+   @PostMapping(value = "/api/v1/chat/{conversationId}/message", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
     public ResponseEntity<?> sendMessageWithAttachment(
             @PathVariable Integer conversationId,
             @RequestPart("message") @Valid ChatMessageDto chatMessageDto,
-            @AuthenticationPrincipal Principal principal,
+            // We remove @AuthenticationPrincipal Principal from the parameters
             @RequestPart(value = "files", required = false) List<MultipartFile> files) {
 
-        chatService.sendMessage(conversationId, chatMessageDto, principal.getName(), files);
+        // Get the authenticated user directly from the security context. This is more reliable.
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        
+        // Pass the username from the UserDetailsImpl object to the service.
+        chatService.sendMessage(conversationId, chatMessageDto, currentUser.getUsername(), files);
+        
         return ResponseEntity.ok().build();
     }
     

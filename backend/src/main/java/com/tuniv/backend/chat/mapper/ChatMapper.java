@@ -14,6 +14,7 @@ public class ChatMapper {
         if (message == null) return null;
 
         ChatMessageDto dto = new ChatMessageDto();
+        dto.setMessageId(message.getMessageId()); // <-- ADD THIS
         dto.setContent(message.getContent());
         dto.setSenderUsername(message.getSender().getUsername());
         dto.setSentAt(message.getSentAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
