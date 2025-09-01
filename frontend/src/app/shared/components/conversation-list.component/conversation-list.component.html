@@ -1,0 +1,37 @@
+@if (conversations().length > 0) {
+  <nz-list class="conversation-list" [nzDataSource]="conversations()" [nzRenderItem]="itemTemplate" [nzSplit]="false">
+    <ng-template #itemTemplate let-conv>
+      <nz-list-item class="conversation-item" (click)="openConversation(conv)">
+        <nz-list-item-meta
+          [nzTitle]="titleTemplate"
+          [nzDescription]="descriptionTemplate"
+          [nzAvatar]="avatarTemplate"
+        >
+          <ng-template #avatarTemplate>
+            <nz-avatar [nzText]="conv.participantName[0]" [nzSrc]="conv.participantAvatarUrl"></nz-avatar>
+          </ng-template>
+          <ng-template #titleTemplate>
+            <span class="participant-name">{{ conv.participantName }}</span>
+          </ng-template>
+          <ng-template #descriptionTemplate>
+            <p class="last-message">{{ conv.lastMessage }}</p>
+          </ng-template>
+        </nz-list-item-meta>
+
+        <div class="meta-info">
+          <span class="timestamp">{{ conv.lastMessageTimestamp | timeAgo }}</span>
+          @if (conv.unreadCount > 0) {
+                <nz-badge [nzCount]="conv.unreadCount" [nzOverflowCount]="9"></nz-badge>          }
+        </div>
+      </nz-list-item>
+    </ng-template>
+  </nz-list>
+} @else {
+  <div class="empty-state-container">
+    <nz-empty
+      nzNotFoundImage="https-gw.alipayobjects.com/zos/antfincdn/ZHrcdLPrvN/empty.svg"
+      nzNotFoundContent="No conversations yet"
+      nzNotFoundFooter="Start a conversation to see it here."
+    ></nz-empty>
+  </div>
+}

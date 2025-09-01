@@ -1,10 +1,12 @@
 package com.tuniv.backend.qa.service;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.notification.event.SolutionMarkedEvent;
 import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.model.Question;
 import com.tuniv.backend.qa.repository.AnswerRepository;
@@ -23,6 +25,8 @@ public class AnswerService {
 
     private static final int ACCEPT_ANSWER_REP = 15; // For the answer author
     private static final int ACCEPTS_ANSWER_REP = 2;  // For the question author
+    private final ApplicationEventPublisher eventPublisher;
+
 
     @Transactional
     public void markAsSolution(Integer answerId, UserDetailsImpl currentUserDetails) {
@@ -53,5 +57,7 @@ public class AnswerService {
         
         userRepository.save(answerAuthor);
         userRepository.save(questionAuthor);
+        eventPublisher.publishEvent(new SolutionMarkedEvent(this, answer)); // Add this line
+
     }
 }

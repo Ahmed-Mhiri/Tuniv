@@ -1,20 +1,22 @@
-<nz-header class="bg-surface border-b border-border shadow-md">
+<nz-header>
   <div class="navbar-content">
-    <a routerLink="/" class="flex items-center gap-3">
-      <span class="themed-logo"></span>
-    </a>
+    <div class="navbar-left">
+      <a routerLink="/" class="logo">
+        <span class="themed-logo"></span>
+      </a>
+      <div class="main-nav-links">
+        <a class="nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
+        <a class="nav-link" routerLink="/universities" routerLinkActive="active">Universities</a>
+      </div>
+    </div>
 
-    @if (isBrowser()) {
-      <div class="flex items-center gap-4">
-        <div class="hidden md:flex">
-          <ul nz-menu nzMode="horizontal" [nzTheme]="menuTheme()" class="main-menu">
-            <li nz-menu-item routerLink="/" routerLinkActive="active-link" [routerLinkActiveOptions]="{ exact: true }">Home</li>
-            <li nz-menu-item routerLink="/universities" routerLinkActive="active-link">Universities</li>
-          </ul>
-        </div>
+    <div class="navbar-center">
+      <app-search-bar />
+    </div>
 
+    <div class="navbar-right">
+      @if (isBrowser()) {
         <nz-switch
-          class="hidden sm:inline-flex"
           [ngModel]="isDarkMode()"
           (ngModelChange)="toggleTheme($event)"
           [nzCheckedChildren]="iconMoon"
@@ -22,49 +24,38 @@
         ></nz-switch>
         <ng-template #iconSun><span nz-icon nzType="sun"></span></ng-template>
         <ng-template #iconMoon><span nz-icon nzType="moon"></span></ng-template>
+        @if (isUserLoggedIn()) {
+          <button (click)="toggleChatWidget()" nz-button nzType="text" nzShape="circle" class="action-icon" nz-tooltip nzTooltipTitle="Chat">
+            <span nz-icon nzType="message" nzTheme="outline"></span>
+          </button>
+          
+          <app-notification-dropdown></app-notification-dropdown>
 
-        <div class="hidden md:flex user-actions items-center gap-2">
-          @if (isUserLoggedIn()) {
-            <a nz-dropdown [nzDropdownMenu]="userMenu" nzPlacement="bottomRight" class="flex items-center gap-2 cursor-pointer p-1 rounded-md hover:bg-surface-subtle">
-              <nz-avatar nzIcon="user" [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"></nz-avatar>
-              <span class="text-text-primary font-body font-medium">{{ currentUser()?.username }}</span>
-            </a>
-            <nz-dropdown-menu #userMenu="nzDropdownMenu">
-              <ul nz-menu>
-                <li nz-menu-item [routerLink]="['/users', currentUser()?.userId]">My Profile</li>
-                <li nz-menu-item routerLink="/settings">Settings</li>
-                <li nz-menu-divider></li>
-                <li nz-menu-item (click)="logout()">Logout</li>
-              </ul>
-            </nz-dropdown-menu>
 
-            <a routerLink="/qa/ask">
-              <button nz-button class="btn btn-accent">
-                <span nz-icon nzType="plus"></span>
-                Ask Question
-              </button>
-            </a>
-          } @else {
-            <a routerLink="/login">
-              <button nz-button nzType="default" class="btn btn-secondary">
-                <span nz-icon nzType="login"></span>
-                Login
-              </button>
-            </a>
-            <a routerLink="/register">
-              <button nz-button nzType="primary" class="btn btn-primary">
-                <span nz-icon nzType="user-add"></span>
-                Register
-              </button>
-            </a>
-          }
-        </div>
-        
-        <button nz-button nzType="text" (click)="openMobileDrawer()" class="md:hidden text-primary" aria-label="Open menu">
-          <span nz-icon nzType="menu"></span>
-        </button>
-      </div>
-    }
+          <a nz-dropdown [nzDropdownMenu]="userMenu" nzPlacement="bottomRight" class="user-profile">
+            <nz-avatar nzIcon="user" [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"></nz-avatar>
+          </a>
+          <nz-dropdown-menu #userMenu="nzDropdownMenu">
+            <ul nz-menu>
+              <div class="dropdown-header">
+                Signed in as <strong>{{ currentUser()?.username }}</strong>
+              </div>
+              <li nz-menu-divider></li>
+              <li nz-menu-item [routerLink]="['/users', currentUser()?.userId]"><span nz-icon nzType="user"></span> My Profile</li>
+              <li nz-menu-item routerLink="/settings"><span nz-icon nzType="setting"></span> Settings</li>
+              <li nz-menu-divider></li>
+              <li nz-menu-item (click)="logout()"><span nz-icon nzType="logout"></span> Logout</li>
+            </ul>
+          </nz-dropdown-menu>
+        } @else {
+          <a routerLink="/login"><button nz-button nzType="default" class="btn-secondary">Login</button></a>
+          <a routerLink="/register"><button nz-button nzType="primary" class="btn-primary">Register</button></a>
+        }
+      }
+      <button nz-button nzType="text" (click)="openMobileDrawer()" class="mobile-menu-trigger" aria-label="Open menu">
+        <span nz-icon nzType="menu"></span>
+      </button>
+    </div>
   </div>
 </nz-header>
 
@@ -77,14 +68,18 @@
   nzTitle="Menu"
 >
   <ng-container *nzDrawerContent>
+    <div class="mobile-search-wrapper">
+      <app-search-bar />
+    </div>
     <ul nz-menu nzMode="inline" [nzTheme]="menuTheme()">
       <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/">Home</li>
       <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/universities">Universities</li>
-      <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/qa/ask">Ask Question</li>
       <li nz-menu-divider></li>
       @if (isUserLoggedIn()) {
         <li nz-menu-item (click)="closeMobileDrawer()" [routerLink]="['/users', currentUser()?.userId]">My Profile</li>
         <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/settings">Settings</li>
+        <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/qa/ask">Ask Question</li>
+        <li nz-menu-divider></li>
         <li nz-menu-item (click)="logout(); closeMobileDrawer()">Logout</li>
       } @else {
         <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/login">Login</li>

@@ -1,16 +1,18 @@
-import { ChangeDetectionStrategy, Component, OnInit, OnDestroy, inject, signal, ViewChild, ElementRef, SecurityContext, afterNextRender } from '@angular/core';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ChangeDetectionStrategy, Component, effect, ElementRef, inject, input, SecurityContext, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { DomSanitizer } from '@angular/platform-browser';
-import { Subscription, switchMap } from 'rxjs';
+import { finalize, retry, Subscription, switchMap, takeWhile, timer } from 'rxjs';
+
 import { AuthService } from '../../../../core/services/auth.service';
 import { ChatService } from '../../services/chat.service';
 import { ChatMessage } from '../../../../shared/models/chat.model';
+import { Conversation } from '../../../../shared/models/conversation.model';
 import { TimeAgoPipe } from '../../../../shared/pipes/time-ago.pipe';
 
 // NG-ZORRO Modules
-import { NzUploadChangeParam, NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
+import { NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzInputModule } from 'ng-zorro-antd/input';
 import { NzIconModule } from 'ng-zorro-antd/icon';
@@ -29,25 +31,30 @@ import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
   styleUrl: './conversation-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ConversationPageComponent implements OnInit, OnDestroy {
-  @ViewChild('messageContainer') private messageContainer!: ElementRef;
+export class ConversationPageComponent {
+  // --- Inputs ---
+  conversation = input.required<Conversation>();
 
-  private readonly route = inject(ActivatedRoute);
+  // --- Dependencies ---
   private readonly chatService = inject(ChatService);
   private readonly authService = inject(AuthService);
   private readonly fb = inject(FormBuilder);
-  private readonly sanitizer = inject(DomSanitizer);
+  readonly sanitizer = inject(DomSanitizer);
 
-  private wsSubscription: Subscription | null = null;
+  // --- Element Refs ---
+  @ViewChild('messageContainer') private messageContainer!: ElementRef<HTMLDivElement>;
 
+  // --- State Signals ---
   readonly messages = signal<ChatMessage[]>([]);
   readonly isLoading = signal(true);
   readonly currentUser = this.authService.currentUser;
-
   readonly fileList = signal<NzUploadFile[]>([]);
   readonly filesToUpload = signal<File[]>([]);
   readonly isSending = signal(false);
 
+  private wsSubscription?: Subscription;
+
+  // --- Form Definition ---
   private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
     const content = control.get('content')?.value;
     const hasFiles = this.filesToUpload().length > 0;
@@ -59,73 +66,130 @@ export class ConversationPageComponent implements OnInit, OnDestroy {
   }, { validators: this.atLeastOneFieldValidator });
 
   constructor() {
-    // This function will run AFTER Angular has rendered any changes to the DOM.
-    // It's the perfect place to run DOM-manipulating code like scrolling.
-    afterNextRender(() => {
-      // This check is important because afterNextRender runs on initial load too.
-      if (this.messages().length > 0) {
-        this.scrollToBottom();
+    // --- Effect 1: Handles data fetching and WebSocket connection ---
+    effect((onCleanup) => {
+      const currentConversation = this.conversation();
+      this.isLoading.set(true);
+      this.messages.set([]); // Clear previous messages
+
+      // Fetch message history
+      this.chatService.getMessageHistory(currentConversation.conversationId).subscribe(history => {
+        this.messages.set(history);
+        this.isLoading.set(false);
+        // The scrolling is now handled by the second effect
+      });
+
+      // Watch for new messages
+      this.wsSubscription = this.chatService.watchConversation(currentConversation.conversationId)
+        .subscribe(newMessage => {
+          if (
+            newMessage.senderUsername !== this.currentUser()?.username &&
+            !this.messages().some(m => m.messageId === newMessage.messageId)
+          ) {
+            this.messages.update(current => [...current, newMessage]);
+            // Scrolling is handled by the second effect
+          }
+        });
+
+      onCleanup(() => {
+        this.wsSubscription?.unsubscribe();
+      });
+    });
+
+    // --- Effect 2: Handles scrolling the view to the bottom ---
+    effect(() => {
+      // Establish a dependency on the messages signal
+      this.messages();
+
+      // Ensure the messageContainer element exists before trying to scroll
+      if (this.messageContainer) {
+        // Use setTimeout to wait for the DOM to be updated with the new messages
+        setTimeout(() => this.scrollToBottom(), 0);
       }
     });
   }
 
-  ngOnInit(): void {
-    this.route.paramMap.pipe(
-      switchMap(params => {
-        const conversationId = Number(params.get('id'));
-        this.isLoading.set(true);
-
-        // When a new message arrives, just update the signal.
-        // The afterNextRender function will handle the scrolling automatically.
-        this.wsSubscription = this.chatService.watchConversation(conversationId).subscribe(newMessage => {
-          this.messages.update(current => [...current, newMessage]);
-        });
-
-        return this.chatService.getMessageHistory(conversationId);
-      })
-    ).subscribe(history => {
-      this.messages.set(history);
-      this.isLoading.set(false);
-    });
-  }
-
-  ngOnDestroy(): void {
-    this.wsSubscription?.unsubscribe();
-  }
-
   sendMessage(): void {
-    if (this.messageForm.invalid) return;
-
-    const content = this.messageForm.value.content?.trim() ?? '';
-    const files = this.filesToUpload();
+    if (this.messageForm.invalid || this.isSending()) return;
 
     this.isSending.set(true);
-    const conversationId = Number(this.route.snapshot.paramMap.get('id'));
+    const content = this.messageForm.value.content?.trim() ?? '';
+    const files = this.filesToUpload();
+    const conversationId = this.conversation().conversationId;
 
-    const sanitizedContent = this.sanitizer.sanitize(SecurityContext.HTML, content) || '';
+    const tempMessageId = Date.now() * -1;
+    const tempAttachments = files.map(file => ({
+      fileName: file.name, fileType: file.type, fileUrl: URL.createObjectURL(file)
+    }));
 
-    this.chatService.sendMessage(conversationId, sanitizedContent, files).subscribe({
-      complete: () => {
-        this.messageForm.reset();
-        this.fileList.set([]);
-        this.filesToUpload.set([]);
-        this.isSending.set(false);
-        // We don't need to call scrollToBottom here anymore.
-        // The WebSocket broadcast will update the signal, which triggers afterNextRender.
-      },
-      error: () => this.isSending.set(false),
-    });
+    const tempMessage: ChatMessage = {
+      messageId: tempMessageId,
+      conversationId: conversationId,
+      senderUsername: this.currentUser()?.username || 'Me',
+      content: this.sanitizer.sanitize(SecurityContext.HTML, content) || '',
+      sentAt: new Date().toISOString(),
+      attachments: tempAttachments,
+      status: 'sending'
+    };
+
+    this.messages.update(current => [...current, tempMessage]);
+    // The scrolling effect will automatically trigger when messages are updated
+    this.resetForm();
+
+    this.chatService.sendMessage(conversationId, tempMessage.content, files)
+      .pipe(finalize(() => this.isSending.set(false)))
+      .subscribe({
+        next: (response: { messageId: number }) => {
+          this.pollForFinalMessage(response.messageId, tempMessageId, tempAttachments);
+        },
+        error: (err) => {
+          console.error('Failed to send message:', err);
+          this.messages.update(current =>
+            current.map(msg => (msg.messageId === tempMessageId ? { ...msg, status: 'error' } : msg))
+          );
+          tempAttachments.forEach(att => URL.revokeObjectURL(att.fileUrl));
+        },
+      });
   }
 
-  trackByMessage(index: number, message: ChatMessage): number {
-    return message.messageId;
+  private pollForFinalMessage(finalMessageId: number, tempMessageId: number, tempAttachments: any[]): void {
+    timer(500, 1500)
+      .pipe(
+        switchMap(() => this.chatService.getSingleMessage(finalMessageId)),
+        retry(3),
+        // Stop when the message has a processed attachment URL, or after ~15 seconds
+        takeWhile(msg => !msg.attachments?.[0]?.fileUrl.startsWith('http'), true)
+      )
+      .subscribe(finalMessage => {
+        if (finalMessage && (!tempAttachments.length || finalMessage.attachments?.[0]?.fileUrl.startsWith('http'))) {
+          this.messages.update(current =>
+            current.map(msg => (msg.messageId === tempMessageId ? finalMessage : msg))
+          );
+          tempAttachments.forEach(att => URL.revokeObjectURL(att.fileUrl));
+        }
+      });
+  }
+
+  private scrollToBottom(): void {
+    try {
+      const container = this.messageContainer.nativeElement;
+      container.scrollTop = container.scrollHeight;
+    } catch (err) {
+      console.error('Could not scroll to bottom:', err);
+    }
+  }
+
+  private resetForm(): void {
+    this.messageForm.reset();
+    this.fileList.set([]);
+    this.filesToUpload.set([]);
   }
 
   beforeUpload = (file: NzUploadFile): boolean => {
     this.filesToUpload.update(list => [...list, file as unknown as File]);
     this.fileList.update(list => [...list, file]);
     this.messageForm.updateValueAndValidity();
-    return false; // Prevent automatic upload
+    return false;
   };
 
   removeFile = (file: NzUploadFile): void => {
@@ -134,24 +198,14 @@ export class ConversationPageComponent implements OnInit, OnDestroy {
     this.messageForm.updateValueAndValidity();
   };
 
-  private scrollToBottom(): void {
-    try {
-      this.messageContainer.nativeElement.scrollTop = this.messageContainer.nativeElement.scrollHeight;
-    } catch (err) {
-      console.error("Could not scroll to bottom:", err);
+  handleEnterPress(event: Event): void {
+    if (!(event instanceof KeyboardEvent)) return;
+
+    if (!event.shiftKey) {
+      event.preventDefault();
+      if (!this.isSending()) {
+        this.sendMessage();
+      }
     }
   }
-
-  handleEnterPress(event: Event): void {
-  // First, check if the event is actually a KeyboardEvent
-  if (!(event instanceof KeyboardEvent)) {
-    return;
-  }
-
-  // Now TypeScript knows it's safe to access keyboard-specific properties
-  if (!event.shiftKey) {
-    event.preventDefault(); // Prevent new line on Enter
-    this.sendMessage();
-  }
-}
 }

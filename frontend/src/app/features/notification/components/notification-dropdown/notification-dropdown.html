@@ -1,0 +1,43 @@
+<a nz-dropdown nzTrigger="click" [nzDropdownMenu]="menu" nzPlacement="bottomRight">
+  <nz-badge [nzCount]="unreadCount()" nzSize="small">
+    <span nz-icon nzType="bell" nzTheme="outline" class="text-2xl text-[var(--color-text-secondary)] hover:text-[var(--color-primary)]"></span>
+  </nz-badge>
+</a>
+
+<nz-dropdown-menu #menu="nzDropdownMenu">
+  <div class="notification-panel">
+    <header class="panel-header">
+      <h3 class="panel-title">Notifications</h3>
+      @if (unreadCount() > 0) {
+        <button nz-button nzType="link" (click)="onMarkAllAsRead()">
+          Mark all as read
+        </button>
+      }
+    </header>
+    <nz-divider></nz-divider>
+
+    <main class="panel-body">
+      @for (notification of notifications(); track notification.notificationId) {
+        <div 
+          class="notification-item" 
+          [class.unread]="!notification.isRead"
+          (click)="onNotificationClick(notification)">
+          
+          @if (!notification.isRead) {
+            <div class="unread-dot"></div>
+          }
+          
+          <div class="notification-content">
+            <p class="message" [innerHTML]="notification.message"></p>
+            <span class="timestamp">{{ notification.createdAt | timeAgo }}</span>
+          </div>
+        </div>
+      } @empty {
+        <div class="empty-state">
+          <img ngSrc="/assets/images/all-caught-up.svg" alt="All caught up illustration" width="120" height="120" />
+          <p>You're all caught up!</p>
+        </div>
+      }
+    </main>
+  </div>
+</nz-dropdown-menu>

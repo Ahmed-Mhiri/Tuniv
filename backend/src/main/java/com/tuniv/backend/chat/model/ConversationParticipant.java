@@ -1,6 +1,7 @@
 package com.tuniv.backend.chat.model;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 import com.tuniv.backend.user.model.User;
@@ -35,6 +36,9 @@ public class ConversationParticipant {
     @MapsId("conversationId")
     @JoinColumn(name = "conversation_id") // <-- THIS IS THE FIX
     private Conversation conversation;
+    
+    @Column(name = "last_read_timestamp")
+    private LocalDateTime lastReadTimestamp;
 
     @Embeddable
     @Getter

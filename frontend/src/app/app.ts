@@ -3,9 +3,10 @@ import { RouterOutlet } from '@angular/router';
 import { NavbarComponent } from "./shared/components/navbar/navbar.component";
 import { FooterComponent } from "./shared/components/footer/footer.component";
 import { WebSocketService } from './core/services/websocket.service';
+import { ChatWidgetComponent } from "./shared/components/chat-widget.component/chat-widget.component";
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, NavbarComponent, FooterComponent],
+  imports: [RouterOutlet, NavbarComponent, FooterComponent, ChatWidgetComponent],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

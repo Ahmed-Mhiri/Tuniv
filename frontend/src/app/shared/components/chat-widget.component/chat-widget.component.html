@@ -1,0 +1,36 @@
+@if (!isWidgetOpen()) {
+  <button 
+    class="chat-launcher-btn" 
+    nz-button 
+    nzType="primary" 
+    nzShape="circle" 
+    (click)="isWidgetOpen.set(true)" 
+    aria-label="Open chat"
+  >
+    <span nz-icon nzType="message"></span>
+  </button>
+}
+
+@if (isWidgetOpen()) {
+  <div class="chat-widget-container">
+    <header class="widget-header">
+      @if (activeConversation()) {
+        <button nz-button nzType="text" nzShape="circle" class="back-btn" (click)="goBackToList()" aria-label="Back to conversations">
+          <span nz-icon nzType="arrow-left"></span>
+        </button>
+      }
+      <h3 class="widget-title">{{ widgetTitle() }}</h3>
+      <button nz-button nzType="text" nzShape="circle" (click)="isWidgetOpen.set(false)" aria-label="Close chat">
+        <span nz-icon nzType="close"></span>
+      </button>
+    </header>
+
+    <main class="widget-body">
+      @if (activeConversation(); as conv) {
+        <app-conversation-page [conversation]="conv"></app-conversation-page>
+      } @else {
+        <app-conversation-list></app-conversation-list>
+      }
+    </main>
+  </div>
+}

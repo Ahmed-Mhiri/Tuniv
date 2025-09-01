@@ -1,6 +1,8 @@
 :host {
   display: flex;
-  height: calc(100vh - 64px); // Full height minus navbar
+  /* This is the key fix: ensures the component fills its parent container (the widget body) instead of the whole screen. */
+  height: 100%;
+  width: 100%;
 }
 
 .chat-container {
@@ -9,6 +11,7 @@
   width: 100%;
   height: 100%;
   background-color: var(--color-background);
+  overflow: hidden;
 }
 
 .loading-overlay {
@@ -22,6 +25,7 @@
 }
 
 .message-container {
+  /* This allows the message area to grow and fill available space, with its own scrollbar. */
   flex-grow: 1;
   overflow-y: auto;
   padding: 1rem;
@@ -33,7 +37,7 @@
 .message-wrapper {
   display: flex;
   max-width: 70%;
-  
+
   &.is-mine {
     align-self: flex-end;
     .message-bubble {
@@ -124,6 +128,8 @@
 }
 
 .message-input-area {
+  /* This safeguard prevents the input area from being compressed or pushed out of view. */
+  flex-shrink: 0;
   padding: 0.75rem;
   background-color: var(--color-surface);
   border-top: 1px solid var(--color-border);
@@ -138,6 +144,7 @@
   padding: 0.5rem;
   background-color: var(--color-background);
   border-radius: 6px;
+
   .file-item {
     display: inline-flex;
     align-items: center;
@@ -157,4 +164,9 @@
   textarea {
     resize: none;
   }
+}
+
+.sending-indicator {
+  margin-right: 5px;
+  color: var(--ant-text-color-secondary);
 }

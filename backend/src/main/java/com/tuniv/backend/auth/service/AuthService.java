@@ -22,7 +22,7 @@ import com.tuniv.backend.auth.dto.ResetPasswordRequest;
 import com.tuniv.backend.auth.mapper.AuthMapper;
 import com.tuniv.backend.config.security.jwt.JwtUtil;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import com.tuniv.backend.notification.service.NotificationService;
+import com.tuniv.backend.notification.service.AuthEmailService;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository; // <-- Make sure package is correct
 
@@ -32,7 +32,7 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class AuthService {
 
-    private final NotificationService notificationService;
+    private final AuthEmailService notificationService;
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;

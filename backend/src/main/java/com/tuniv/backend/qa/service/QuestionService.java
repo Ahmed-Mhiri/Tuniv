@@ -16,11 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.notification.event.NewAnswerEvent;
+import com.tuniv.backend.notification.event.NewQuestionInUniversityEvent;
 import com.tuniv.backend.qa.dto.AnswerCreateRequest; // <-- IMPORT ADDED
 import com.tuniv.backend.qa.dto.AnswerResponseDto;
 import com.tuniv.backend.qa.dto.QuestionCreateRequest;
 import com.tuniv.backend.qa.dto.QuestionResponseDto;
-import com.tuniv.backend.qa.event.NewAnswerEvent;
 import com.tuniv.backend.qa.mapper.QAMapper;
 import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.model.Attachment;
@@ -68,8 +69,11 @@ public class QuestionService {
         Question finalQuestion = questionRepository.findById(savedQuestion.getQuestionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch question"));
 
+
         Map<Integer, List<Attachment>> questionAttachments = finalQuestion.getAttachments().stream()
                 .collect(Collectors.groupingBy(Attachment::getPostId));
+
+        eventPublisher.publishEvent(new NewQuestionInUniversityEvent(this, finalQuestion));
 
         return QAMapper.toQuestionResponseDto(finalQuestion, currentUser, questionAttachments, Collections.emptyMap(), Collections.emptyMap());
     }
@@ -102,14 +106,16 @@ public AnswerResponseDto addAnswer(AnswerCreateRequest request, Integer question
     Answer savedAnswer = answerRepository.save(answer);
     attachmentService.saveAttachments(files, savedAnswer.getAnswerId(), "ANSWER");
     
-    NewAnswerEvent event = new NewAnswerEvent(this, question.getTitle(), question.getAuthor().getEmail(), author.getUsername());
-    eventPublisher.publishEvent(event);
 
     Answer finalAnswer = answerRepository.findById(savedAnswer.getAnswerId())
             .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch answer"));
 
     Map<Integer, List<Attachment>> answerAttachments = finalAnswer.getAttachments().stream()
             .collect(Collectors.groupingBy(Attachment::getPostId));
+
+        eventPublisher.publishEvent(new NewAnswerEvent(this, finalAnswer)); // Update this line
+
+    
 
     return QAMapper.toAnswerResponseDto(finalAnswer, currentUser, answerAttachments, Collections.emptyMap());
 }

@@ -1,13 +1,15 @@
-export interface ChatAttachment {
-  fileName: string;
-  fileUrl: string;
-  fileType: string;
-}
 export interface ChatMessage {
-    messageId: number; // <-- ADD THIS
-  content: string;
+  messageId: number;
+  conversationId: number;
   senderUsername: string;
-  sentAt: string; // ISO date string
-  attachments: ChatAttachment[];
+  content: string;
+  sentAt: string; // ISO string format
+  attachments: Attachment[];
+  status?: 'sending' | 'sent' | 'error'; // Add this optional property
+}
 
+export interface Attachment {
+  fileUrl: string;
+  fileName: string;
+  fileType: string;
 }

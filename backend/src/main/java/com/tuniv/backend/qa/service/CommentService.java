@@ -6,11 +6,13 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.notification.event.NewCommentEvent;
 import com.tuniv.backend.qa.dto.CommentCreateRequest; // <-- IMPORT ADDED
 import com.tuniv.backend.qa.dto.CommentResponseDto;
 import com.tuniv.backend.qa.mapper.QAMapper;
@@ -35,6 +37,8 @@ public class CommentService {
     private final UserRepository userRepository;
     private final AttachmentService attachmentService;
     private final AttachmentRepository attachmentRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
 
     @Transactional
 @CacheEvict(value = "questions", allEntries = true)
@@ -81,6 +85,8 @@ public CommentResponseDto createComment(
     
     Map<Integer, List<Attachment>> commentAttachments = finalComment.getAttachments().stream()
             .collect(Collectors.groupingBy(Attachment::getPostId));
+    eventPublisher.publishEvent(new NewCommentEvent(this, finalComment)); // Add this line
+
 
     return QAMapper.toCommentResponseDto(finalComment, currentUser, commentAttachments);
 }

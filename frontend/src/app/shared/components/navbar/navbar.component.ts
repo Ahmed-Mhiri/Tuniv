@@ -29,6 +29,11 @@ import { NzDividerModule } from 'ng-zorro-antd/divider';
 
 // Services
 import { AuthService } from '../../../core/services/auth.service';
+import { SearchBarComponent } from '../search-bar/search-bar';
+import { NzBadgeComponent } from 'ng-zorro-antd/badge';
+import { ChatWidgetService } from '../../../features/chat/services/chat-widget.service';
+import { NotificationDropdown } from '../../../features/notification/components/notification-dropdown/notification-dropdown';
+import { NotificationService } from '../../../features/notification/services/notification.service';
 
 @Component({
   selector: 'app-navbar',
@@ -46,6 +51,9 @@ import { AuthService } from '../../../core/services/auth.service';
     NzSwitchModule,
     NzDrawerModule,
     NzDividerModule,
+    SearchBarComponent,
+    NzBadgeComponent,
+    NotificationDropdown
   ],
   templateUrl: './navbar.component.html',
   // --- THIS LINE WAS MISSING ---
@@ -56,34 +64,35 @@ import { AuthService } from '../../../core/services/auth.service';
   }
 })
 export class NavbarComponent implements OnInit {
-  // Dependency injection
-  private authService = inject(AuthService);
-  private renderer = inject(Renderer2);
-  private document = inject(DOCUMENT);
-  private platformId = inject(PLATFORM_ID);
-  private router = inject(Router);
+  // --- Dependencies ---
+  private readonly authService = inject(AuthService);
+  private readonly renderer = inject(Renderer2);
+  private readonly document = inject(DOCUMENT);
+  private readonly platformId = inject(PLATFORM_ID);
+  private readonly router = inject(Router);
+  private readonly chatWidgetService = inject(ChatWidgetService); // ✅ 2. Inject the service
+  private readonly notificationService = inject(NotificationService); // ✅ 3. Inject the NotificationService
 
-  // State signals
-  isDarkMode = signal(false);
-  isMobileDrawerVisible = signal(false);
-  isBrowser = signal(false);
 
-  // Computed properties
-  currentUser = computed(() => this.authService.currentUser());
-  isUserLoggedIn = computed(() => this.authService.isUserLoggedIn());
-  menuTheme = computed(() => this.isDarkMode() ? 'dark' : 'light');
+
+  // --- State Signals ---
+  readonly isDarkMode = signal(false);
+  readonly isMobileDrawerVisible = signal(false);
+  readonly isBrowser = signal(false);
+  // ✅ 4. Replace the placeholder with the real signal from the service
+  readonly unreadNotificationCount = this.notificationService.unreadNotificationsCount;
+
+  // --- Computed Signals ---
+  readonly currentUser = computed(() => this.authService.currentUser());
+  readonly isUserLoggedIn = computed(() => this.authService.isUserLoggedIn());
+  readonly menuTheme = computed(() => (this.isDarkMode() ? 'dark' : 'light'));
 
   ngOnInit(): void {
-    // Check if we're in the browser environment
     this.isBrowser.set(isPlatformBrowser(this.platformId));
-
     if (this.isBrowser()) {
       const savedTheme = localStorage.getItem('theme');
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-      // Set theme based on saved preference or system preference
       const shouldUseDarkMode = savedTheme === 'dark' || (!savedTheme && prefersDark);
-
       if (shouldUseDarkMode) {
         this.isDarkMode.set(true);
         this.renderer.addClass(this.document.documentElement, 'dark');
@@ -94,7 +103,6 @@ export class NavbarComponent implements OnInit {
   toggleTheme(isDark: boolean): void {
     this.isDarkMode.set(isDark);
     const htmlEl = this.document.documentElement;
-
     if (isDark) {
       this.renderer.addClass(htmlEl, 'dark');
       localStorage.setItem('theme', 'dark');
@@ -115,5 +123,8 @@ export class NavbarComponent implements OnInit {
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/']);
+  }
+  toggleChatWidget(): void {
+    this.chatWidgetService.toggleWidget();
   }
 }

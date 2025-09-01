@@ -21,6 +21,8 @@ export interface Page<T> {
   };
   totalElements: number;
   totalPages: number;
+    last: boolean; // ✅ ADD THIS LINE
+
 }
 
 /**

@@ -6,10 +6,12 @@ import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.notification.event.UserJoinedUniversityEvent;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.university.dto.UniversityDto; // <-- IMPORT ADDED
 import com.tuniv.backend.university.mapper.UniversityMapper;
@@ -30,6 +32,8 @@ public class UniversityService {
     // --- ModuleRepository is no longer needed here ---
     private final UserRepository userRepository;
     private final UniversityMembershipRepository membershipRepository;
+        private final ApplicationEventPublisher eventPublisher;
+
 
     @Transactional(readOnly = true)
     @Cacheable("universities")
@@ -73,8 +77,9 @@ public class UniversityService {
         membership.setUser(user);
         membership.setUniversity(university);
         membership.setRole("student");
+        membershipRepository.save(membership);       
+        eventPublisher.publishEvent(new UserJoinedUniversityEvent(this, user, university)); // Add this line
 
-        membershipRepository.save(membership);
     }
 
     @Transactional

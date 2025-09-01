@@ -134,6 +134,7 @@ CREATE TABLE conversations (
 CREATE TABLE conversation_participants (
     user_id INT NOT NULL,
     conversation_id INT NOT NULL,
+    last_read_timestamp TIMESTAMP WITH TIME ZONE, -- ✅ ADDED: Tracks when a user last read messages in this conversation.
     PRIMARY KEY (user_id, conversation_id),
     CONSTRAINT fk_participant_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     CONSTRAINT fk_participant_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE
@@ -145,7 +146,24 @@ CREATE TABLE messages (
     sent_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     conversation_id INT NOT NULL,
     sender_id INT NOT NULL,
-    -- Removed file columns; attachments will be handled by the 'attachments' table
     CONSTRAINT fk_message_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
     CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
+-- =================================================================
+-- NOTIFICATIONS
+-- =================================================================
+CREATE TABLE notifications (
+    notification_id SERIAL PRIMARY KEY,
+    recipient_id INT NOT NULL,
+    actor_id INT, -- Can be NULL for system notifications (e.g., welcome messages)
+    type VARCHAR(50) NOT NULL,
+    message VARCHAR(255) NOT NULL,
+    link VARCHAR(512) NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_notification_recipient FOREIGN KEY (recipient_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_notification_actor FOREIGN KEY (actor_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+-- Add an index on the recipient_id for fast retrieval of a user's notifications.
+CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);

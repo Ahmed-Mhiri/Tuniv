@@ -68,4 +68,12 @@ export class QuestionService {
 
     return this.http.post<Answer>(`${this.apiUrl}/questions/${questionId}/answers`, formData);
   }
+  searchQuestions(query: string, page: number = 0, size: number = 5): Observable<Page<Question>> {
+    const params = new HttpParams()
+      .set('query', query)
+      .set('page', page.toString())
+      .set('size', size.toString());
+
+    return this.http.get<Page<Question>>(`${this.apiUrl}/questions/search`, { params });
+  }
 }

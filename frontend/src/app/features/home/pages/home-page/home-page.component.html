@@ -1,1 +1,80 @@
-<p>home-page works!</p>
+<div class="page-container" nz-row [nzGutter]="[24, 24]">
+
+  <div class="main-content" nz-col nzXs="24" nzLg="16">
+    @if (isLoading()) {
+      <div class="spinner-container">
+        <nz-spin nzSimple nzSize="large"></nz-spin>
+      </div>
+    } @else {
+      <div class="feed-list">
+        @for (item of feedItems(); track item.questionId) {
+          <app-question-list-item [question]="item"></app-question-list-item>
+        } @empty {
+          <nz-card class="empty-feed-card">
+            <nz-empty nzNotFoundImage="https-gw.alipayobjects.com/zos/antfincdn/ZHrcdLPrvN/empty.svg"
+              nzNotFoundContent="Your home feed is empty.">
+              <p class="empty-subtext">Join universities and modules to see questions from your communities here.</p>
+              <div nz-empty-footer>
+                <a routerLink="/universities" nz-button nzType="primary">Explore Universities</a>
+              </div>
+            </nz-empty>
+          </nz-card>
+        }
+      </div>
+
+      @if (hasMoreItems()) {
+        <div class="load-more-container">
+          <button nz-button (click)="loadMore()" [nzLoading]="isLoadingMore()">
+            Load More Posts
+          </button>
+        </div>
+      }
+    }
+  </div>
+
+  <div class="sidebar" nz-col nzXs="24" nzLg="8">
+    <div class="sticky-sidebar-content">
+    
+      <nz-card class="sidebar-card info-card">
+        <div class="sidebar-header">
+          <img src="/assets/images/home-banner.png" alt="Community Banner" class="sidebar-banner"/>
+          <h2 class="sidebar-title">Home</h2>
+        </div>
+        <p class="sidebar-description">
+          Your personal frontpage. Come here to check in with your
+          favorite communities.
+        </p>
+        <nz-divider></nz-divider>
+        <div class="sidebar-actions">
+          <a routerLink="/qa/ask" nz-button nzType="primary" nzBlock class="btn-accent">Ask a Question</a>
+          <a routerLink="/universities" nz-button nzType="default" nzBlock>Explore Universities</a>
+        </div>
+      </nz-card>
+
+      <nz-card class="sidebar-card community-card" [nzTitle]="topUniversitiesTitle" [nzBordered]="false">
+        <ng-template #topUniversitiesTitle>
+          <div class="card-title-wrapper">
+            <span nz-icon nzType="fire" nzTheme="fill"></span>
+            Top Universities
+          </div>
+        </ng-template>
+        <nz-list [nzDataSource]="topUniversities()" [nzRenderItem]="uniItem" [nzSplit]="false">
+          <ng-template #uniItem let-uni let-i="index">
+            <nz-list-item>
+              <a [routerLink]="['/universities', uni.universityId, 'modules']" class="community-link">
+                <span class="community-rank">{{ i + 1 }}</span>
+                <span nz-icon nzType="bank" class="community-icon"></span>
+                <div class="community-info">
+                  <span class="community-name">{{ uni.name }}</span>
+                  <span class="community-meta">{{ uni.memberCount | number }} members</span>
+                </div>
+                <span nz-icon nzType="right" class="community-arrow"></span>
+              </a>
+            </nz-list-item>
+          </ng-template>
+        </nz-list>
+      </nz-card>
+
+    </div>
+  </div>
+</div>

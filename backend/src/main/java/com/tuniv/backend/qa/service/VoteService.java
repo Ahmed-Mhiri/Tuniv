@@ -4,11 +4,14 @@ import java.io.Serializable;
 import java.util.Optional;
 
 import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.notification.event.NewVoteEvent;
+import com.tuniv.backend.notification.model.PostType;
 import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.model.AnswerVote;
 import com.tuniv.backend.qa.model.Comment;
@@ -39,6 +42,8 @@ public class VoteService {
     private final QuestionVoteRepository questionVoteRepository;
     private final AnswerVoteRepository answerVoteRepository;
     private final CommentVoteRepository commentVoteRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
 
     private static final int QUESTION_UPVOTE_REP = 5;
     private static final int ANSWER_UPVOTE_REP = 10;
@@ -126,9 +131,6 @@ public class VoteService {
             } else {
                 // User is changing their vote (e.g., from up to down)
                 reputationChange = calculateReputationChange(existingVote.getValue(), value, upvoteReputation);
-                // We must update the value on the existing entity, not create a new one.
-                // This requires vote entities to have a setValue method.
-                // Assuming your @Setter from Lombok provides this.
                 if (existingVote instanceof QuestionVote) ((QuestionVote) existingVote).setValue(value);
                 if (existingVote instanceof AnswerVote) ((AnswerVote) existingVote).setValue(value);
                 if (existingVote instanceof CommentVote) ((CommentVote) existingVote).setValue(value);
@@ -138,6 +140,32 @@ public class VoteService {
             // This is a new vote
             voteRepository.save(newVote);
             reputationChange = (value == 1) ? upvoteReputation : DOWNVOTE_REP;
+
+            // =========================================================================
+            // ✅ NEW: PUBLISH NOTIFICATION EVENT FOR NEW UPVOTES
+            // =========================================================================
+            if (value == 1) {
+                User voter = (User) newVote.getUser();
+                
+                if (newVote instanceof QuestionVote) {
+                    Question question = ((QuestionVote) newVote).getQuestion();
+                    eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
+                        PostType.QUESTION, question.getQuestionId(), question.getTitle(), question.getQuestionId()));
+                
+                } else if (newVote instanceof AnswerVote) {
+                    Answer answer = ((AnswerVote) newVote).getAnswer();
+                    Question question = answer.getQuestion();
+                    eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
+                        PostType.ANSWER, answer.getAnswerId(), question.getTitle(), question.getQuestionId()));
+                
+                } else if (newVote instanceof CommentVote) {
+                    Comment comment = ((CommentVote) newVote).getComment();
+                    Question question = comment.getAnswer().getQuestion();
+                    eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
+                        PostType.COMMENT, comment.getCommentId(), question.getTitle(), question.getQuestionId()));
+                }
+            }
+            // =========================================================================
         }
 
         author.setReputationScore(author.getReputationScore() + reputationChange);

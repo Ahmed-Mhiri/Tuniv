@@ -1,123 +1,125 @@
-// navbar.component.scss
-
 :host {
   display: block;
 }
 
-// --- HEADER & GLASS EFFECT ---
 nz-header {
   position: sticky;
   top: 0;
   z-index: 900;
-  width: 100%;
-  height: var(--header-height, 72px);
+  height: 64px; // A more standard header height
   padding: 0;
-  background-color: rgba(var(--color-surface-rgb), 0.85);
-  backdrop-filter: saturate(180%) blur(12px);
+  background-color: color-mix(in srgb, var(--color-surface) 85%, transparent);
+  backdrop-filter: saturate(180%) blur(10px);
   border-bottom: 1px solid var(--color-border);
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-// --- MAIN LAYOUT CONTAINER ---
-:host nz-header .navbar-content {
+.navbar-content {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr; // Three-column layout
+  align-items: center;
+  gap: 16px;
+  height: 100%;
+  max-width: 1400px; // Wider for modern screens
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+// --- Sections ---
+.navbar-left {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 100%;
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 0 24px;
-}
+  gap: 16px;
+  justify-content: flex-start;
 
-// --- DESKTOP MENU STYLES ---
-.main-menu {
-  background: transparent !important;
-  ::ng-deep .ant-menu-item {
-    font-size: 1rem;
-    font-weight: 500;
-    color: var(--color-text-secondary);
-    border-radius: 6px;
-    &:hover {
-      color: var(--color-text-primary);
-      background-color: var(--color-surface-subtle);
-    }
-    &.active-link {
-      color: var(--color-text-primary);
-      font-weight: 600;
-    }
+  .logo {
+    display: flex;
+    align-items: center;
   }
 }
 
-// --- BUTTON STYLES ---
-.btn {
-  display: inline-flex;
+.navbar-center {
+  display: none; // Hidden by default
+  @media (min-width: 768px) {
+    display: flex; // Visible on medium screens and up
+    justify-content: center;
+    min-width: 300px;
+    max-width: 500px;
+  }
+}
+
+.navbar-right {
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-  border-radius: 8px;
-  border: none;
-  transition: all 0.2s ease-in-out;
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+// --- Main Nav Links (Desktop) ---
+.main-nav-links {
+  display: none; // Hidden on mobile
+  @media (min-width: 1024px) {
+    // Visible on large screens
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 }
-.btn-primary {
-  background-color: var(--color-primary);
-  color: white;
-  &:hover {
-    background-color: var(--color-primary-dark);
-  }
-}
-.btn-secondary {
-  background-color: var(--color-surface);
+
+.nav-link {
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  transition: color 0.2s, background-color 0.2s;
+  text-decoration: none;
+
   &:hover {
     color: var(--color-text-primary);
-    border-color: var(--color-primary);
+    background-color: var(--color-surface-subtle);
+  }
+
+  &.active {
+    color: var(--color-primary);
+    font-weight: 600;
   }
 }
 
-// --- MOBILE DRAWER THEME & LAYOUT ---
-::ng-deep .ant-drawer-content-wrapper {
-  .ant-drawer-header {
-    background-color: var(--color-background);
-    border-bottom: 1px solid var(--color-border);
-    .ant-drawer-title, .ant-drawer-close {
-      color: var(--color-text-primary);
-    }
-  }
-  .ant-drawer-body {
-    background-color: var(--color-background);
-    padding: 0;
-  }
-  .ant-menu {
-    background: transparent;
-    .ant-menu-item {
-      color: var(--color-text-secondary);
-      &:hover {
-        color: var(--color-text-primary);
-      }
-    }
+// --- Action Icons ---
+.action-icon {
+  color: var(--color-text-secondary);
+  font-size: 18px;
+  &:hover {
+    color: var(--color-primary);
+    background-color: var(--color-surface-subtle) !important;
   }
 }
 
-// --- RESPONSIVE VISIBILITY OVERRIDE ---
-// This safely fixes conflicts between Tailwind classes and NG-ZORRO.
+.user-profile {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
 
-// On screens 768px and wider (desktop)...
-@media (min-width: 768px) {
-  // Force the mobile hamburger button to be hidden.
-  button.md\:hidden {
+// --- Mobile Menu ---
+.mobile-menu-trigger {
+  @media (min-width: 768px) {
     display: none !important;
   }
 }
 
-// On screens smaller than 768px (mobile)...
-@media (max-width: 767.98px) {
-  // Force the desktop elements (menus, buttons) to be hidden.
-  div.hidden.md\:flex {
-    display: none !important;
+.mobile-search-wrapper {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+// --- Dropdown Header ---
+.dropdown-header {
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  strong {
+    color: var(--color-text-primary);
   }
 }

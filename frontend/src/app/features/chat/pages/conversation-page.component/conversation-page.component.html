@@ -10,6 +10,7 @@
       <div class="message-wrapper" [class.is-mine]="msg.senderUsername === currentUser()?.username">
         <div class="message-bubble">
           <div class="sender-name">{{ msg.senderUsername }}</div>
+
           @if (msg.content) {
             <p class="message-content" [innerHTML]="sanitizer.bypassSecurityTrustHtml(msg.content)"></p>
           }
@@ -28,7 +29,15 @@
               }
             </div>
           }
-          <div class="timestamp">{{ msg.sentAt | timeAgo }}</div>
+
+          <div class="timestamp">
+            @if (msg.status === 'sending') {
+              <span nz-icon nzType="clock-circle-o" class="sending-indicator"></span>
+            } @else if (msg.status === 'error') {
+              <span nz-icon nzType="exclamation-circle" class="error-indicator"></span>
+            }
+            {{ msg.sentAt | timeAgo }}
+          </div>
         </div>
       </div>
     }
@@ -60,8 +69,9 @@
         formControlName="content"
         placeholder="Type a message..."
         [nzAutosize]="{ minRows: 1, maxRows: 4 }"
-        (keydown.enter)="handleEnterPress($event)" ></textarea>
-      <button nz-button nzType="primary" nzShape="circle" class="send-btn" [disabled]="isSending() || messageForm.invalid">
+        (keydown.enter)="handleEnterPress($event)"
+      ></textarea>
+      <button nz-button nzType="primary" nzShape="circle" type="submit" class="send-btn" [disabled]="isSending() || messageForm.invalid">
         <span nz-icon nzType="send"></span>
       </button>
     </form>
