@@ -1,5 +1,7 @@
 package com.tuniv.backend.user.controller;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,8 +12,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.user.dto.UserActivityItemDto;
 import com.tuniv.backend.user.dto.UserProfileDto;
 import com.tuniv.backend.user.dto.UserProfileUpdateRequest;
+import com.tuniv.backend.user.service.ActivityService;
 import com.tuniv.backend.user.service.UserService;
 
 import jakarta.validation.Valid;
@@ -23,6 +27,9 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final UserService userService;
+        
+    private final ActivityService activityService;
+
 
     @GetMapping("/me")
     public ResponseEntity<UserProfileDto> getCurrentUserProfile(@AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -39,6 +46,11 @@ public class UserController {
     @GetMapping("/users/{userId}")
     public ResponseEntity<UserProfileDto> getUserProfileById(@PathVariable Integer userId) {
         return ResponseEntity.ok(userService.getUserProfileById(userId));
+    }
+    @GetMapping("/{id}/activity")
+    public ResponseEntity<List<UserActivityItemDto>> getUserActivity(@PathVariable Integer id) {
+        List<UserActivityItemDto> activity = activityService.getActivityForUser(id);
+        return ResponseEntity.ok(activity);
     }
     
 }

@@ -1,9 +1,11 @@
 package com.tuniv.backend.qa.model;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.Objects;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
+import org.hibernate.annotations.CreationTimestamp;
+
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.Column;
@@ -15,10 +17,13 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
 
 @Entity
 @Table(name = "comment_votes")
@@ -26,6 +31,7 @@ import lombok.Setter;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class CommentVote implements Vote {
 
     @EmbeddedId
@@ -34,17 +40,43 @@ public class CommentVote implements Vote {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
     @JoinColumn(name = "user_id")
-    @JsonBackReference("user-comment-votes")
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("commentId")
     @JoinColumn(name = "comment_id")
-    @JsonBackReference("comment-votes")
     private Comment comment;
 
     @Column(nullable = false)
-    private short value; // <-- FIX: Changed from int to short
+    private short value;
+
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
+
+    // --- ADD THESE METHODS MANUALLY TO FIX THE ERROR ---
+    @Override
+    public User getUser() {
+        return this.user;
+    }
+    
+    @Override
+    public short getValue() {
+        return this.value;
+    }
+
+    public Comment getComment() {
+        return this.comment;
+    }
+    
+    @Override
+    @Transient // This tells JPA to ignore this method for database mapping
+    public Integer getPostId() {
+        // Return the ID of the comment this vote belongs to
+        return this.comment != null ? this.comment.getCommentId() : null;
+    }
+    // --- END OF ADDED METHODS ---
+
 
     @Embeddable
     @Getter
@@ -57,7 +89,6 @@ public class CommentVote implements Vote {
         @Column(name = "comment_id")
         private Integer commentId;
 
-        // --- FULL IMPLEMENTATION OF equals and hashCode ---
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;

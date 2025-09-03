@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { UserProfile, UserProfileUpdateRequest } from '../../../shared/models/user.model';
+import { UserActivityItem } from '../../../shared/models/activity.model';
 
 @Injectable({
   providedIn: 'root'
@@ -33,5 +34,9 @@ export class UserService {
    */
   getUserProfileById(userId: number): Observable<UserProfile> {
     return this.http.get<UserProfile>(`${this.apiUrl}/users/${userId}`);
+  }
+
+  getUserActivity(userId: number): Observable<UserActivityItem[]> {
+    return this.http.get<UserActivityItem[]>(`${this.apiUrl}/${userId}/activity`);
   }
 }

@@ -59,3 +59,45 @@
 .uploader-container {
   width: 100%;
 }
+// profile-edit-page.component.scss
+
+// (Keep your existing styles for .loading-container, .edit-profile-container, etc.)
+
+.profile-picture-section {
+  display: flex;
+  justify-content: center; // Center the avatar uploader
+  padding: 16px 0;
+}
+
+.avatar-uploader {
+  position: relative;
+  cursor: pointer;
+  border-radius: 50%;
+  overflow: hidden; // Ensures the overlay corner doesn't stick out
+
+  .avatar-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.4);
+    color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  &:hover .avatar-overlay {
+    opacity: 1;
+  }
+}
+
+// Adjust form control padding if needed
+.flex.justify-end {
+  display: flex;
+  justify-content: flex-end;
+}

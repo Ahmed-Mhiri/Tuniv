@@ -11,5 +11,6 @@ import com.tuniv.backend.qa.model.Comment;
 public interface CommentRepository extends JpaRepository<Comment, Integer> {
     List<Comment> findByAnswerAnswerIdOrderByCreatedAtAsc(Integer answerId);
     List<Comment> findByAnswerAnswerIdAndParentCommentIsNullOrderByCreatedAtAsc(Integer answerId);
+    List<Comment> findByAuthorUserIdOrderByCreatedAtDesc(Integer userId);
 
 }

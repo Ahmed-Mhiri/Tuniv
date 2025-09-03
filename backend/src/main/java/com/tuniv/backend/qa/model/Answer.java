@@ -1,19 +1,21 @@
 package com.tuniv.backend.qa.model;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.hibernate.annotations.Where; // <-- IMPORT
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.annotations.Where;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonBackReference; // <-- IMPORT
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity; // <-- IMPORT ADDED
-import jakarta.persistence.FetchType;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType; // <-- IMPORT ADDED
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -41,8 +43,9 @@ public class Answer {
     @Column(name = "is_solution", nullable = false)
     private Boolean isSolution = false;
 
-    @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @CreationTimestamp // <-- USE THIS annotation for auto-creation timestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt; // <-- CHANGE type to Instant
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "question_id", nullable = false)
@@ -68,6 +71,12 @@ public class Answer {
     @JoinColumn(name = "post_id", referencedColumnName = "answer_id", insertable = false, updatable = false)
     @Where(clause = "post_type = 'ANSWER'")
     private Set<Attachment> attachments = new HashSet<>();
+
+    
+
+    @UpdateTimestamp // <-- USE THIS annotation for auto-update timestamp
+    @Column(name = "updated_at", nullable = false)
+    private Instant updatedAt; // <-- CHANGE type to Instant
 
 
 }

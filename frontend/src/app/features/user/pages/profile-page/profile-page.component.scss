@@ -1,80 +1,187 @@
+/* ==========================================================================
+   1. Profile Page: Main Layout & Status Containers
+   ========================================================================== */
+
+// This is the main wrapper for the entire profile page.
 .profile-container {
   display: flex;
   justify-content: center;
-  padding: 2rem;
+  padding: 2rem 1rem;
 }
 
+// Styles the loading spinner and error message containers.
 .status-container {
   display: flex;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
   gap: 1rem;
-  margin-top: 4rem;
+  padding: 4rem 0;
+
+  .status-text {
+    color: var(--color-text-secondary);
+    font-size: 1.1rem;
+  }
 }
 
-.status-text {
-  font-size: 1rem;
-  color: var(--color-text-secondary);
-}
-
+// Sets a max-width for the main profile card to keep it centered and readable.
 .profile-card {
   width: 100%;
   max-width: 800px;
-  /* The background and border are now handled by the global .ant-card style */
 }
 
+/* ==========================================================================
+   2. Profile Header Section
+   ========================================================================== */
+
+// Uses flexbox to arrange the avatar, user info, and edit button.
 .profile-header {
   display: flex;
+  flex-wrap: wrap; // Allows button to wrap on smaller screens
   align-items: center;
-  flex-wrap: wrap;
   gap: 1.5rem;
-  margin-bottom: 2rem;
-  position: relative;
+  padding-bottom: 1.5rem;
 }
 
+// Container for the user's name, major, and reputation.
 .profile-info {
-  .username {
-    font-family: var(--font-display);
-    font-size: 2.25rem;
-    font-weight: 700;
-    color: var(--color-text-primary);
-    margin: 0;
-  }
-  .major {
-    font-size: 1.125rem;
-    color: var(--color-text-secondary);
-  }
-  .reputation {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-top: 0.5rem;
-    color: var(--color-primary);
-    font-weight: 600;
+  flex-grow: 1;
+}
+
+.username {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  font-family: var(--font-display);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.major {
+  font-size: 1.1rem;
+  color: var(--color-text-secondary);
+  margin: 0.25rem 0 0.5rem;
+}
+
+.reputation {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+
+  // Make the star icon pop with the theme's accent color.
+  .anticon-star {
+    color: var(--color-accent);
+    font-size: 1.1rem;
   }
 }
 
+// Pushes the edit button to the far right on larger screens.
 .edit-button {
-  position: absolute;
-  top: 0;
-  right: 0;
+  margin-left: auto;
 }
+
+/* ==========================================================================
+   3. Tab Content (Bio & Activity Feed)
+   ========================================================================== */
 
 .tab-content {
-  padding: 1.5rem 0.5rem;
+  padding: 1rem 0.5rem;
 
   h2 {
     font-size: 1.25rem;
-    font-weight: 600;
-    color: var(--color-text-primary);
-    border-bottom: 1px solid var(--color-border);
+    font-weight: 700;
+    margin-bottom: 0.5rem;
     padding-bottom: 0.5rem;
-    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-text-primary);
   }
+
   .bio-text {
     color: var(--color-text-secondary);
-    white-space: pre-wrap;
-    line-height: 1.6;
+    line-height: 1.7;
+  }
+}
+
+/* ==========================================================================
+   4. Activity Feed List
+   ========================================================================== */
+
+.activity-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem; // 12px
+}
+
+.activity-item {
+  display: grid;
+  grid-template-columns: 40px 1fr auto; // Icon | Details | Score
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background-color: var(--color-surface-subtle);
+  }
+}
+
+.activity-icon-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  color: var(--color-text-secondary);
+
+  .accepted-icon {
+    color: var(--color-success);
+  }
+  .upvote-icon {
+    color: var(--color-warning);
+  }
+  .downvote-icon {
+    color: var(--color-primary);
+  }
+}
+
+.activity-details {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-type {
+  font-size: 0.9em;
+  color: var(--color-text-secondary);
+}
+
+.activity-title {
+  font-weight: 500;
+  margin: 2px 0;
+  // Link color is already handled globally in your styles.scss
+}
+
+.activity-date {
+  font-size: 0.8em;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+}
+
+.activity-score {
+  font-size: 1.1em;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  min-width: 40px;
+  text-align: center;
+
+  &.positive {
+    color: var(--color-success);
+  }
+  &.negative {
+    color: var(--color-accent); // Use accent for negative scores
+  }
+  &.zero {
+    color: var(--color-text-secondary);
   }
 }

@@ -44,7 +44,6 @@ public class VoteService {
     private final CommentVoteRepository commentVoteRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-
     private static final int QUESTION_UPVOTE_REP = 5;
     private static final int ANSWER_UPVOTE_REP = 10;
     private static final int COMMENT_UPVOTE_REP = 2;
@@ -52,11 +51,10 @@ public class VoteService {
 
     @Transactional
     @CacheEvict(value = "questions", key = "#questionId")
-
     public void voteOnQuestion(Integer questionId, UserDetailsImpl currentUser, short value) {
         User voter = findVoter(currentUser);
         Question question = questionRepository.findById(questionId)
-            .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
         
         if (voter.getUserId().equals(question.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
@@ -72,11 +70,10 @@ public class VoteService {
 
     @Transactional
     @CacheEvict(value = "questions", allEntries = true)
-
     public void voteOnAnswer(Integer answerId, UserDetailsImpl currentUser, short value) {
         User voter = findVoter(currentUser);
         Answer answer = answerRepository.findById(answerId)
-            .orElseThrow(() -> new ResourceNotFoundException("Answer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Answer not found"));
 
         if (voter.getUserId().equals(answer.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
@@ -95,7 +92,7 @@ public class VoteService {
     public void voteOnComment(Integer commentId, UserDetailsImpl currentUser, short value) {
         User voter = findVoter(currentUser);
         Comment comment = commentRepository.findById(commentId)
-            .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         if (voter.getUserId().equals(comment.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
@@ -104,14 +101,17 @@ public class VoteService {
         CommentVote.CommentVoteId voteId = new CommentVote.CommentVoteId(voter.getUserId(), commentId);
         Optional<CommentVote> existingVote = commentVoteRepository.findById(voteId);
 
-        CommentVote newVote = new CommentVote(voteId, voter, comment, value);
+        // --- THE FIX: Use the builder pattern for consistency and to avoid constructor errors. ---
+        CommentVote newVote = CommentVote.builder()
+                .id(voteId)
+                .user(voter)
+                .comment(comment)
+                .value(value)
+                .build();
 
         processVote(comment.getAuthor(), existingVote, newVote, value, COMMENT_UPVOTE_REP, commentVoteRepository);
     }
 
-    /**
-     * --- NEW: A generic, reusable method to handle all voting logic ---
-     */
     private <V extends Vote, ID extends Serializable> void processVote(
             User author,
             Optional<V> existingVoteOpt,
@@ -140,32 +140,23 @@ public class VoteService {
             // This is a new vote
             voteRepository.save(newVote);
             reputationChange = (value == 1) ? upvoteReputation : DOWNVOTE_REP;
-
-            // =========================================================================
-            // ✅ NEW: PUBLISH NOTIFICATION EVENT FOR NEW UPVOTES
-            // =========================================================================
-            if (value == 1) {
+            
+            if (value == 1) { // Publish event only for new upvotes
                 User voter = (User) newVote.getUser();
                 
-                if (newVote instanceof QuestionVote) {
-                    Question question = ((QuestionVote) newVote).getQuestion();
+                if (newVote instanceof QuestionVote qv) {
                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
-                        PostType.QUESTION, question.getQuestionId(), question.getTitle(), question.getQuestionId()));
+                        PostType.QUESTION, qv.getPostId(), qv.getQuestion().getTitle(), qv.getPostId()));
                 
-                } else if (newVote instanceof AnswerVote) {
-                    Answer answer = ((AnswerVote) newVote).getAnswer();
-                    Question question = answer.getQuestion();
+                } else if (newVote instanceof AnswerVote av) {
                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
-                        PostType.ANSWER, answer.getAnswerId(), question.getTitle(), question.getQuestionId()));
+                        PostType.ANSWER, av.getPostId(), av.getAnswer().getQuestion().getTitle(), av.getAnswer().getQuestion().getQuestionId()));
                 
-                } else if (newVote instanceof CommentVote) {
-                    Comment comment = ((CommentVote) newVote).getComment();
-                    Question question = comment.getAnswer().getQuestion();
+                } else if (newVote instanceof CommentVote cv) {
                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
-                        PostType.COMMENT, comment.getCommentId(), question.getTitle(), question.getQuestionId()));
+                        PostType.COMMENT, cv.getPostId(), cv.getComment().getAnswer().getQuestion().getTitle(), cv.getComment().getAnswer().getQuestion().getQuestionId()));
                 }
             }
-            // =========================================================================
         }
 
         author.setReputationScore(author.getReputationScore() + reputationChange);
@@ -174,7 +165,7 @@ public class VoteService {
 
     private User findVoter(UserDetailsImpl currentUser) {
         return userRepository.findById(currentUser.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("Voter not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Voter not found"));
     }
 
     private int calculateReputationChange(int oldValue, int newValue, int upvoteRep) {

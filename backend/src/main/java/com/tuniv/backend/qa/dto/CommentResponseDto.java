@@ -1,12 +1,12 @@
 package com.tuniv.backend.qa.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public record CommentResponseDto(
     Integer commentId,
     String body,
-    LocalDateTime createdAt,
+    Instant createdAt,
     AuthorDto author, // Use AuthorDto for consistency
     int score,
     int currentUserVote, // 1 for upvote, -1 for downvote, 0 for no vote

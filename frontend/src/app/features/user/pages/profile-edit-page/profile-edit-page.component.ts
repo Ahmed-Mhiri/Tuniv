@@ -1,11 +1,14 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+// profile-edit-page.component.ts
+
+import { ChangeDetectionStrategy, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
+import { of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 import { UserService } from '../../services/user.service';
 import { FileUploadService } from '../../../../core/services/file-upload.service';
 import { UserProfile, UserProfileUpdateRequest } from '../../../../shared/models/user.model';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
-import { FileUploadComponent } from '../../../../shared/components/file-upload/file-upload.component';
 import { AuthService } from '../../../../core/services/auth.service';
 import { AuthResponse } from '../../../../shared/models/auth.model';
 
@@ -17,27 +20,28 @@ import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzAvatarModule } from 'ng-zorro-antd/avatar';
 import { NzDividerModule } from 'ng-zorro-antd/divider';
 import { NzTypographyModule } from 'ng-zorro-antd/typography';
-import { NzUploadModule } from 'ng-zorro-antd/upload';
+import { NzIconModule } from 'ng-zorro-antd/icon'; // <-- Import NzIconModule
 
 @Component({
   selector: 'app-profile-edit-page',
+  standalone: true, // <-- Make sure it's standalone if using new imports structure
   imports: [
     ReactiveFormsModule,
     SpinnerComponent,
-    FileUploadComponent,
+    // FileUploadComponent is no longer needed here
     NzFormModule,
     NzInputModule,
     NzButtonModule,
     NzAvatarModule,
     NzDividerModule,
     NzTypographyModule,
-    NzUploadModule,
+    NzIconModule, // <-- Add NzIconModule to imports
   ],
   templateUrl: './profile-edit-page.component.html',
   styleUrl: './profile-edit-page.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ProfileEditPageComponent implements OnInit {
+export class ProfileEditPageComponent implements OnInit, OnDestroy {
   // --- Dependencies ---
   private readonly fb = inject(FormBuilder);
   private readonly userService = inject(UserService);
@@ -48,8 +52,14 @@ export class ProfileEditPageComponent implements OnInit {
   // --- State Signals ---
   readonly isLoading = signal(true);
   readonly isSaving = signal(false);
-  readonly isUploading = signal(false);
+  
+  // -- Photo State --
   readonly profilePhotoUrl = signal<string | undefined>(undefined);
+  readonly newProfilePhotoFile = signal<File | null>(null);
+  readonly newProfilePhotoPreviewUrl = signal<string | null>(null);
+
+  // -- Computed signal to decide which URL to display --
+  readonly displayPhotoUrl = computed(() => this.newProfilePhotoPreviewUrl() ?? this.profilePhotoUrl());
 
   readonly editForm = this.fb.group({
     bio: ['', [Validators.maxLength(500)]],
@@ -70,54 +80,73 @@ export class ProfileEditPageComponent implements OnInit {
     });
   }
 
-  onProfilePhotoChanged(files: File[]): void {
-    const file = files[0];
+  ngOnDestroy(): void {
+    // Clean up the object URL to prevent memory leaks
+    const previewUrl = this.newProfilePhotoPreviewUrl();
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+  }
+
+  onProfilePhotoChanged(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
 
-    this.isUploading.set(true);
-    this.fileUploadService.uploadFile(file).subscribe({
-      next: (response) => {
-        const newPhotoUrl = response.url;
-        this.userService.updateCurrentUserProfile({ profilePhotoUrl: newPhotoUrl }).subscribe({
-          next: (updatedProfile: UserProfile) => {
-            // --- FIX: Update the global user state in AuthService ---
-            this.authService.updateCurrentUser(updatedProfile as Partial<AuthResponse>);
-            
-            this.profilePhotoUrl.set(newPhotoUrl);
-            this.isUploading.set(false);
-            this.message.success('Profile photo updated successfully!');
-          },
-          error: () => {
-            this.isUploading.set(false);
-            this.message.error('Failed to save the new profile photo.');
-          },
-        });
-      },
-      error: (err: HttpErrorResponse) => {
-        this.isUploading.set(false);
-        this.message.error(err.error?.message || 'File upload failed.');
-      },
-    });
+    // Validate file type and size before creating a preview
+    if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+        this.message.error('Invalid file type. Please select a PNG, JPG, or GIF.');
+        return;
+    }
+    if (file.size > 5 * 1024 * 1024) { // 5MB
+        this.message.error('File is too large. Maximum size is 5MB.');
+        return;
+    }
+
+    // Store the file for later upload
+    this.newProfilePhotoFile.set(file);
+
+    // Create a local URL for previewing the image
+    const oldPreviewUrl = this.newProfilePhotoPreviewUrl();
+    if (oldPreviewUrl) {
+        URL.revokeObjectURL(oldPreviewUrl); // Clean up previous preview
+    }
+    this.newProfilePhotoPreviewUrl.set(URL.createObjectURL(file));
+
+    // Mark the form as dirty to enable the save button
+    this.editForm.markAsDirty();
   }
 
   submitForm(): void {
     if (this.editForm.invalid) return;
 
     this.isSaving.set(true);
-    const { bio, major } = this.editForm.getRawValue();
-    const updateData: UserProfileUpdateRequest = {
-      bio: bio ?? undefined,
-      major: major ?? undefined,
-    };
+    const newFile = this.newProfilePhotoFile();
 
-    this.userService.updateCurrentUserProfile(updateData).subscribe({
+    const uploadAndSave$ = (newFile ? this.fileUploadService.uploadFile(newFile) : of({ url: this.profilePhotoUrl() }));
+
+    uploadAndSave$.pipe(
+      switchMap(uploadResponse => {
+        const { bio, major } = this.editForm.getRawValue();
+        const updateData: UserProfileUpdateRequest = {
+          bio: bio ?? undefined,
+          major: major ?? undefined,
+          profilePhotoUrl: uploadResponse?.url
+        };
+        return this.userService.updateCurrentUserProfile(updateData);
+      })
+    ).subscribe({
       next: (updatedProfile: UserProfile) => {
-        // --- FIX: Update the global user state in AuthService ---
         this.authService.updateCurrentUser(updatedProfile as Partial<AuthResponse>);
-
-        this.isSaving.set(false);
-        this.message.success('Profile details updated successfully!');
+        this.profilePhotoUrl.set(updatedProfile.profilePhotoUrl ?? undefined);
+        
+        // Reset state after successful save
+        this.newProfilePhotoFile.set(null);
+        this.newProfilePhotoPreviewUrl.set(null);
         this.editForm.markAsPristine();
+        
+        this.isSaving.set(false);
+        this.message.success('Profile updated successfully!');
       },
       error: (err: HttpErrorResponse) => {
         this.isSaving.set(false);

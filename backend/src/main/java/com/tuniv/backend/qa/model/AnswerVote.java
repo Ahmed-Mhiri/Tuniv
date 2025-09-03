@@ -1,7 +1,10 @@
 package com.tuniv.backend.qa.model;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.Objects;
+
+import org.hibernate.annotations.CreationTimestamp;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.tuniv.backend.user.model.User;
@@ -15,6 +18,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -35,30 +39,54 @@ public class AnswerVote implements Vote {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
-    @JoinColumn(name = "user_id") // <-- ADDED THIS
+    @JoinColumn(name = "user_id")
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("answerId")
-    @JoinColumn(name = "answer_id") // <-- ADDED THIS
-    @JsonBackReference("answer-votes") // Add this to match the Answer entity
+    @JoinColumn(name = "answer_id")
+    @JsonBackReference("answer-votes")
     private Answer answer;
 
     @Column(nullable = false)
-    private short value; // <-- FIX: Changed from int to short
+    private short value;
+    
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
+
+    // --- ADD THESE METHODS MANUALLY ---
+    @Override
+    public User getUser() {
+        return this.user;
+    }
+
+    @Override
+    public short getValue() {
+        return this.value;
+    }
+
+    public Answer getAnswer() {
+        return this.answer;
+    }
+
+    @Override
+    @Transient // This tells JPA to ignore this method for database mapping
+    public Integer getPostId() {
+        return this.answer != null ? this.answer.getAnswerId() : null;
+    }
+    // --- END OF ADDED METHODS ---
 
     @Embeddable
     @Getter
     @Setter
     public static class AnswerVoteId implements Serializable {
-        
-        @Column(name = "user_id") // <-- ADDED THIS
+        @Column(name = "user_id")
         private Integer userId;
         
-        @Column(name = "answer_id") // <-- ADDED THIS
+        @Column(name = "answer_id")
         private Integer answerId;
 
-        // Constructors, equals, and hashCode...
         public AnswerVoteId() {}
         public AnswerVoteId(Integer userId, Integer answerId) {
             this.userId = userId;

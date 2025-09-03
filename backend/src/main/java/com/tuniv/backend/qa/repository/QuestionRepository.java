@@ -15,5 +15,7 @@ public interface QuestionRepository extends JpaRepository<Question, Integer> {
     // It now accepts a Pageable object and returns a Page of Questions
     Page<Question> findByModuleModuleId(Integer moduleId, Pageable pageable);
     Page<Question> findByModule_ModuleIdIn(List<Integer> moduleIds, Pageable pageable);
+        List<Question> findByAuthorUserIdOrderByCreatedAtDesc(Integer userId);
+
 
 }

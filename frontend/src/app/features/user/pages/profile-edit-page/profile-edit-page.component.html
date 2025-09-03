@@ -11,23 +11,13 @@
     </p>
 
     <div class="profile-picture-section">
-      <div class="avatar-container">
-        <nz-avatar [nzSize]="96" nzIcon="user" [nzSrc]="profilePhotoUrl()"></nz-avatar>
-        @if (isUploading()) {
-          <div class="upload-spinner-overlay">
-            <app-spinner></app-spinner>
-          </div>
-        }
+      <div class="avatar-uploader" (click)="fileInput.click()" title="Change profile photo">
+        <nz-avatar [nzSize]="96" nzIcon="user" [nzSrc]="displayPhotoUrl()"></nz-avatar>
+        <div class="avatar-overlay">
+          <i nz-icon nzType="camera" nzTheme="outline"></i>
+        </div>
       </div>
-      <div class="uploader-container">
-        <app-file-upload
-          [multiple]="false"
-          [maxFileSize]="5"
-          uploadText="Click or drag a new photo here"
-          uploadHint="PNG, JPG, GIF up to 5MB. Recommended: 1:1 ratio."
-          (filesChanged)="onProfilePhotoChanged($event)"
-        ></app-file-upload>
-      </div>
+      <input #fileInput type="file" hidden accept="image/png, image/jpeg, image/gif" (change)="onProfilePhotoChanged($event)"/>
     </div>
     
     <nz-divider></nz-divider>
@@ -57,7 +47,7 @@
 
       <nz-form-item>
         <nz-form-control class="flex justify-end">
-          <button nz-button nzType="primary" [nzLoading]="isSaving()" [disabled]="editForm.pristine || editForm.invalid">
+          <button nz-button nzType="primary" [nzLoading]="isSaving()" [disabled]="editForm.pristine && !newProfilePhotoFile()">
             Save Profile Details
           </button>
         </nz-form-control>

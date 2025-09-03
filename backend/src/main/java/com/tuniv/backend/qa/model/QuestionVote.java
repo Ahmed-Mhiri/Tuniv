@@ -1,7 +1,10 @@
 package com.tuniv.backend.qa.model;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.Objects;
+
+import org.hibernate.annotations.CreationTimestamp;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.tuniv.backend.user.model.User;
@@ -15,6 +18,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -41,25 +45,48 @@ public class QuestionVote implements Vote {
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("questionId")
     @JoinColumn(name = "question_id")
-    @JsonBackReference("question-votes") // Add this to match the Question entity
+    @JsonBackReference("question-votes")
     private Question question;
 
     @Column(nullable = false)
-    private short value; // <-- FIX: Changed from int to short
+    private short value;
 
+    @CreationTimestamp
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
+
+    // --- ADD THESE METHODS MANUALLY ---
+    @Override
+    public User getUser() {
+        return this.user;
+    }
+
+    @Override
+    public short getValue() {
+        return this.value;
+    }
+
+    public Question getQuestion() {
+        return this.question;
+    }
+
+    @Override
+    @Transient // This tells JPA to ignore this method for database mapping
+    public Integer getPostId() {
+        return this.question != null ? this.question.getQuestionId() : null;
+    }
+    // --- END OF ADDED METHODS ---
 
     @Embeddable
     @Getter
     @Setter
     public static class QuestionVoteId implements Serializable {
-        
-        @Column(name = "user_id") // <-- ADDED THIS
+        @Column(name = "user_id")
         private Integer userId;
 
-        @Column(name = "question_id") // <-- ADDED THIS
+        @Column(name = "question_id")
         private Integer questionId;
         
-        // Constructors, equals, and hashCode...
         public QuestionVoteId() {}
         public QuestionVoteId(Integer userId, Integer questionId) {
             this.userId = userId;

@@ -11,7 +11,7 @@
   } @else if (userProfile(); as profile) {
     <nz-card class="profile-card">
       <div class="profile-header">
-        <nz-avatar [nzSize]="128" nzIcon="user" [nzSrc]="profile.profilePhotoUrl ?? undefined"></nz-avatar>
+          <nz-avatar [nzSize]="128" nzIcon="user" [nzSrc]="profile.profilePhotoUrl ?? undefined"></nz-avatar>
         <div class="profile-info">
           <h1 class="username">{{ profile.username }}</h1>
           <p class="major">{{ profile.major }}</p>
@@ -28,7 +28,7 @@
         }
       </div>
 
-      <nz-tabset>
+      <nz-tabset (nzSelectChange)="loadActivity()">
         <nz-tab nzTitle="Profile Details">
           <div class="tab-content">
             <h2>Bio</h2>
@@ -37,7 +37,61 @@
         </nz-tab>
         <nz-tab nzTitle="Activity">
           <div class="tab-content">
-            <p>User's questions and answers will be displayed here.</p>
+            @if (isActivityLoading()) {
+              <div class="status-container">
+                <app-spinner></app-spinner>
+              </div>
+            } @else {
+              @if (activityItems().length > 0) {
+                <div class="activity-list">
+                  @for (item of activityItems(); track $index) {
+                    <div class="activity-item">
+                      <div class="activity-icon-container">
+                        @switch (item.type) {
+                          @case ('QUESTION_ASKED') { <span nz-icon nzType="question-circle" nzTheme="twotone"></span> }
+                          @case ('ANSWER_POSTED') { <span nz-icon nzType="message" nzTheme="twotone" [nzTwotoneColor]="item.isSolution ? '#52c41a' : ''"></span> }
+                          @case ('COMMENT_POSTED') { <span nz-icon nzType="form" nzTheme="outline"></span> }
+                          @case ('ACCEPTED_AN_ANSWER') { <span class="accepted-icon" nz-icon nzType="check-circle" nzTheme="fill"></span> }
+                          @case ('VOTE_CAST') {
+                            @if (item.voteValue && item.voteValue > 0) {
+                              <span class="upvote-icon" nz-icon nzType="arrow-up" nzTheme="outline"></span>
+                            } @else {
+                              <span class="downvote-icon" nz-icon nzType="arrow-down" nzTheme="outline"></span>
+                            }
+                          }
+                        }
+                      </div>
+                      <div class="activity-details">
+                        <span class="activity-type">
+                          @switch (item.type) {
+                            @case ('QUESTION_ASKED') { Asked a question }
+                            @case ('ANSWER_POSTED') { Answered a question }
+                            @case ('COMMENT_POSTED') { Commented on an answer }
+                            @case ('ACCEPTED_AN_ANSWER') { Accepted an answer on }
+                            @case ('VOTE_CAST') {
+                              @if (item.voteValue && item.voteValue > 0) {
+                                Upvoted a @if(item.commentId){comment} @else if(item.answerId){answer} @else{question} on
+                              } @else {
+                                Downvoted a @if(item.commentId){comment} @else if(item.answerId){answer} @else{question} on
+                              }
+                            }
+                          }
+                        </span>
+                        <a class="activity-title" [routerLink]="['/questions', item.questionId]">
+                          {{ item.questionTitle }}
+                        </a>
+                        <span class="activity-date">{{ item.createdAt | date:'medium' }}</span>
+                      </div>
+                      <div class="activity-score" [ngClass]="{'positive': item.postScore > 0, 'negative': item.postScore < 0, 'zero': item.postScore === 0}">
+                        {{ item.postScore }}
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else if (hasLoadedActivity()) {
+                <p>This user has no activity yet.</p>
+              }
+            }
           </div>
         </nz-tab>
       </nz-tabset>

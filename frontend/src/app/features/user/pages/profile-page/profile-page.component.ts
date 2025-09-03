@@ -1,27 +1,31 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { of, switchMap } from 'rxjs'; // <-- Import 'of'
+import { of, switchMap } from 'rxjs';
 import { AuthService } from '../../../../core/services/auth.service';
 import { UserService } from '../../services/user.service';
 import { AuthResponse } from '../../../../shared/models/auth.model';
 import { UserProfile } from '../../../../shared/models/user.model';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
+import { CommonModule } from '@angular/common'; // <-- ADDED: Import CommonModule for pipes and directives
+
+// --- ADDED: Import the activity model ---
+import { UserActivityItem } from '../../../../shared/models/activity.model';
 
 // NG-ZORRO Imports
-import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzAlertModule } from 'ng-zorro-antd/alert';
-import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzAvatarModule } from 'ng-zorro-antd/avatar';
 import { NzButtonModule } from 'ng-zorro-antd/button';
+import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzTabsModule } from 'ng-zorro-antd/tabs';
 
 @Component({
   selector: 'app-profile-page',
+  standalone: true, // <-- Make sure it's standalone if using new imports structure
   imports: [
+    CommonModule, // <-- ADDED: For the date pipe and @if/@for blocks
     RouterLink,
     SpinnerComponent,
-    NzSpinModule,
     NzAlertModule,
     NzCardModule,
     NzAvatarModule,
@@ -38,16 +42,21 @@ export class ProfilePageComponent implements OnInit {
   private readonly userService = inject(UserService);
   private readonly authService = inject(AuthService);
 
+  // --- Existing Signals ---
   readonly userProfile = signal<UserProfile | AuthResponse | null>(null);
   readonly isLoading = signal(true);
   readonly error = signal<string | null>(null);
   
+  // --- ADDED: Signals for the activity feed ---
+  readonly activityItems = signal<UserActivityItem[]>([]);
+  readonly isActivityLoading = signal(false);
+  readonly hasLoadedActivity = signal(false); // To prevent re-fetching
+
   readonly currentUser = this.authService.currentUser;
   readonly isOwnProfile = computed(() => {
     const currentUserId = this.currentUser()?.userId;
-    // The userProfile signal can now hold either type, so we check userId on both
     const profileUserId = (this.userProfile() as UserProfile)?.userId;
-    return currentUserId && profileUserId && currentUserId === profileUserId;
+    return currentUserId && profileUserId && currentUserId === currentUserId;
   });
 
   ngOnInit(): void {
@@ -57,12 +66,10 @@ export class ProfilePageComponent implements OnInit {
           this.isLoading.set(true);
           const userId = Number(params.get('id'));
 
-          // --- FIX: Check against 'userId' instead of 'id' ---
           if (this.currentUser()?.userId === userId) {
-            // If it's our own profile, use the reactive signal from AuthService
             this.userProfile.set(this.currentUser());
             this.isLoading.set(false);
-            return of(null); // Stop the observable chain
+            return of(null);
           }
 
           if (isNaN(userId)) {
@@ -71,7 +78,6 @@ export class ProfilePageComponent implements OnInit {
             return of(null);
           }
           
-          // If it's someone else's profile, fetch it from the API
           return this.userService.getUserProfileById(userId);
         })
       )
@@ -87,5 +93,28 @@ export class ProfilePageComponent implements OnInit {
           this.isLoading.set(false);
         },
       });
+  }
+
+  // --- ADDED: Method to load activity data on demand ---
+  loadActivity(): void {
+    const profile = this.userProfile();
+    // Only fetch if we have a profile ID and haven't fetched before
+    if (!profile || this.hasLoadedActivity()) {
+      return;
+    }
+
+    this.isActivityLoading.set(true);
+    this.hasLoadedActivity.set(true);
+
+    this.userService.getUserActivity(profile.userId).subscribe({
+      next: (items) => {
+        this.activityItems.set(items);
+        this.isActivityLoading.set(false);
+      },
+      error: () => {
+        // Optional: Set an error signal for the activity tab specifically
+        this.isActivityLoading.set(false);
+      },
+    });
   }
 }

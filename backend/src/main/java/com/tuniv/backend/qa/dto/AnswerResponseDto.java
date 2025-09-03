@@ -1,13 +1,13 @@
 package com.tuniv.backend.qa.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 public record AnswerResponseDto(
     Integer answerId,
     String body,
     Boolean isSolution,
-    LocalDateTime createdAt,
+    Instant createdAt,
     AuthorDto author,
     int score,
     int currentUserVote,
