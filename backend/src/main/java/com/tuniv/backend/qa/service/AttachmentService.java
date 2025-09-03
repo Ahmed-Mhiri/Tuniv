@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.tuniv.backend.filestorage.model.FileStorage;
 import com.tuniv.backend.qa.model.Attachment;
+import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.qa.repository.AttachmentRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -22,30 +23,24 @@ public class AttachmentService {
     private final FileStorage fileStorageService;
     private final AttachmentRepository attachmentRepository;
 
-    public List<Attachment> saveAttachments(List<MultipartFile> files, Integer postId, String postType) {
-        if (files == null) {
+    // ✅ CHANGE: The method now accepts a Post object.
+    public List<Attachment> saveAttachments(List<MultipartFile> files, Post post) {
+        if (files == null || post == null || post.getId() == null) {
             return Collections.emptyList();
         }
         
         List<Attachment> savedAttachments = new ArrayList<>();
 
-        // =========================================================================
-        // ✅ FINAL FIX: We remove the ".filter(file -> !file.isEmpty())" check.
-        // The file is being incorrectly flagged as empty, so we will process it anyway.
-        // The try-catch block will prevent any real issues.
-        // =========================================================================
         List<MultipartFile> validFiles = files.stream()
                 .filter(Objects::nonNull)
+                .filter(file -> file.getSize() > 0)
                 .collect(Collectors.toList());
 
         for (MultipartFile file : validFiles) {
-            // We can add a check here to skip genuinely empty uploads without filtering.
-            if (file.getSize() == 0) {
-                continue;
-            }
-            
             try {
-                String subDirectory = postType.toLowerCase() + "s";
+                // ✅ CHANGE: Determine subdirectory from the Post's class name.
+                String postType = post.getClass().getSimpleName().toLowerCase();
+                String subDirectory = postType + "s";
                 String fileUrl = fileStorageService.storeFile(file, subDirectory);
 
                 Attachment attachment = new Attachment();
@@ -53,12 +48,12 @@ public class AttachmentService {
                 attachment.setFileUrl(fileUrl);
                 attachment.setFileType(file.getContentType());
                 attachment.setFileSize(file.getSize());
-                attachment.setPostId(postId);
-                attachment.setPostType(postType);
+                
+                // ✅ CHANGE: Set the entire Post object.
+                attachment.setPost(post); 
 
                 savedAttachments.add(attachmentRepository.save(attachment));
             } catch (Exception e) {
-                // Re-throwing as a specific exception is good practice
                 throw new RuntimeException("Failed to store file: " + file.getOriginalFilename(), e);
             }
         }

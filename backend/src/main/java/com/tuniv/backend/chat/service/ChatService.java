@@ -39,8 +39,7 @@ public class ChatService {
     private final ConversationParticipantRepository conversationParticipantRepository;
     private final SimpMessageSendingOperations messagingTemplate;
     private final AttachmentService attachmentService;
-        private final ApplicationEventPublisher eventPublisher;
-
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * Orchestrates sending a message by first saving it to the database
@@ -57,8 +56,7 @@ public class ChatService {
 
         String destination = "/topic/conversation/" + conversationId;
         messagingTemplate.convertAndSend(destination, dtoToSend);
-        eventPublisher.publishEvent(new NewMessageEvent(this, messageWithAttachments)); // Add this line
-
+        eventPublisher.publishEvent(new NewMessageEvent(this, messageWithAttachments));
 
         return messageWithAttachments;
     }
@@ -82,11 +80,13 @@ public class ChatService {
 
         Message message = new Message();
         message.setConversation(conversation);
-        message.setSender(sender);
-        
+
+        // ✅ FIX: Use setAuthor() for consistency with the Post model.
+        // The custom setter in the Message entity will also handle setting the 'sender' field.
+        message.setAuthor(sender);
+
         String content = chatMessageDto.getContent();
-        message.setContent(content == null ? "" : content);
-        
+        message.setBody(content == null ? "" : content);
         message.setSentAt(LocalDateTime.now());
 
         Message savedMessage = messageRepository.save(message);
@@ -94,14 +94,13 @@ public class ChatService {
         if (files != null && !files.isEmpty()) {
             attachmentService.saveAttachments(
                     files.stream().filter(Objects::nonNull).collect(Collectors.toList()),
-                    savedMessage.getMessageId(),
-                    "MESSAGE"
+                    savedMessage
             );
         }
 
-        // Re-fetch to include attachments before returning
-        return messageRepository.findById(savedMessage.getMessageId())
-                .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch message after saving attachments"));
+        // ✅ FIX: The re-fetch is unnecessary. The 'savedMessage' object is managed by
+        // the transaction and is ready to be returned.
+        return savedMessage;
     }
 
     /**
@@ -129,6 +128,8 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
     }
     
+    // ... other methods in the service remain the same ...
+
     /**
      * Retrieves a summary list of all conversations for a given user,
      * including unread message counts.
@@ -167,7 +168,6 @@ public class ChatService {
      * A private helper method to map entity data to the ConversationSummaryDto.
      */
     private ConversationSummaryDto mapToConversationSummaryDto(Conversation conv, User currentUser) {
-        // Find the other participant in the conversation
         User otherParticipant = conv.getParticipants().stream()
                 .map(ConversationParticipant::getUser)
                 .filter(user -> !user.getUserId().equals(currentUser.getUserId()))
@@ -175,20 +175,17 @@ public class ChatService {
                 .orElse(null);
 
         if (otherParticipant == null) {
-            return null; // Assuming 1-on-1 chats for now
+            return null;
         }
 
-        // Find the last message sent in the conversation
         Optional<Message> lastMessageOpt = messageRepository.findTopByConversationConversationIdOrderBySentAtDesc(conv.getConversationId());
 
-        // Find the current user's participation record to get their last read time
         LocalDateTime lastReadTimestamp = conv.getParticipants().stream()
                 .filter(p -> p.getUser().getUserId().equals(currentUser.getUserId()))
                 .findFirst()
                 .map(ConversationParticipant::getLastReadTimestamp)
-                .orElse(conv.getCreatedAt()); // Default to conversation creation if never read
+                .orElse(conv.getCreatedAt());
 
-        // Use the repository to efficiently count messages sent by others after the last read time
         long unreadCount = messageRepository.countByConversationConversationIdAndSenderUserIdNotAndSentAtAfter(
                 conv.getConversationId(),
                 currentUser.getUserId(),
@@ -199,7 +196,8 @@ public class ChatService {
                 .conversationId(conv.getConversationId())
                 .participantName(otherParticipant.getUsername())
                 .participantAvatarUrl(otherParticipant.getProfilePhotoUrl())
-                .lastMessage(lastMessageOpt.map(Message::getContent).orElse("No messages yet..."))
+                // ✅ FIX: Use getBody() here as well.
+                .lastMessage(lastMessageOpt.map(Message::getBody).orElse("No messages yet..."))
                 .lastMessageTimestamp(lastMessageOpt.map(m -> m.getSentAt().toString()).orElse(conv.getCreatedAt().toString()))
                 .unreadCount((int) unreadCount)
                 .build();

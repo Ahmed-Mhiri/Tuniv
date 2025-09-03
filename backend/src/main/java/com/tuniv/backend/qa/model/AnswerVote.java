@@ -71,10 +71,11 @@ public class AnswerVote implements Vote {
     }
 
     @Override
-    @Transient // This tells JPA to ignore this method for database mapping
-    public Integer getPostId() {
-        return this.answer != null ? this.answer.getAnswerId() : null;
-    }
+@Transient
+public Integer getPostId() {
+    // ✅ CHANGE: Use getId() from the Post superclass
+    return this.answer != null ? this.answer.getId() : null;
+}
     // --- END OF ADDED METHODS ---
 
     @Embeddable

@@ -1,5 +1,21 @@
 package com.tuniv.backend.qa.service;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationEventPublisher; // Import all models
+import org.springframework.data.domain.Page; // Import all repositories
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.notification.event.NewAnswerEvent;
 import com.tuniv.backend.notification.event.NewQuestionInUniversityEvent;
@@ -8,26 +24,25 @@ import com.tuniv.backend.qa.dto.AnswerResponseDto;
 import com.tuniv.backend.qa.dto.QuestionCreateRequest;
 import com.tuniv.backend.qa.dto.QuestionResponseDto;
 import com.tuniv.backend.qa.mapper.QAMapper;
-import com.tuniv.backend.qa.model.*; // Import all models
-import com.tuniv.backend.qa.repository.*; // Import all repositories
+import com.tuniv.backend.qa.model.Answer;
+import com.tuniv.backend.qa.model.AnswerVote;
+import com.tuniv.backend.qa.model.Comment;
+import com.tuniv.backend.qa.model.CommentVote;
+import com.tuniv.backend.qa.model.Question;
+import com.tuniv.backend.qa.model.QuestionVote;
+import com.tuniv.backend.qa.model.Vote;
+import com.tuniv.backend.qa.repository.AnswerRepository;
+import com.tuniv.backend.qa.repository.AnswerVoteRepository;
+import com.tuniv.backend.qa.repository.CommentVoteRepository;
+import com.tuniv.backend.qa.repository.QuestionRepository;
+import com.tuniv.backend.qa.repository.QuestionVoteRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.university.model.Module;
 import com.tuniv.backend.university.repository.ModuleRepository;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
-import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -39,9 +54,9 @@ public class QuestionService {
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final AttachmentService attachmentService;
-    private final AttachmentRepository attachmentRepository;
+    // ✅ FIX: AttachmentRepository is no longer needed here.
 
-    // --- 1. Inject all vote repositories for bulk fetching ---
+    // Vote repositories are still needed for efficient bulk fetching
     private final QuestionVoteRepository questionVoteRepository;
     private final AnswerVoteRepository answerVoteRepository;
     private final CommentVoteRepository commentVoteRepository;
@@ -60,26 +75,23 @@ public class QuestionService {
         question.setAuthor(author);
 
         Question savedQuestion = questionRepository.save(question);
-        attachmentService.saveAttachments(files, savedQuestion.getQuestionId(), "QUESTION");
+        attachmentService.saveAttachments(files, savedQuestion);
 
-        Question finalQuestion = questionRepository.findById(savedQuestion.getQuestionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch question"));
+        // ✅ FIX: No need to re-fetch or build attachment maps.
+        // The 'savedQuestion' object is managed and has its ID.
 
-        Map<Integer, List<Attachment>> questionAttachments = finalQuestion.getAttachments().stream()
-                .collect(Collectors.groupingBy(Attachment::getPostId));
+        eventPublisher.publishEvent(new NewQuestionInUniversityEvent(this, savedQuestion));
 
-        eventPublisher.publishEvent(new NewQuestionInUniversityEvent(this, finalQuestion));
-
-        // --- 2. Call updated mapper. For new questions, scores and votes are empty. ---
-        return QAMapper.toQuestionResponseDto(finalQuestion, currentUser, questionAttachments,
-                Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+        // ✅ FIX: Call the updated, simpler mapper.
+        return QAMapper.toQuestionResponseDto(savedQuestion, currentUser,
+                Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Transactional
     @CacheEvict(value = "questions", key = "#questionId")
     public AnswerResponseDto addAnswer(AnswerCreateRequest request, Integer questionId, UserDetailsImpl currentUser, List<MultipartFile> files) {
         boolean isBodyEmpty = request.body() == null || request.body().trim().isEmpty();
-        boolean hasFiles = files != null && !files.stream().allMatch(MultipartFile::isEmpty);
+        boolean hasFiles = files != null && !files.isEmpty() && files.stream().anyMatch(f -> f.getSize() > 0);
 
         if (isBodyEmpty && !hasFiles) {
             throw new IllegalArgumentException("Cannot create an empty answer. Please provide text or attach a file.");
@@ -94,21 +106,17 @@ public class QuestionService {
         answer.setBody(request.body());
         answer.setQuestion(question);
         answer.setAuthor(author);
-        
+
         Answer savedAnswer = answerRepository.save(answer);
-        attachmentService.saveAttachments(files, savedAnswer.getAnswerId(), "ANSWER");
-        
-        Answer finalAnswer = answerRepository.findById(savedAnswer.getAnswerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch answer"));
+        attachmentService.saveAttachments(files, savedAnswer);
 
-        Map<Integer, List<Attachment>> answerAttachments = finalAnswer.getAttachments().stream()
-                .collect(Collectors.groupingBy(Attachment::getPostId));
+        // ✅ FIX: No need to re-fetch or build attachment maps.
 
-        eventPublisher.publishEvent(new NewAnswerEvent(this, finalAnswer));
+        eventPublisher.publishEvent(new NewAnswerEvent(this, savedAnswer));
 
-        // --- 3. Call updated mapper. For new answers, scores and votes are empty. ---
-        return QAMapper.toAnswerResponseDto(finalAnswer, currentUser, answerAttachments,
-                Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap());
+        // ✅ FIX: Call the updated, simpler mapper for the answer.
+        return QAMapper.toAnswerResponseDto(savedAnswer, currentUser,
+                Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Transactional(readOnly = true)
@@ -119,40 +127,39 @@ public class QuestionService {
             return Page.empty(pageable);
         }
 
-        // --- 4. Bulk fetch votes for all questions on the page ---
-        List<Integer> questionIds = questions.stream().map(Question::getQuestionId).collect(Collectors.toList());
-        List<QuestionVote> votes = questionVoteRepository.findByQuestionQuestionIdIn(questionIds);
+        // ✅ FIX: Use getId() from the Post superclass.
+        List<Integer> questionIds = questions.stream().map(Question::getId).collect(Collectors.toList());
+        List<QuestionVote> votes = questionVoteRepository.findByQuestionIdIn(questionIds);
 
         Map<Integer, Integer> scores = votes.stream().collect(Collectors.groupingBy(
-                vote -> vote.getQuestion().getQuestionId(),
+                vote -> vote.getQuestion().getId(), // ✅ FIX: Use getId()
                 Collectors.summingInt(vote -> (int) vote.getValue())
         ));
         Map<Integer, Integer> currentUserVotes = votes.stream()
                 .filter(vote -> vote.getUser().getUserId().equals(currentUser.getId()))
-                .collect(Collectors.toMap(vote -> vote.getQuestion().getQuestionId(), vote -> (int) vote.getValue()));
+                .collect(Collectors.toMap(vote -> vote.getQuestion().getId(), vote -> (int) vote.getValue())); // ✅ FIX: Use getId()
 
-        return questionPage.map(question -> QAMapper.toQuestionResponseDto(question, currentUser,
-                Collections.emptyMap(), Collections.emptyMap(), Collections.emptyMap(), scores, currentUserVotes));
+        // ✅ FIX: Call the updated mapper in the page map.
+        return questionPage.map(question -> QAMapper.toQuestionResponseDto(question, currentUser, scores, currentUserVotes));
     }
-    
+
     @Transactional(readOnly = true)
     @Cacheable(value = "questions", key = "#questionId")
     public QuestionResponseDto getQuestionById(Integer questionId, UserDetailsImpl currentUser) {
-        // --- 5. This is the fully optimized implementation ---
         Question question = questionRepository.findById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
 
-        List<Integer> questionIds = List.of(questionId);
-        List<Integer> answerIds = question.getAnswers().stream().map(Answer::getAnswerId).collect(Collectors.toList());
+        // Efficiently fetch all votes for the question, its answers, and their comments
+        List<Integer> answerIds = question.getAnswers().stream().map(Answer::getId).collect(Collectors.toList());
         List<Integer> commentIds = question.getAnswers().stream()
                 .flatMap(answer -> answer.getComments().stream())
                 .flatMap(comment -> flattenComments(comment).stream())
-                .map(Comment::getCommentId)
+                .map(Comment::getId)
                 .collect(Collectors.toList());
 
-        List<QuestionVote> questionVotes = questionIds.isEmpty() ? Collections.emptyList() : questionVoteRepository.findByQuestionQuestionIdIn(questionIds);
-        List<AnswerVote> answerVotes = answerIds.isEmpty() ? Collections.emptyList() : answerVoteRepository.findByAnswerAnswerIdIn(answerIds);
-        List<CommentVote> commentVotes = commentIds.isEmpty() ? Collections.emptyList() : commentVoteRepository.findByCommentCommentIdIn(commentIds);
+        List<QuestionVote> questionVotes = questionVoteRepository.findByQuestionIdIn(List.of(questionId));
+        List<AnswerVote> answerVotes = answerIds.isEmpty() ? Collections.emptyList() : answerVoteRepository.findByAnswerIdIn(answerIds);
+        List<CommentVote> commentVotes = commentIds.isEmpty() ? Collections.emptyList() : commentVoteRepository.findByCommentIdIn(commentIds);
 
         Map<Integer, Integer> scores = Stream.of(questionVotes, answerVotes, commentVotes)
                 .flatMap(List::stream)
@@ -162,26 +169,20 @@ public class QuestionService {
                 .flatMap(List::stream)
                 .filter(vote -> currentUser != null && vote.getUser().getUserId().equals(currentUser.getId()))
                 .collect(Collectors.toMap(Vote::getPostId, vote -> (int) vote.getValue(), (v1, v2) -> v1));
-        
-        Map<Integer, List<Attachment>> questionAttachments = findAttachments("QUESTION", questionIds);
-        Map<Integer, List<Attachment>> answerAttachments = findAttachments("ANSWER", answerIds);
-        Map<Integer, List<Attachment>> commentAttachments = findAttachments("COMMENT", commentIds);
 
-        return QAMapper.toQuestionResponseDto(question, currentUser, questionAttachments, answerAttachments, commentAttachments, scores, currentUserVotes);
+        // ✅ FIX: The attachment maps are gone! The mapper handles it.
+        // We simply call the new, simpler mapper.
+        return QAMapper.toQuestionResponseDto(question, currentUser, scores, currentUserVotes);
     }
 
     private List<Comment> flattenComments(Comment comment) {
         List<Comment> list = new ArrayList<>();
         list.add(comment);
-        comment.getChildren().forEach(child -> list.addAll(flattenComments(child)));
+        if (comment.getChildren() != null) {
+            comment.getChildren().forEach(child -> list.addAll(flattenComments(child)));
+        }
         return list;
     }
 
-    private Map<Integer, List<Attachment>> findAttachments(String postType, List<Integer> postIds) {
-        if (postIds == null || postIds.isEmpty()) {
-            return Collections.emptyMap();
-        }
-        return attachmentRepository.findAllByPostTypeAndPostIdIn(postType, postIds)
-                .stream().collect(Collectors.groupingBy(Attachment::getPostId));
-    }
+    // ✅ FIX: The findAttachments helper method is no longer needed and has been removed.
 }

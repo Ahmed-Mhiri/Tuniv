@@ -150,11 +150,11 @@ public class VoteService {
                 
                 } else if (newVote instanceof AnswerVote av) {
                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
-                        PostType.ANSWER, av.getPostId(), av.getAnswer().getQuestion().getTitle(), av.getAnswer().getQuestion().getQuestionId()));
+                        PostType.ANSWER, av.getPostId(), av.getAnswer().getQuestion().getTitle(), av.getAnswer().getQuestion().getId()));
                 
                 } else if (newVote instanceof CommentVote cv) {
                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
-                        PostType.COMMENT, cv.getPostId(), cv.getComment().getAnswer().getQuestion().getTitle(), cv.getComment().getAnswer().getQuestion().getQuestionId()));
+                        PostType.COMMENT, cv.getPostId(), cv.getComment().getAnswer().getQuestion().getTitle(), cv.getComment().getAnswer().getQuestion().getId()));
                 }
             }
         }

@@ -70,11 +70,11 @@ public class CommentVote implements Vote {
     }
     
     @Override
-    @Transient // This tells JPA to ignore this method for database mapping
-    public Integer getPostId() {
-        // Return the ID of the comment this vote belongs to
-        return this.comment != null ? this.comment.getCommentId() : null;
-    }
+@Transient
+public Integer getPostId() {
+    // ✅ CHANGE: Use getId() from the Post superclass
+    return this.comment != null ? this.comment.getId() : null;
+}
     // --- END OF ADDED METHODS ---
 
 

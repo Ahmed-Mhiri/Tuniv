@@ -18,11 +18,9 @@ import com.tuniv.backend.qa.dto.CommentCreateRequest; // <-- IMPORT ADDED
 import com.tuniv.backend.qa.dto.CommentResponseDto;
 import com.tuniv.backend.qa.mapper.QAMapper;
 import com.tuniv.backend.qa.model.Answer;
-import com.tuniv.backend.qa.model.Attachment;
 import com.tuniv.backend.qa.model.Comment;
 import com.tuniv.backend.qa.model.CommentVote;
 import com.tuniv.backend.qa.repository.AnswerRepository;
-import com.tuniv.backend.qa.repository.AttachmentRepository;
 import com.tuniv.backend.qa.repository.CommentRepository;
 import com.tuniv.backend.qa.repository.CommentVoteRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
@@ -36,11 +34,11 @@ import lombok.RequiredArgsConstructor;
 public class CommentService {
 
     private final CommentRepository commentRepository;
-    private final CommentVoteRepository commentVoteRepository; // <-- 1. Inject the repository for votes
+    private final CommentVoteRepository commentVoteRepository;
     private final AnswerRepository answerRepository;
     private final UserRepository userRepository;
     private final AttachmentService attachmentService;
-    private final AttachmentRepository attachmentRepository;
+    // ✅ FIX: AttachmentRepository is no longer needed here.
     private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
@@ -50,9 +48,9 @@ public class CommentService {
             CommentCreateRequest request,
             UserDetailsImpl currentUser,
             List<MultipartFile> files) {
-        
+
         boolean isBodyEmpty = request.body() == null || request.body().trim().isEmpty();
-        boolean hasFiles = files != null && !files.stream().allMatch(MultipartFile::isEmpty);
+        boolean hasFiles = files != null && files.stream().anyMatch(f -> f.getSize() > 0);
 
         if (isBodyEmpty && !hasFiles) {
             throw new IllegalArgumentException("Cannot create an empty comment. Please provide text or attach a file.");
@@ -67,7 +65,7 @@ public class CommentService {
         comment.setBody(request.body());
         comment.setAnswer(answer);
         comment.setAuthor(author);
-        
+
         if (request.parentCommentId() != null) {
             Comment parent = commentRepository.findById(request.parentCommentId())
                     .orElseThrow(() -> new ResourceNotFoundException("Parent comment not found"));
@@ -75,22 +73,15 @@ public class CommentService {
         }
 
         Comment savedComment = commentRepository.save(comment);
-        attachmentService.saveAttachments(files, savedComment.getCommentId(), "COMMENT");
-        
-        Comment finalComment = commentRepository.findById(savedComment.getCommentId())
-                .orElseThrow(() -> new ResourceNotFoundException("Failed to re-fetch comment"));
-        
-        Map<Integer, List<Attachment>> commentAttachments = finalComment.getAttachments().stream()
-                .collect(Collectors.groupingBy(Attachment::getPostId));
-        
-        // This is a new comment, so its score is 0 and there are no votes
-        Map<Integer, Integer> scores = Collections.emptyMap();
-        Map<Integer, Integer> currentUserVotes = Collections.emptyMap();
+        attachmentService.saveAttachments(files, savedComment);
 
-        eventPublisher.publishEvent(new NewCommentEvent(this, finalComment));
+        // ✅ FIX: No need to re-fetch the comment or manually build attachment maps.
+        // The 'savedComment' object is sufficient.
+        
+        eventPublisher.publishEvent(new NewCommentEvent(this, savedComment));
 
-        // <-- 2. Call the updated mapper with empty vote maps
-        return QAMapper.toCommentResponseDto(finalComment, currentUser, commentAttachments, scores, currentUserVotes);
+        // ✅ FIX: Call the updated, simpler mapper with empty vote maps for the new comment.
+        return QAMapper.toCommentResponseDto(savedComment, currentUser, Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Transactional(readOnly = true)
@@ -98,41 +89,44 @@ public class CommentService {
         if (!answerRepository.existsById(answerId)) {
             throw new ResourceNotFoundException("Answer not found with id: " + answerId);
         }
-        
-        List<Comment> topLevelComments = commentRepository.findByAnswerAnswerIdAndParentCommentIsNullOrderByCreatedAtAsc(answerId);
-        
-        // <-- 3. Collect all comment IDs (including children) for bulk fetching
+
+        List<Comment> topLevelComments = commentRepository.findByAnswerIdAndParentCommentIsNullOrderByCreatedAtAsc(answerId);
+
+        if (topLevelComments.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        // Collect all comment IDs (including children) for bulk fetching votes
         List<Integer> allCommentIds = topLevelComments.stream()
                 .flatMap(comment -> flattenComments(comment).stream())
-                .map(Comment::getCommentId)
+                .map(Comment::getId) // ✅ FIX: Use getId()
                 .collect(Collectors.toList());
         
-        Map<Integer, List<Attachment>> commentAttachments = attachmentRepository.findAllByPostTypeAndPostIdIn("COMMENT", allCommentIds)
-                .stream().collect(Collectors.groupingBy(Attachment::getPostId));
+        // ✅ FIX: The manual fetching of attachments is no longer needed. It's handled by JPA's relationships.
 
-        // <-- 4. Fetch all votes for these comments in a single query
-        List<CommentVote> votes = allCommentIds.isEmpty() ? Collections.emptyList() : commentVoteRepository.findByCommentCommentIdIn(allCommentIds);
+        // Fetch all votes for these comments in a single query
+List<CommentVote> votes = allCommentIds.isEmpty() ? Collections.emptyList() : commentVoteRepository.findByCommentIdIn(allCommentIds);
 
-        // <-- 5. Process votes into maps
+        // Process votes into maps
         Map<Integer, Integer> scores = votes.stream()
-            .collect(Collectors.groupingBy(
-                vote -> vote.getComment().getCommentId(),
-                Collectors.summingInt(vote -> (int) vote.getValue())
-            ));
+                .collect(Collectors.groupingBy(
+                        vote -> vote.getComment().getId(), // ✅ FIX: Use getId()
+                        Collectors.summingInt(vote -> (int) vote.getValue())
+                ));
 
         Map<Integer, Integer> currentUserVotes = votes.stream()
-            .filter(vote -> currentUser != null && vote.getUser().getUserId().equals(currentUser.getId()))
-            .collect(Collectors.toMap(
-                vote -> vote.getComment().getCommentId(),
-                vote -> (int) vote.getValue()
-            ));
-        
-        // <-- 6. Call the updated mapper inside the stream
+                .filter(vote -> currentUser != null && vote.getUser().getUserId().equals(currentUser.getId()))
+                .collect(Collectors.toMap(
+                        vote -> vote.getComment().getId(), // ✅ FIX: Use getId()
+                        vote -> (int) vote.getValue()
+                ));
+
+        // ✅ FIX: Call the updated mapper inside the stream, without the attachment map.
         return topLevelComments.stream()
-                .map(comment -> QAMapper.toCommentResponseDto(comment, currentUser, commentAttachments, scores, currentUserVotes))
+                .map(comment -> QAMapper.toCommentResponseDto(comment, currentUser, scores, currentUserVotes))
                 .collect(Collectors.toList());
     }
-    
+
     private List<Comment> flattenComments(Comment comment) {
         List<Comment> list = new ArrayList<>();
         list.add(comment);

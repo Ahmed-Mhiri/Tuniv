@@ -14,16 +14,18 @@ public class ChatMapper {
         if (message == null) return null;
 
         ChatMessageDto dto = new ChatMessageDto();
-        dto.setMessageId(message.getMessageId()); // <-- ADD THIS
-        dto.setContent(message.getContent());
+        dto.setMessageId(message.getId());
+        
+        // ✅ FIX: Use getBody() from the Post superclass instead of getContent().
+        dto.setContent(message.getBody());
+        
         dto.setSenderUsername(message.getSender().getUsername());
         dto.setSentAt(message.getSentAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-
-        // --- FIX: Map the attachments collection ---
+        
         dto.setAttachments(
             message.getAttachments() != null ?
                 message.getAttachments().stream()
-                    .map(QAMapper::toAttachmentDto) // Reuse the existing attachment mapper
+                    .map(QAMapper::toAttachmentDto)
                     .collect(Collectors.toList()) :
                 Collections.emptyList()
         );

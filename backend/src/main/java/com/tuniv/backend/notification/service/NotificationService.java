@@ -71,7 +71,7 @@ public class NotificationService {
         if (actor.equals(recipient)) return;
 
         var message = actor.getUsername() + " answered your question: \"" + truncate(answer.getQuestion().getTitle(), 40) + "\"";
-        var link = "/questions/" + answer.getQuestion().getQuestionId() + "?answerId=" + answer.getAnswerId();
+        var link = "/questions/" + answer.getQuestion().getId() + "?answerId=" + answer.getId();
 
         createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_ANSWER, message, link);
     }
@@ -90,7 +90,7 @@ public class NotificationService {
             if (actor.equals(recipient)) return;
 
             var message = actor.getUsername() + " replied to your comment.";
-            var link = "/questions/" + question.getQuestionId() + "?commentId=" + comment.getCommentId() + "#comment-" + comment.getCommentId();
+            var link = "/questions/" + question.getId() + "?commentId=" + comment.getId() + "#comment-" + comment.getId();
             createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_REPLY_TO_COMMENT, message, link);
         }
         // Case B: New comment on an answer
@@ -99,7 +99,7 @@ public class NotificationService {
             if (actor.equals(recipient)) return;
 
             var message = actor.getUsername() + " commented on your answer for \"" + truncate(question.getTitle(), 30) + "\".";
-            var link = "/questions/" + question.getQuestionId() + "?answerId=" + answer.getAnswerId() + "#comment-" + comment.getCommentId();
+            var link = "/questions/" + question.getId() + "?answerId=" + answer.getId() + "#comment-" + comment.getId();
             createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_COMMENT_ON_ANSWER, message, link);
         }
     }
@@ -115,6 +115,7 @@ public class NotificationService {
 
                 String message = actor.getUsername() + " upvoted your " + event.getPostType().toString().toLowerCase() + ".";
                 String link = "/questions/" + event.getQuestionId();
+
                 NotificationType type;
 
                 switch (event.getPostType()) {
@@ -138,7 +139,7 @@ public class NotificationService {
         if (actor.equals(recipient)) return;
 
         var message = "Your answer to \"" + truncate(answer.getQuestion().getTitle(), 30) + "\" was marked as the solution!";
-        var link = "/questions/" + answer.getQuestion().getQuestionId() + "?answerId=" + answer.getAnswerId();
+        var link = "/questions/" + answer.getQuestion().getId() + "?answerId=" + answer.getId();
         createNotificationAndSendEmail(recipient, actor, NotificationType.ANSWER_MARKED_AS_SOLUTION, message, link);
     }
     
@@ -156,7 +157,7 @@ public void handleNewQuestion(NewQuestionInUniversityEvent event) {
     );
 
     var message = "A new question was asked in " + university.getName() + ": \"" + truncate(question.getTitle(), 30) + "\"";
-    var link = "/questions/" + question.getQuestionId();
+    var link = "/questions/" + question.getId();
 
     recipients.forEach(recipient -> 
         createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_QUESTION_IN_UNI, message, link)

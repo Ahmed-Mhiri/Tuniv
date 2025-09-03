@@ -10,7 +10,7 @@ import com.tuniv.backend.qa.model.QuestionVote;
 @Repository
 public interface QuestionVoteRepository extends JpaRepository<QuestionVote, QuestionVote.QuestionVoteId> {
     List<QuestionVote> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
-    List<QuestionVote> findByQuestionQuestionIdIn(List<Integer> questionIds);
 
-
+    // ✅ FIX: Changed from QuestionQuestionIdIn to QuestionIdIn
+    List<QuestionVote> findByQuestionIdIn(List<Integer> questionIds);
 }

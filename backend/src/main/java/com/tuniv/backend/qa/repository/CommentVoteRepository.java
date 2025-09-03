@@ -10,7 +10,7 @@ import com.tuniv.backend.qa.model.CommentVote;
 @Repository
 public interface CommentVoteRepository extends JpaRepository<CommentVote, CommentVote.CommentVoteId> {
     List<CommentVote> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
-    List<CommentVote> findByCommentCommentIdIn(List<Integer> commentIds);
 
-
+    // ✅ FIX: Changed from CommentCommentIdIn to CommentIdIn
+    List<CommentVote> findByCommentIdIn(List<Integer> commentIds);
 }

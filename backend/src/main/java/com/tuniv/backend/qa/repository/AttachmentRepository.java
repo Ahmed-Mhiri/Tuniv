@@ -9,6 +9,7 @@ import com.tuniv.backend.qa.model.Attachment;
 
 @Repository
 public interface AttachmentRepository extends JpaRepository<Attachment, Integer> {
-        List<Attachment> findAllByPostTypeAndPostIdIn(String postType, List<Integer> postIds);
+            List<Attachment> findByPostIdIn(List<Integer> postIds);
+
 
 }

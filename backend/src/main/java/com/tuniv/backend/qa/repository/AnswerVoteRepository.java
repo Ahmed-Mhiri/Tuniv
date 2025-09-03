@@ -10,7 +10,7 @@ import com.tuniv.backend.qa.model.AnswerVote;
 @Repository
 public interface AnswerVoteRepository extends JpaRepository<AnswerVote, AnswerVote.AnswerVoteId> {
     List<AnswerVote> findByUserUserIdOrderByCreatedAtDesc(Integer userId);
-    List<AnswerVote> findByAnswerAnswerIdIn(List<Integer> answerIds);
 
-
+    // ✅ FIX: Changed from AnswerAnswerIdIn to AnswerIdIn
+    List<AnswerVote> findByAnswerIdIn(List<Integer> answerIds);
 }
