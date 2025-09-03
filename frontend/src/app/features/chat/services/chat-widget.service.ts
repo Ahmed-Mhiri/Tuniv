@@ -25,9 +25,6 @@ export class ChatWidgetService {
       .subscribe(() => this.loadConversations());
   }
 
-  /**
-   * Fetches the conversation list from the API and updates the state.
-   */
   loadConversations(): void {
     if (!this.isLoading()) {
       this.isLoading.set(true);
@@ -46,27 +43,58 @@ export class ChatWidgetService {
   }
 
   // --- Public API Methods ---
+
+  /**
+   * ✅ [RESTORED] Toggles the visibility of the chat widget.
+   */
   toggleWidget(): void {
     this.isWidgetOpen.update(isOpen => !isOpen);
   }
 
-  /**
-   * Opens a specific conversation and marks it as read if necessary.
-   */
+  startConversationWithUser(participant: {
+    participantId: number;
+    participantName: string;
+    participantAvatarUrl?: string | null;
+  }): void {
+    if (!this.isWidgetOpen()) {
+      this.isWidgetOpen.set(true);
+    }
+
+    const existingConv = this.conversations().find(
+      (c) => c.participantId === participant.participantId
+    );
+
+    if (existingConv) {
+      this.openConversation(existingConv);
+      return;
+    }
+
+    this.chatService.findOrCreateConversation(participant.participantId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (newConversation) => {
+          this.conversations.update((convs) => [newConversation, ...convs]);
+          this.openConversation(newConversation);
+        },
+        error: (err) => {
+          console.error('Failed to start conversation:', err);
+          this.isWidgetOpen.set(false);
+        },
+      });
+  }
+
   openConversation(conversation: Conversation): void {
     this.activeConversation.set(conversation);
     if (!this.isWidgetOpen()) {
       this.isWidgetOpen.set(true);
     }
 
-    // If the conversation has unread messages, mark it as read.
     if (conversation.unreadCount > 0) {
       this.chatService.markAsRead(conversation.conversationId)
         .pipe(
-          // This tap provides instant UI feedback without waiting for the next poll.
           tap(() => {
-            this.conversations.update(currentConvos =>
-              currentConvos.map(c =>
+            this.conversations.update((currentConvos) =>
+              currentConvos.map((c) =>
                 c.conversationId === conversation.conversationId
                   ? { ...c, unreadCount: 0 }
                   : c
@@ -76,14 +104,12 @@ export class ChatWidgetService {
           takeUntilDestroyed(this.destroyRef)
         )
         .subscribe({
-          error: err => console.error('Failed to mark conversation as read', err),
+          error: (err) =>
+            console.error('Failed to mark conversation as read', err),
         });
     }
   }
 
-  /**
-   * Closes the active conversation view and returns to the list.
-   */
   closeConversation(): void {
     this.activeConversation.set(null);
   }

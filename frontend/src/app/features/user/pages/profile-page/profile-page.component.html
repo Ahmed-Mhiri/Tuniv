@@ -11,7 +11,7 @@
   } @else if (userProfile(); as profile) {
     <nz-card class="profile-card">
       <div class="profile-header">
-          <nz-avatar [nzSize]="128" nzIcon="user" [nzSrc]="profile.profilePhotoUrl ?? undefined"></nz-avatar>
+        <nz-avatar [nzSize]="128" nzIcon="user" [nzSrc]="profile.profilePhotoUrl ?? undefined"></nz-avatar>
         <div class="profile-info">
           <h1 class="username">{{ profile.username }}</h1>
           <p class="major">{{ profile.major }}</p>
@@ -20,11 +20,17 @@
             {{ profile.reputationScore }} Reputation
           </div>
         </div>
+        
         @if (isOwnProfile()) {
           <a routerLink="/settings" nz-button class="edit-button">
             <span nz-icon nzType="edit"></span>
             Edit Profile
           </a>
+        } @else {
+          <button nz-button nzType="primary" class="message-button" (click)="startConversation()">
+            <span nz-icon nzType="message"></span>
+            Message
+          </button>
         }
       </div>
 

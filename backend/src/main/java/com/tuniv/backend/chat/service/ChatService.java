@@ -43,7 +43,7 @@ public class ChatService {
 
     /**
      * Orchestrates sending a message by first saving it to the database
-     * and then broadcasting it via WebSockets. Not transactional itself.
+     * and then broadcasting it via WebSockets.
      */
     public Message sendMessage(
             Integer conversationId,
@@ -80,11 +80,7 @@ public class ChatService {
 
         Message message = new Message();
         message.setConversation(conversation);
-
-        // ✅ FIX: Use setAuthor() for consistency with the Post model.
-        // The custom setter in the Message entity will also handle setting the 'sender' field.
         message.setAuthor(sender);
-
         String content = chatMessageDto.getContent();
         message.setBody(content == null ? "" : content);
         message.setSentAt(LocalDateTime.now());
@@ -97,9 +93,6 @@ public class ChatService {
                     savedMessage
             );
         }
-
-        // ✅ FIX: The re-fetch is unnecessary. The 'savedMessage' object is managed by
-        // the transaction and is ready to be returned.
         return savedMessage;
     }
 
@@ -111,7 +104,6 @@ public class ChatService {
         if (!conversationRepository.existsById(conversationId)) {
             throw new ResourceNotFoundException("Conversation not found with id: " + conversationId);
         }
-
         return messageRepository.findByConversationConversationIdOrderBySentAtAsc(conversationId)
                 .stream()
                 .map(ChatMapper::toChatMessageDto)
@@ -127,39 +119,62 @@ public class ChatService {
                 .map(ChatMapper::toChatMessageDto)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
     }
-    
-    // ... other methods in the service remain the same ...
 
     /**
-     * Retrieves a summary list of all conversations for a given user,
-     * including unread message counts.
+     * Retrieves a summary list of all conversations for a given user.
      */
     @Transactional(readOnly = true)
     public List<ConversationSummaryDto> getConversationSummaries(String username) {
         User currentUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
-
         List<Conversation> conversations = conversationRepository.findConversationsByUserId(currentUser.getUserId());
-
         return conversations.stream()
                 .map(conv -> mapToConversationSummaryDto(conv, currentUser))
-                .filter(Objects::nonNull) // Filter out malformed conversations
+                .filter(Objects::nonNull)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Marks all messages in a conversation as read for the current user
-     * by updating their `lastReadTimestamp`.
+     * Finds an existing conversation between two users or creates a new one.
+     */
+    @Transactional
+    public ConversationSummaryDto findOrCreateConversation(Integer currentUserId, Integer participantId) {
+        if (currentUserId.equals(participantId)) {
+            throw new IllegalArgumentException("Cannot start a conversation with oneself.");
+        }
+
+        return conversationRepository.findDirectConversationBetweenUsers(currentUserId, participantId)
+                .map(conversation -> {
+                    User currentUser = userRepository.findById(currentUserId).get();
+                    return mapToConversationSummaryDto(conversation, currentUser);
+                })
+                .orElseGet(() -> {
+                    User currentUser = userRepository.findById(currentUserId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
+                    User otherParticipant = userRepository.findById(participantId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Participant user not found"));
+
+                    Conversation newConversation = new Conversation();
+                    conversationRepository.save(newConversation);
+
+                    ConversationParticipant currentUserParticipant = new ConversationParticipant(currentUser, newConversation);
+                    ConversationParticipant otherUserParticipant = new ConversationParticipant(otherParticipant, newConversation);
+                    conversationParticipantRepository.saveAll(List.of(currentUserParticipant, otherUserParticipant));
+
+                    return mapToConversationSummaryDto(newConversation, currentUser);
+                });
+    }
+
+    /**
+     * Marks all messages in a conversation as read for the current user.
      */
     @Transactional
     public void markConversationAsRead(Integer conversationId, String username) {
         User currentUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
-
         ConversationParticipant participant = conversationParticipantRepository
                 .findByUserUserIdAndConversationConversationId(currentUser.getUserId(), conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Participant not found in conversation"));
-
         participant.setLastReadTimestamp(LocalDateTime.now());
         conversationParticipantRepository.save(participant);
     }
@@ -174,18 +189,14 @@ public class ChatService {
                 .findFirst()
                 .orElse(null);
 
-        if (otherParticipant == null) {
-            return null;
-        }
+        if (otherParticipant == null) return null;
 
         Optional<Message> lastMessageOpt = messageRepository.findTopByConversationConversationIdOrderBySentAtDesc(conv.getConversationId());
-
         LocalDateTime lastReadTimestamp = conv.getParticipants().stream()
                 .filter(p -> p.getUser().getUserId().equals(currentUser.getUserId()))
                 .findFirst()
                 .map(ConversationParticipant::getLastReadTimestamp)
                 .orElse(conv.getCreatedAt());
-
         long unreadCount = messageRepository.countByConversationConversationIdAndSenderUserIdNotAndSentAtAfter(
                 conv.getConversationId(),
                 currentUser.getUserId(),
@@ -194,9 +205,9 @@ public class ChatService {
 
         return ConversationSummaryDto.builder()
                 .conversationId(conv.getConversationId())
+                .participantId(otherParticipant.getUserId())
                 .participantName(otherParticipant.getUsername())
                 .participantAvatarUrl(otherParticipant.getProfilePhotoUrl())
-                // ✅ FIX: Use getBody() here as well.
                 .lastMessage(lastMessageOpt.map(Message::getBody).orElse("No messages yet..."))
                 .lastMessageTimestamp(lastMessageOpt.map(m -> m.getSentAt().toString()).orElse(conv.getCreatedAt().toString()))
                 .unreadCount((int) unreadCount)

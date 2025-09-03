@@ -18,6 +18,7 @@ import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzCardModule } from 'ng-zorro-antd/card';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzTabsModule } from 'ng-zorro-antd/tabs';
+import { ChatWidgetService } from '../../../chat/services/chat-widget.service';
 
 @Component({
   selector: 'app-profile-page',
@@ -38,25 +39,28 @@ import { NzTabsModule } from 'ng-zorro-antd/tabs';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ProfilePageComponent implements OnInit {
+  // --- Dependencies ---
   private readonly route = inject(ActivatedRoute);
   private readonly userService = inject(UserService);
   private readonly authService = inject(AuthService);
+  private readonly chatWidgetService = inject(ChatWidgetService); // 👈 Inject the chat service
 
-  // --- Existing Signals ---
+  // --- State Signals ---
   readonly userProfile = signal<UserProfile | AuthResponse | null>(null);
   readonly isLoading = signal(true);
   readonly error = signal<string | null>(null);
-  
-  // --- ADDED: Signals for the activity feed ---
   readonly activityItems = signal<UserActivityItem[]>([]);
   readonly isActivityLoading = signal(false);
-  readonly hasLoadedActivity = signal(false); // To prevent re-fetching
+  readonly hasLoadedActivity = signal(false);
 
   readonly currentUser = this.authService.currentUser;
+
+  // --- Computed Signals ---
   readonly isOwnProfile = computed(() => {
     const currentUserId = this.currentUser()?.userId;
     const profileUserId = (this.userProfile() as UserProfile)?.userId;
-    return currentUserId && profileUserId && currentUserId === currentUserId;
+    // ❗ FIX: Corrected comparison from currentUserId === currentUserId to currentUserId === profileUserId
+    return currentUserId && profileUserId && currentUserId === profileUserId;
   });
 
   ngOnInit(): void {
@@ -95,10 +99,8 @@ export class ProfilePageComponent implements OnInit {
       });
   }
 
-  // --- ADDED: Method to load activity data on demand ---
   loadActivity(): void {
-    const profile = this.userProfile();
-    // Only fetch if we have a profile ID and haven't fetched before
+    const profile = this.userProfile() as UserProfile;
     if (!profile || this.hasLoadedActivity()) {
       return;
     }
@@ -112,9 +114,30 @@ export class ProfilePageComponent implements OnInit {
         this.isActivityLoading.set(false);
       },
       error: () => {
-        // Optional: Set an error signal for the activity tab specifically
         this.isActivityLoading.set(false);
       },
     });
   }
+  
+  /**
+   * 👇 [NEW] Starts a conversation with the currently viewed profile user.
+   */
+  startConversation(): void {
+  const profile = this.userProfile() as UserProfile;
+  
+  if (profile && profile.userId) {
+    const participantPayload = {
+      participantId: profile.userId,
+      participantName: profile.username,
+      participantAvatarUrl: profile.profilePhotoUrl,
+    };
+
+    // ✅ ADD THIS LINE to check the data in your browser's console
+    console.log('Attempting to start conversation with:', participantPayload);
+
+    this.chatWidgetService.startConversationWithUser(participantPayload);
+  } else {
+    console.error('Could not start conversation: Profile or user ID is missing.', profile);
+  }
+}
 }

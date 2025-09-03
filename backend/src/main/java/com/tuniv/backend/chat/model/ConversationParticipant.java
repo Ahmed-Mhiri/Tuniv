@@ -29,30 +29,46 @@ public class ConversationParticipant {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("userId")
-    @JoinColumn(name = "user_id") // <-- THIS IS THE FIX
+    @JoinColumn(name = "user_id")
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @MapsId("conversationId")
-    @JoinColumn(name = "conversation_id") // <-- THIS IS THE FIX
+    @JoinColumn(name = "conversation_id")
     private Conversation conversation;
-    
+
     @Column(name = "last_read_timestamp")
     private LocalDateTime lastReadTimestamp;
+
+    /**
+     * ✅ FIX: Default constructor required by JPA.
+     */
+    public ConversationParticipant() {
+    }
+
+    /**
+     * ✅ FIX: Add a constructor to easily create new instances.
+     * This constructor sets the user, the conversation, and correctly
+     * initializes the composite primary key (id).
+     */
+    public ConversationParticipant(User user, Conversation conversation) {
+        this.user = user;
+        this.conversation = conversation;
+        this.id = new ConversationParticipantId(user.getUserId(), conversation.getConversationId());
+    }
 
     @Embeddable
     @Getter
     @Setter
     public static class ConversationParticipantId implements Serializable {
-        // We also need to map the fields in the composite key to the correct column names.
         @Column(name = "user_id")
         private Integer userId;
         
         @Column(name = "conversation_id")
         private Integer conversationId;
 
-        // Default constructor is needed by JPA
-        public ConversationParticipantId() {}
+        public ConversationParticipantId() {
+        }
 
         public ConversationParticipantId(Integer userId, Integer conversationId) {
             this.userId = userId;

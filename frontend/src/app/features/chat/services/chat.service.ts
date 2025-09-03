@@ -46,14 +46,26 @@ export class ChatService {
     return this.http.get<ChatMessage>(`${this.apiUrl}/messages/${messageId}`);
   }
 
-  // ✅ 2. NEW METHODS ADDED FOR THE CHAT WIDGET
-  
   /**
    * Fetches the conversation summary list for the current user.
    * Corresponds to: GET /api/v1/chat/conversations
    */
   getConversations(): Observable<Conversation[]> {
     return this.http.get<Conversation[]>(`${this.apiUrl}/chat/conversations`);
+  }
+  
+  /**
+   * [NEW] Finds a conversation with a user or creates a new one.
+   * Corresponds to: POST /api/v1/chat/conversations
+   * @param participantId The user ID of the person to start a conversation with.
+   */
+  findOrCreateConversation(participantId: number): Observable<Conversation> {
+    // ✅ THE FIX IS HERE: The body is now correctly wrapped in an object.
+    // This sends { "participantId": 2 } instead of just 2.
+    return this.http.post<Conversation>(
+      `${this.apiUrl}/chat/conversations`,
+      { participantId }
+    );
   }
 
   /**
