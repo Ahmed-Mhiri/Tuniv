@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.service.AnswerService;
 
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class AnswerController {
     @PostMapping("/{answerId}/solution")
     public ResponseEntity<?> markAsSolution(@PathVariable Integer answerId,
                                             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        answerService.markAsSolution(answerId, currentUser);
-        return ResponseEntity.ok("Answer marked as solution successfully.");
+        Answer updatedAnswer = answerService.markAsSolution(answerId, currentUser);
+        return ResponseEntity.ok(updatedAnswer);
     }
 }

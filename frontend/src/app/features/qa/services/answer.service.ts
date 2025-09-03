@@ -11,7 +11,8 @@ export class AnswerService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = environment.apiUrl;
 
-  markAsSolution(answerId: number): Observable<unknown> {
+  markAsSolution(answerId: number): Observable<any> {
+    // The { responseType: 'text' } option has been removed
     return this.http.post(`${this.apiUrl}/answers/${answerId}/solution`, {});
   }
 }

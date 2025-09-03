@@ -65,34 +65,52 @@ export class QuestionDetailPageComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.route.paramMap.pipe(
-      switchMap(params => {
-        this.isLoading.set(true);
-        const questionId = Number(params.get('id'));
+  this.route.paramMap.pipe(
+    switchMap(params => {
+      this.isLoading.set(true);
+      const questionId = Number(params.get('id'));
 
-        // A robust check for invalid IDs in the URL
-        if (isNaN(questionId)) {
-          this.question.set(null);
-          this.isLoading.set(false);
-          return of(null);
-        }
-        return this.questionService.getQuestionById(questionId);
-      })
-    ).subscribe(data => {
+      if (isNaN(questionId)) {
+        this.question.set(null);
+        this.isLoading.set(false);
+        return of(null);
+      }
+      // This is the GET request that is failing silently
+      return this.questionService.getQuestionById(questionId);
+    })
+  ).subscribe({
+    next: (data) => {
+      // This runs if the GET request succeeds
       this.question.set(data);
       this.isLoading.set(false);
-    });
-  }
+    },
+    error: (err) => {
+      // ✅ THIS BLOCK WILL SHOW YOU THE REAL PROBLEM
+      // This runs when the GET request fails
+      console.error('CRITICAL FRONTEND ERROR: Failed to load question data:', err);
+      this.question.set(null);
+      this.isLoading.set(false);
+    }
+  });
+}
   
   refreshData(): void {
-    const questionId = this.question()?.questionId;
-    if (questionId) {
-      // This refresh happens silently in the background without a main spinner
-      this.questionService.getQuestionById(questionId).subscribe(data => {
-        this.question.set(data);
+  const questionId = this.question()?.questionId;
+  if (questionId) {
+    // This delay is critical to prevent the race condition.
+    setTimeout(() => {
+      this.questionService.getQuestionById(questionId).subscribe({
+        next: (data) => {
+          this.question.set(data);
+        },
+        error: (err) => {
+          console.error('Failed to refresh question data:', err);
+        }
       });
-    }
+    }, 300);
   }
+}
+
 
   handleAnswerSubmit(event: AnswerSubmitEvent): void {
     const questionId = this.question()?.questionId;

@@ -1,5 +1,6 @@
 package com.tuniv.backend.qa.service;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -29,14 +30,15 @@ public class AnswerService {
 
 
     @Transactional
-    public void markAsSolution(Integer answerId, UserDetailsImpl currentUserDetails) {
+    @CacheEvict(value = "questions", key = "#result.question.questionId")
+    public Answer markAsSolution(Integer answerId, UserDetailsImpl currentUserDetails) {
         Answer answer = answerRepository.findById(answerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Answer not found with id: " + answerId));
 
         Question question = answer.getQuestion();
         User questionAuthor = question.getAuthor();
         User answerAuthor = answer.getAuthor();
-        
+
         // Security Check: Only the person who asked the question can mark a solution.
         if (!questionAuthor.getUserId().equals(currentUserDetails.getId())) {
             throw new AccessDeniedException("Only the author of the question can mark an answer as the solution.");
@@ -46,7 +48,7 @@ public class AnswerService {
         if (questionAuthor.getUserId().equals(answerAuthor.getUserId())) {
             throw new IllegalArgumentException("You cannot mark your own answer as the solution.");
         }
-        
+
         // Set the solution flag and save
         answer.setIsSolution(true);
         answerRepository.save(answer);
@@ -54,10 +56,11 @@ public class AnswerService {
         // Award reputation points
         answerAuthor.setReputationScore(answerAuthor.getReputationScore() + ACCEPT_ANSWER_REP);
         questionAuthor.setReputationScore(questionAuthor.getReputationScore() + ACCEPTS_ANSWER_REP);
-        
+
         userRepository.save(answerAuthor);
         userRepository.save(questionAuthor);
-        eventPublisher.publishEvent(new SolutionMarkedEvent(this, answer)); // Add this line
+        eventPublisher.publishEvent(new SolutionMarkedEvent(this, answer));
 
+        return answer;
     }
 }

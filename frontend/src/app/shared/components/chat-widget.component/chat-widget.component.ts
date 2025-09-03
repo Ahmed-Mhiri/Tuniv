@@ -35,4 +35,6 @@ export class ChatWidgetComponent {
   goBackToList(): void {
     this.chatWidgetService.closeConversation();
   }
+  
+  
 }

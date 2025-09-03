@@ -59,15 +59,22 @@ export class QuestionService {
   }
 
   addAnswer(questionId: number, answerData: AnswerCreateRequest, files: File[]): Observable<Answer> {
-    const formData = new FormData();
-    formData.append('answer', new Blob([JSON.stringify(answerData)], { type: 'application/json' }));
-    
-    files.forEach(file => {
-      formData.append('files', file, file.name);
-    });
+  const formData = new FormData();
+  formData.append('answer', new Blob([JSON.stringify(answerData)], { type: 'application/json' }));
+  
+  files.forEach(file => {
+    formData.append('files', file, file.name);
+  });
 
-    return this.http.post<Answer>(`${this.apiUrl}/questions/${questionId}/answers`, formData);
+  // ✅ ADD THIS DEBUGGING BLOCK
+  console.log('--- DEBUG: Inspecting FormData in QuestionService ---');
+  for (const [key, value] of formData.entries()) {
+    console.log(`Key: '${key}', Value:`, value);
   }
+  console.log('--------------------------------------------------');
+
+  return this.http.post<Answer>(`${this.apiUrl}/questions/${questionId}/answers`, formData);
+}
   searchQuestions(query: string, page: number = 0, size: number = 5): Observable<Page<Question>> {
     const params = new HttpParams()
       .set('query', query)

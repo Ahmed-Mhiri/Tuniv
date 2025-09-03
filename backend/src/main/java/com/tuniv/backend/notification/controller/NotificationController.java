@@ -4,6 +4,8 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,6 +56,20 @@ public class NotificationController {
     public ResponseEntity<Void> markAllNotificationsAsRead(
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         notificationService.markAllAsRead(currentUser);
+        return ResponseEntity.noContent().build();
+    }
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteNotification(@PathVariable Integer id) {
+        // Assuming you get the current user from the security context
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        notificationService.deleteNotification(id, currentUser.getUsername());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/all")
+    public ResponseEntity<Void> deleteAllNotifications() {
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        notificationService.deleteAllNotifications(currentUser.getUsername());
         return ResponseEntity.noContent().build();
     }
 }

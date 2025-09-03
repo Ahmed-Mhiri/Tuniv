@@ -46,10 +46,10 @@ export class AnswerItemComponent {
   answer = input.required<Answer>();
   isQuestionAuthor = input<boolean>(false);
   updateRequired = output<void>();
-   readonly commentFileList = signal<NzUploadFile[]>([]);
+  readonly commentFileList = signal<NzUploadFile[]>([]);
   readonly commentFilesToUpload = signal<File[]>([]);
-
   isCommentFormVisible = signal(false);
+
   private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
     const body = control.get('body')?.value;
     const hasFiles = this.commentFileList().length > 0;
@@ -61,12 +61,6 @@ export class AnswerItemComponent {
     validators: this.atLeastOneFieldValidator
   });
 
-
- 
-
-  // =========================================================================
-  // ✅ THE FINAL FIX
-  // =========================================================================
   beforeUpload = (file: NzUploadFile): Observable<boolean> => {
     this.commentFilesToUpload.update(list => [...list, file as unknown as File]);
     this.commentFileList.update(list => [...list, file]);
@@ -75,7 +69,7 @@ export class AnswerItemComponent {
   };
 
   handleCommentFileChange(info: NzUploadChangeParam): void {
-     if (info.type === 'removed') {
+    if (info.type === 'removed') {
       this.removeCommentFile(info.file);
     }
   }
@@ -85,7 +79,6 @@ export class AnswerItemComponent {
     this.commentFilesToUpload.update(list => (list as unknown as NzUploadFile[]).filter(f => f.uid !== fileToRemove.uid) as unknown as File[]);
     this.cdr.detectChanges();
   }
-  // =========================================================================
 
   handleVote(voteValue: number): void {
     const valueToSubmit = voteValue >= 0 ? 1 : -1;
@@ -98,10 +91,12 @@ export class AnswerItemComponent {
     });
   }
 
+  // ✅ CORRECTED AND SIMPLIFIED
   markAsSolution(): void {
     this.answerService.markAsSolution(this.answer().answerId).subscribe({
       next: () => {
         this.message.success('Answer marked as solution!');
+        // Just like handleVote(), we only emit to the parent.
         this.updateRequired.emit();
       },
       error: (err) => this.message.error(err.error?.message || 'Action failed.'),

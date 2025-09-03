@@ -16,63 +16,41 @@ import { ModuleListPageComponent } from './features/university/pages/module-list
 import { authGuard } from './core/guards/auth.guard';
 import { publicOnlyGuard } from './core/guards/public-only.guard';
 import { QuestionDetailPageComponent } from './features/qa/pages/question-detail-page/question-detail-page.component';
-import { AskQuestionPageComponent } from './features/qa/pages/ask-question-page/ask-question-page.component';
 
 export const routes: Routes = [
   // --- Public Routes ---
   { path: '', component: HomePageComponent },
   { path: 'verify-email', component: VerifyEmailPageComponent },
 
-  // --- Public-Only Routes ---
+  // --- Public-Only Routes (for users who are not logged in) ---
   { path: 'login', component: LoginPageComponent, canActivate: [publicOnlyGuard] },
   { path: 'register', component: RegisterPageComponent, canActivate: [publicOnlyGuard] },
   { path: 'forgot-password', component: ForgotPasswordPageComponent, canActivate: [publicOnlyGuard] },
   { path: 'reset-password', component: ResetPasswordPageComponent, canActivate: [publicOnlyGuard] },
 
-  // --- Private Routes ---
+  // --- Private Routes (for logged-in users) ---
   { path: 'settings', component: SettingsPageComponent, canActivate: [authGuard] },
   { path: 'users/:id', component: ProfilePageComponent, canActivate: [authGuard] },
+  { path: 'universities', component: UniversityListPageComponent, canActivate: [authGuard] },
+  { path: 'universities/:id/modules', component: ModuleListPageComponent, canActivate: [authGuard] },
+
+  // --- Q&A Feature Routes ---
   {
-    path: 'universities',
-    // --- FIX: Point to the correct component ---
-    component: UniversityListPageComponent,
-    canActivate: [authGuard],
-  },
-  {
-    path: 'universities/:id/modules',
-    component: ModuleListPageComponent,
-    canActivate: [authGuard],
-  },
-   {
     path: 'qa/ask',
-    // Lazy-load the AskQuestionPageComponent when the user navigates to this path.
-    loadComponent: () => 
+    loadComponent: () =>
       import('./features/qa/pages/ask-question-page/ask-question-page.component').then(c => c.AskQuestionPageComponent),
     canActivate: [authGuard],
   },
-  // =========================================================================
-  { path: 'questions/:id', component: QuestionDetailPageComponent },
+  {
+    // This is the main route for viewing a question. It does NOT have a /qa prefix.
+    path: 'questions/:id',
+    component: QuestionDetailPageComponent,
+    canActivate: [authGuard], // Assuming users must be logged in to see questions
+  },
   {
     path: 'modules/:moduleId/questions',
-    loadComponent: () => 
+    loadComponent: () =>
       import('./features/qa/pages/question-list-page/question-list-page.component').then(c => c.QuestionListPageComponent),
-    canActivate: [authGuard],
-  },
-  // =========================================================================
-  {
-    path: 'qa/ask',
-    loadComponent: () => 
-      import('./features/qa/pages/ask-question-page/ask-question-page.component').then(c => c.AskQuestionPageComponent),
-    canActivate: [authGuard],
-  },
-  { 
-    path: 'questions/:id', 
-    component: QuestionDetailPageComponent 
-  },
-  {
-    path: 'chat/conversation/:id', // e.g., /chat/conversation/123
-    loadComponent: () => 
-      import('./features/chat/pages/conversation-page.component/conversation-page.component').then(c => c.ConversationPageComponent),
     canActivate: [authGuard],
   },
 ];

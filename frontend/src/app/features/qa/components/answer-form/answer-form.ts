@@ -1,10 +1,11 @@
+// answer-form.ts
+
 import { ChangeDetectionStrategy, Component, output, inject, signal } from '@angular/core';
-// IMPORTANT: AbstractControl and ValidationErrors are needed for the custom validator
-import { FormBuilder, ReactiveFormsModule, Validators, FormGroup, AbstractControl, ValidationErrors } from '@angular/forms';
+import { FormBuilder, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzFormModule } from 'ng-zorro-antd/form';
 import { NzTypographyModule } from 'ng-zorro-antd/typography';
-import { NzUploadFile, NzUploadChangeParam, NzUploadModule } from 'ng-zorro-antd/upload';
+import { NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
 import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
@@ -37,76 +38,68 @@ export class AnswerFormComponent {
   readonly filesToUpload = signal<File[]>([]);
   readonly isSubmitting = signal(false);
 
-  // ===============================================================
-  // START OF FIX
-  // ===============================================================
-
-  // 1. Define the custom validator as a class property (using an arrow function).
-  // This validator checks if either the body has text or if files have been uploaded.
   private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
     const body = control.get('body')?.value;
     const hasFiles = this.fileList().length > 0;
-
-    // If the body is empty AND there are no files, return an error.
     if (!body?.trim() && !hasFiles) {
       return { atLeastOneRequired: true };
     }
-    
-    // Otherwise, the form is valid.
     return null; 
   };
 
-  // 2. Update the form definition.
   readonly answerForm = this.fb.group({
-    // Remove the old validators from the 'body' control.
     body: [''],
   }, {
-    // Add our new custom validator to the entire form group.
     validators: this.atLeastOneFieldValidator
   });
 
-  // ===============================================================
-  // END OF FIX
-  // ===============================================================
-
-  handleFileChange({ fileList }: NzUploadChangeParam): void {
-    const validatedList = fileList.filter(f => {
-      const isLt5M = (f.size ?? 0) / 1024 / 1024 < 5;
-      if (!isLt5M) {
-        this.message.error(`File '${f.name}' is too large. Must be smaller than 5MB!`);
-        return false;
-      }
-      return true;
-    });
-
-    this.fileList.set(validatedList);
-    this.filesToUpload.set(
-      validatedList.map(f => f.originFileObj as File).filter(f => !!f)
-    );
-
-    // 3. We need to re-validate the form whenever the file list changes.
-    this.answerForm.updateValueAndValidity();
+  beforeUpload = (file: NzUploadFile): boolean => {
+  const isLt5M = (file.size ?? 0) / 1024 / 1024 < 5;
+  if (!isLt5M) {
+    this.message.error(`File '${file.name}' is too large. Must be smaller than 5MB!`);
+    return false;
   }
+
+  // ✅ THE FINAL FIX:
+  // The 'file' parameter is the actual File object.
+  // Add it directly to both the display list and the upload list.
+  this.fileList.update(list => [...list, file]);
+  this.filesToUpload.update(list => [...list, file as unknown as File]);
+  
+  this.answerForm.updateValueAndValidity();
+  return false;
+};
 
   removeFile(fileToRemove: NzUploadFile): void {
     const newFileList = this.fileList().filter(f => f.uid !== fileToRemove.uid);
-    // handleFileChange already re-validates, so we are covered here.
-    this.handleFileChange({ file: fileToRemove, fileList: newFileList });
+    this.fileList.set(newFileList);
+
+    const newFilesToUpload = newFileList
+      .map(f => f.originFileObj as File)
+      .filter(f => !!f); // This filter correctly removes any null/undefined values
+    this.filesToUpload.set(newFilesToUpload);
+
+    this.answerForm.updateValueAndValidity();
   }
 
   submit(): void {
-    if (this.answerForm.invalid) {
-      this.answerForm.markAllAsTouched();
-      return;
-    }
-    
-    this.answerSubmit.emit({
-      body: this.answerForm.value.body!,
-      files: this.filesToUpload(),
-    });
-    
-    this.answerForm.reset();
-    this.fileList.set([]);
-    this.filesToUpload.set([]);
+  if (this.answerForm.invalid) {
+    this.answerForm.markAllAsTouched();
+    return;
   }
+
+  // ✅ ADD THIS LOG
+  console.log('--- DEBUG: Submitting from AnswerFormComponent ---');
+  console.log('Files to submit:', this.filesToUpload());
+  console.log('-------------------------------------------');
+
+  this.answerSubmit.emit({
+    body: this.answerForm.value.body!,
+    files: this.filesToUpload(),
+  });
+  
+  this.answerForm.reset();
+  this.fileList.set([]);
+  this.filesToUpload.set([]);
+}
 }

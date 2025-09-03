@@ -18,11 +18,11 @@
     <div class="actions-footer">
       <div class="actions-group">
         <nz-upload
-          [nzFileList]="fileList()"
-          (nzChange)="handleFileChange($event)"
-          [nzShowUploadList]="false"
-          [nzMultiple]="true"
-        >
+  [nzFileList]="fileList()"
+  [nzShowUploadList]="false"
+  [nzMultiple]="true"
+  [nzBeforeUpload]="beforeUpload"
+>
           <button nz-button nzType="text" type="button" nz-tooltip nzTooltipTitle="Attach files">
             <span nz-icon nzType="paper-clip"></span> Attach
           </button>

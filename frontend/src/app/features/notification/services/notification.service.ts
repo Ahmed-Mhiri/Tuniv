@@ -18,23 +18,23 @@ export class NotificationService {
   private readonly authService = inject(AuthService);
   private readonly webSocketService = inject(WebSocketService);
 
-  // --- Private State using Signals ---
-  private readonly notifications: WritableSignal<Notification[]> = signal([]);
-  private readonly unreadCount: WritableSignal<number> = signal(0);
+  // --- Private Writable State ---
+  private readonly _notifications: WritableSignal<Notification[]> = signal([]);
+  private readonly _unreadCount: WritableSignal<number> = signal(0);
   
   // --- Public Readonly Signals for Components ---
-  public readonly allNotifications: Signal<Notification[]> = this.notifications.asReadonly();
-  public readonly unreadNotificationsCount: Signal<number> = this.unreadCount.asReadonly();
+  public readonly allNotifications: Signal<Notification[]> = this._notifications.asReadonly();
+  public readonly unreadNotificationsCount: Signal<number> = this._unreadCount.asReadonly();
 
-  private readonly apiBaseUrl = environment.apiUrl;
+  private readonly apiUrl = `${environment.apiUrl}/notifications`; // ✅ REFINEMENT: Centralized API URL
   private notificationSub: Subscription | null = null;
 
   constructor() {
-    // Use an effect to react to user login/logout from AuthService
+    // React to user login/logout to initialize or clean up the service.
     effect(() => {
       const user = this.authService.currentUser();
-      if (user && user.username) {
-        this.initialize(user.username);
+      if (user && user.userId) { // Use a stable identifier like userId
+        this.initialize(user.userId);
       } else {
         this.cleanup();
       }
@@ -42,102 +42,124 @@ export class NotificationService {
   }
 
   /**
-   * Initializes the service, fetches data, and connects to WebSockets.
+   * Initializes the service, fetches initial data, and connects to the WebSocket.
    */
-  private initialize(username: string): void {
+  private initialize(userId: number): void {
     this.fetchInitialNotifications().subscribe();
     this.webSocketService.connect();
 
-    const topic = `/topic/notifications/${username}`;
+    // User-specific topic for real-time notifications
+    const topic = `/topic/user/${userId}/notifications`;
     this.notificationSub = this.webSocketService
       .watch<Notification>(topic)
       .subscribe((newNotification: Notification) => {
-        // Add new notification and update unread count
-        this.notifications.update(current => [newNotification, ...current]);
-        this.unreadCount.update(count => count + 1);
+        this._notifications.update(current => [newNotification, ...current]);
+        this._unreadCount.update(count => count + 1);
       });
   }
   
-  /**
-   * Cleans up subscriptions and resets state upon logout.
-   */
-  private cleanup(): void {
-    if (this.notificationSub) {
-      this.notificationSub.unsubscribe();
-      this.notificationSub = null;
-    }
-    this.webSocketService.disconnect();
-    this.notifications.set([]);
-    this.unreadCount.set(0);
-  }
-
   private fetchInitialNotifications(): Observable<Notification[]> {
-    return this.http.get<Notification[]>(`${this.apiBaseUrl}/notifications`).pipe(
+    return this.http.get<Notification[]>(this.apiUrl).pipe(
       tap(notifications => {
-        this.notifications.set(notifications);
-        const unread = notifications.filter(n => !n.isRead).length;
-        this.unreadCount.set(unread);
+        this._notifications.set(notifications);
+        this._unreadCount.set(notifications.filter(n => !n.isRead).length);
       }),
       catchError(() => {
-        this.notifications.set([]);
-        this.unreadCount.set(0);
+        this._notifications.set([]);
+        this._unreadCount.set(0);
         return of([]);
       })
     );
   }
 
-  /**
-   * Marks a single notification as read.
-   */
   markAsRead(notificationId: number): void {
-    // Optimistic update
-    let wasUnread = false;
-    this.notifications.update(notifications => {
-      return notifications.map(n => {
-        if (n.notificationId === notificationId && !n.isRead) {
-          wasUnread = true;
-          return { ...n, isRead: true };
-        }
-        return n;
-      });
-    });
-
-    if (wasUnread) {
-      this.unreadCount.update(count => count - 1);
+    // Find the notification first to see if it's actually unread
+    const target = this.allNotifications().find(n => n.notificationId === notificationId);
+    if (!target || target.isRead) {
+      return; // Do nothing if already read or not found
     }
+
+    // Optimistic update of the UI
+    this._notifications.update(list =>
+      list.map(n => n.notificationId === notificationId ? { ...n, isRead: true } : n)
+    );
+    this._unreadCount.update(count => count - 1);
     
     // Persist change to the backend
-    this.http.post(`${this.apiBaseUrl}/notifications/${notificationId}/read`, {}).pipe(
+    this.http.post(`${this.apiUrl}/${notificationId}/read`, {}).pipe(
       catchError(err => {
-        // Revert on error
-        this.notifications.update(notifications => notifications.map(n => 
-          n.notificationId === notificationId ? { ...n, isRead: false } : n
-        ));
-        if (wasUnread) {
-          this.unreadCount.update(count => count + 1);
-        }
         console.error('Failed to mark notification as read', err);
+        // Revert UI changes on error
+        this._notifications.update(list =>
+          list.map(n => n.notificationId === notificationId ? { ...n, isRead: false } : n)
+        );
+        this._unreadCount.update(count => count + 1);
+        return of(null);
+      })
+    ).subscribe();
+  }
+
+  markAllAsRead(): void {
+    // ✅ FIX: Use the correct API endpoint from our backend implementation
+    this.http.post(`${this.apiUrl}/read-all`, {}).pipe(
+      tap(() => {
+        this._notifications.update(list => 
+          list.map(n => n.isRead ? n : { ...n, isRead: true })
+        );
+        this._unreadCount.set(0);
+      }),
+      catchError(err => {
+        console.error('Failed to mark all as read', err);
+        return of(null);
+      })
+    ).subscribe();
+  }
+  
+  deleteNotification(notificationId: number): void {
+    const wasUnread = !!this.allNotifications().find(n => n.notificationId === notificationId && !n.isRead);
+
+    // Optimistic update
+    this._notifications.update(list =>
+        list.filter(n => n.notificationId !== notificationId)
+    );
+    if (wasUnread) {
+        this._unreadCount.update(c => c - 1);
+    }
+      
+    this.http.delete(`${this.apiUrl}/${notificationId}`).pipe(
+      catchError(err => {
+        console.error('Failed to delete notification', err);
+        // Revert on error by re-fetching the list
+        this.fetchInitialNotifications().subscribe();
+        return of(null);
+      })
+    ).subscribe();
+  }
+
+  deleteAllNotifications(): void {
+    // Optimistic update
+    this._notifications.set([]);
+    this._unreadCount.set(0);
+
+    // ✅ FIX: Use the correct API endpoint from our backend implementation
+    this.http.delete(`${this.apiUrl}/all`).pipe(
+      catchError(err => {
+        console.error('Failed to delete all notifications', err);
+        // Revert on error by re-fetching
+        this.fetchInitialNotifications().subscribe();
         return of(null);
       })
     ).subscribe();
   }
 
   /**
-   * Marks all unread notifications as read.
+   * Cleans up subscriptions and resets state upon logout.
    */
-  markAllAsRead(): void {
-    this.http.post(`${this.apiBaseUrl}/notifications/mark-all-read`, {}).pipe(
-      tap(() => {
-        // On success, update the local state
-        this.notifications.update(notifications => 
-          notifications.map(n => ({ ...n, isRead: true }))
-        );
-        this.unreadCount.set(0);
-      }),
-      catchError(err => {
-        console.error('Failed to mark all notifications as read', err);
-        return of(null);
-      })
-    ).subscribe();
+  private cleanup(): void {
+    this.notificationSub?.unsubscribe();
+    this.notificationSub = null;
+    this.webSocketService.disconnect();
+    this._notifications.set([]);
+    this._unreadCount.set(0);
   }
 }

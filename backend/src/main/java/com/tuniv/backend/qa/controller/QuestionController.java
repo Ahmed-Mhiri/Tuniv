@@ -55,13 +55,20 @@ public class QuestionController {
 
     // --- THIS IS THE FIX ---
     @GetMapping("/questions/{questionId}")
-    public ResponseEntity<QuestionResponseDto> getQuestionById(
-            @PathVariable Integer questionId,
-            @AuthenticationPrincipal UserDetailsImpl currentUser) { // <-- ADD THIS PARAMETER
-        
-        // Pass the currentUser to the service method
-        return ResponseEntity.ok(questionService.getQuestionById(questionId, currentUser));
-    }
+public ResponseEntity<QuestionResponseDto> getQuestionById(
+        @PathVariable Integer questionId,
+        @AuthenticationPrincipal UserDetailsImpl currentUser) {
+
+    // First, get the data from your service as usual
+    QuestionResponseDto question = questionService.getQuestionById(questionId, currentUser);
+
+    // ✅ THE FIX: Add headers to the response to prevent caching
+    return ResponseEntity.ok()
+        .header("Cache-Control", "no-cache, no-store, must-revalidate")
+        .header("Pragma", "no-cache") // For older HTTP/1.0 clients
+        .header("Expires", "0")       // For proxies
+        .body(question);
+}
 
     @PostMapping(value = "/questions/{questionId}/answers", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
     public ResponseEntity<AnswerResponseDto> addAnswer(

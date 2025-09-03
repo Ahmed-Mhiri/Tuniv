@@ -143,26 +143,25 @@ public class NotificationService {
     }
     
     @Async
-    @EventListener
-    public void handleNewQuestion(NewQuestionInUniversityEvent event) {
-        var question = event.getQuestion();
-        var actor = question.getAuthor();
-        var university = question.getModule().getUniversity();
+@EventListener
+public void handleNewQuestion(NewQuestionInUniversityEvent event) {
+    var question = event.getQuestion();
+    var actor = question.getAuthor();
+    var university = question.getModule().getUniversity();
 
-        // Fetch all members, excluding the question author
-        List<User> recipients = university.getMembers() 
-            .stream()
-            .map(membership -> membership.getUser())
-            .filter(user -> !user.equals(actor))
-            .collect(Collectors.toList());
+    // ✅ FIX: Replace the slow stream with a single, fast query
+    List<User> recipients = userRepository.findAllMembersOfUniversityExcludingAuthor(
+        university.getUniversityId(),
+        actor.getUserId()
+    );
 
-        var message = "A new question was asked in " + university.getName() + ": \"" + truncate(question.getTitle(), 30) + "\"";
-        var link = "/questions/" + question.getQuestionId();
-        
-        recipients.forEach(recipient -> 
-            createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_QUESTION_IN_UNI, message, link)
-        );
-    }
+    var message = "A new question was asked in " + university.getName() + ": \"" + truncate(question.getTitle(), 30) + "\"";
+    var link = "/questions/" + question.getQuestionId();
+
+    recipients.forEach(recipient -> 
+        createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_QUESTION_IN_UNI, message, link)
+    );
+}
     
     @Async
     @EventListener
@@ -212,7 +211,7 @@ public class NotificationService {
 
         // 2. Push a real-time update via WebSockets
         // The destination is specific to the recipient's username.
-        String destination = "/topic/notifications/" + recipient.getUsername();
+        String destination = "/topic/user/" + recipient.getUserId() + "/notifications";
         NotificationDto notificationDto = NotificationMapper.toDto(notification);
 
         messagingTemplate.convertAndSend(destination, notificationDto);
@@ -311,13 +310,24 @@ public class NotificationService {
      * @param currentUser The details of the logged-in user.
      */
     @Transactional
-    public void markAllAsRead(UserDetailsImpl currentUser) {
-        List<Notification> unreadNotifications = notificationRepository
-                .findAllByRecipientUserIdAndIsReadIsFalse(currentUser.getId());
+public void markAllAsRead(UserDetailsImpl currentUser) {
+    // ✅ FIX: Replace the multi-step process with a single, efficient query
+    notificationRepository.markAllAsReadForUser(currentUser.getId());
+}
 
-        if (!unreadNotifications.isEmpty()) {
-            unreadNotifications.forEach(notification -> notification.setRead(true));
-            notificationRepository.saveAll(unreadNotifications);
-        }
+    @Transactional
+    public void deleteNotification(Integer notificationId, String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        
+        notificationRepository.deleteByNotificationIdAndRecipient_UserId(notificationId, currentUser.getUserId());
+    }
+
+    @Transactional
+    public void deleteAllNotifications(String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        notificationRepository.deleteAllByRecipient_UserId(currentUser.getUserId());
     }
 }
