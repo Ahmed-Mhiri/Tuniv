@@ -49,6 +49,10 @@ export class ConversationPageComponent {
   readonly isSending = signal(false);
   messageForm: FormGroup;
   private wsSubscription?: Subscription;
+  
+  // Store pending attachments that haven't been confirmed by server yet
+  private pendingAttachments = new Map<number, any[]>();
+  
   private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
     const content = control.get('content')?.value;
     const hasFiles = this.filesToUpload().length > 0;
@@ -64,41 +68,71 @@ export class ConversationPageComponent {
       const currentConversation = this.conversation();
       this.isLoading.set(true);
       this.messages.set([]);
+      this.pendingAttachments.clear();
 
       this.chatService.getMessageHistory(currentConversation.conversationId).subscribe((history) => {
-        this.messages.set(history);
+        const sanitizedHistory = history.map(msg => this.sanitizeMessageAttachments(msg));
+        this.messages.set(sanitizedHistory);
         this.isLoading.set(false);
       });
 
       this.wsSubscription = this.chatService
         .watchConversation(currentConversation.conversationId)
-        .subscribe((finalMessage) => {
+        .subscribe((incomingMessage) => {
           this.messages.update((currentMessages) => {
-            const messageIndex = currentMessages.findIndex(
-              (m) => m.messageId === finalMessage.clientTempId
-            );
-
-            if (messageIndex !== -1) {
+            const existingIndex = this.findMessageIndex(currentMessages, incomingMessage);
+            
+            if (existingIndex !== -1) {
               const updatedMessages = [...currentMessages];
-              const oldMessage = updatedMessages[messageIndex];
-              oldMessage.attachments?.forEach((att: any) => {
-                if (att._originalUrl) URL.revokeObjectURL(att._originalUrl);
-              });
-              updatedMessages[messageIndex] = finalMessage;
+              const existingMessage = updatedMessages[existingIndex];
+              
+              let updatedMessage: ChatMessage = { ...incomingMessage, attachments: [] }; // Start with empty attachments
+              
+              if (!incomingMessage.attachments || incomingMessage.attachments.length === 0) {
+                const clientTempId = incomingMessage.clientTempId || incomingMessage.messageId;
+                
+                // ✅ FIX: Safely get from the map and check for existence
+                const pending = this.pendingAttachments.get(clientTempId);
+                if (pending) {
+                  updatedMessage.attachments = pending;
+                } else if (existingMessage.attachments && existingMessage.attachments.length > 0) {
+                  updatedMessage.attachments = existingMessage.attachments;
+                }
+              } else {
+                const sanitizedMsg = this.sanitizeMessageAttachments(incomingMessage);
+                updatedMessage = { ...sanitizedMsg };
+                
+                if (existingMessage.attachments) {
+                  existingMessage.attachments.forEach((att: any) => {
+                    if (att._originalUrl) {
+                      URL.revokeObjectURL(att._originalUrl);
+                    }
+                  });
+                }
+                
+                const clientTempId = incomingMessage.clientTempId || incomingMessage.messageId;
+                this.pendingAttachments.delete(clientTempId);
+              }
+              
+              updatedMessage.status = undefined;
+              updatedMessages[existingIndex] = updatedMessage;
               return updatedMessages;
+
             } else {
-              if (!currentMessages.some(m => m.messageId === finalMessage.messageId)) {
-                return [...currentMessages, finalMessage];
+              const sanitizedMessage = this.sanitizeMessageAttachments(incomingMessage);
+              if (!currentMessages.some(m => m.messageId === sanitizedMessage.messageId)) {
+                return [...currentMessages, sanitizedMessage];
               }
               return currentMessages;
             }
           });
 
-          this.chatWidgetService.updateConversationSummary(finalMessage);
+          this.chatWidgetService.updateConversationSummary(incomingMessage);
         });
 
       onCleanup(() => {
         this.wsSubscription?.unsubscribe();
+        this.pendingAttachments.clear();
       });
     });
 
@@ -108,6 +142,45 @@ export class ConversationPageComponent {
     });
   }
 
+  // Helper to find message index (checks both messageId and clientTempId)
+  private findMessageIndex(messages: ChatMessage[], incomingMessage: any): number {
+    // First try to match by clientTempId (for messages we sent)
+    if (incomingMessage.clientTempId) {
+      const index = messages.findIndex(m => 
+        m.messageId === incomingMessage.clientTempId || 
+        m.messageId === incomingMessage.messageId
+      );
+      if (index !== -1) return index;
+    }
+    
+    // Then try to match by messageId
+    return messages.findIndex(m => m.messageId === incomingMessage.messageId);
+  }
+
+  // Helper method to sanitize attachment URLs in a message
+  private sanitizeMessageAttachments(message: ChatMessage): ChatMessage {
+    if (!message.attachments || message.attachments.length === 0) {
+      return message;
+    }
+
+    const sanitizedAttachments = message.attachments.map(att => {
+      // Check if fileUrl needs sanitizing
+      if (typeof att.fileUrl === 'string') {
+        return {
+          ...att,
+          fileUrl: this.sanitizer.bypassSecurityTrustUrl(att.fileUrl)
+        };
+      }
+      // Already sanitized or is a SafeUrl
+      return att;
+    });
+
+    return {
+      ...message,
+      attachments: sanitizedAttachments
+    };
+  }
+
   sendMessage(): void {
     if (this.messageForm.invalid || this.isSending()) return;
     this.isSending.set(true);
@@ -115,14 +188,25 @@ export class ConversationPageComponent {
     const content = this.messageForm.value.content?.trim() ?? '';
     const files = this.filesToUpload();
     const tempMessageId = Date.now() * -1;
+    
+    // Create temporary attachments with blob URLs for immediate preview
     const tempAttachments = files.map((file) => {
       const originalUrl = URL.createObjectURL(file);
       return {
-        fileName: file.name, fileType: file.type,
+        fileName: file.name,
+        fileType: file.type,
         fileUrl: this.sanitizer.bypassSecurityTrustUrl(originalUrl),
-        _originalUrl: originalUrl,
+        _originalUrl: originalUrl, // Store for cleanup
+        _isTemp: true // Flag to identify temp attachments
       };
     });
+    
+    // Store attachments in pending map
+    if (tempAttachments.length > 0) {
+      this.pendingAttachments.set(tempMessageId, tempAttachments);
+    }
+    
+    // Create temp message with immediate preview
     const tempMessage: ChatMessage = {
       messageId: tempMessageId,
       conversationId: this.conversation().conversationId,
@@ -132,23 +216,80 @@ export class ConversationPageComponent {
       attachments: tempAttachments,
       status: 'sending',
     };
+    
+    // Add to messages immediately for instant feedback
     this.messages.update((current) => [...current, tempMessage]);
     this.resetForm();
 
-    this.chatService.sendMessage(tempMessage.conversationId, tempMessage.content, files, tempMessageId)
-      .pipe(finalize(() => this.isSending.set(false)))
-      .subscribe({
-        next: () => {
-          console.log('File upload confirmed by server. Waiting for WebSocket message for UI update.');
-        },
-        error: (err) => {
-          console.error('Failed to send message:', err);
+    // Send to server
+    this.chatService.sendMessage(
+      tempMessage.conversationId, 
+      tempMessage.content, 
+      files, 
+      tempMessageId
+    )
+    .pipe(finalize(() => this.isSending.set(false)))
+    .subscribe({
+      next: (response) => {
+        console.log('Message sent successfully:', response);
+        
+        // If the response includes complete attachment data, update immediately
+        if (response && response.attachments && response.attachments.length > 0) {
+          const sanitizedAttachments = response.attachments.map((att: any) => ({
+            ...att,
+            fileUrl: typeof att.fileUrl === 'string' 
+              ? this.sanitizer.bypassSecurityTrustUrl(att.fileUrl)
+              : att.fileUrl
+          }));
+          
+          // Update the message with server-confirmed attachments
           this.messages.update((current) =>
-            current.map((msg) => msg.messageId === tempMessageId ? { ...msg, status: 'error' } : msg)
+            current.map((msg) => {
+              if (msg.messageId === tempMessageId) {
+                // Clean up temp blob URLs
+                msg.attachments?.forEach((att: any) => {
+                  if (att._originalUrl) {
+                    URL.revokeObjectURL(att._originalUrl);
+                  }
+                });
+                
+                // Update pending attachments with server URLs
+                this.pendingAttachments.set(tempMessageId, sanitizedAttachments);
+                
+                return {
+                  ...msg,
+                  attachments: sanitizedAttachments,
+                  messageId: response.messageId || msg.messageId,
+                  status: undefined
+                };
+              }
+              return msg;
+            })
           );
-          tempAttachments.forEach((att) => URL.revokeObjectURL(att._originalUrl));
-        },
-      });
+        } else {
+          // Server didn't return attachments, keep using temp ones
+          console.log('Server response lacks attachments, keeping temporary preview');
+        }
+      },
+      error: (err) => {
+        console.error('Failed to send message:', err);
+        
+        // Mark message as error
+        this.messages.update((current) =>
+          current.map((msg) => 
+            msg.messageId === tempMessageId 
+              ? { ...msg, status: 'error' } 
+              : msg
+          )
+        );
+        
+        // Clean up on error
+        tempAttachments.forEach((att) => {
+          if (att._originalUrl) URL.revokeObjectURL(att._originalUrl);
+        });
+        this.pendingAttachments.delete(tempMessageId);
+      },
+    });
   }
   
   beforeUpload = (file: NzUploadFile): boolean => {
@@ -158,6 +299,7 @@ export class ConversationPageComponent {
     this.messageForm.updateValueAndValidity();
     return false;
   };
+
   removeFile = (file: NzUploadFile): void => {
     const updatedFileList = this.fileList().filter((f) => f.uid !== file.uid);
     this.fileList.set(updatedFileList);
@@ -165,16 +307,19 @@ export class ConversationPageComponent {
     this.filesToUpload.set(updatedFilesToUpload);
     this.messageForm.updateValueAndValidity();
   };
+
   private resetForm(): void {
     this.messageForm.reset();
     this.fileList.set([]);
     this.filesToUpload.set([]);
   }
+
   private scrollToBottom(): void {
     if (this.messageContainer?.nativeElement) {
       this.messageContainer.nativeElement.scrollTop = this.messageContainer.nativeElement.scrollHeight;
     }
   }
+
   handleEnterPress(event: KeyboardEvent): void {
     if (!event.shiftKey) {
       event.preventDefault();
@@ -182,5 +327,17 @@ export class ConversationPageComponent {
         this.sendMessage();
       }
     }
+  }
+
+  ngOnDestroy(): void {
+    // Clean up any remaining blob URLs
+    this.messages().forEach(msg => {
+      msg.attachments?.forEach((att: any) => {
+        if (att._originalUrl) {
+          URL.revokeObjectURL(att._originalUrl);
+        }
+      });
+    });
+    this.pendingAttachments.clear();
   }
 }
