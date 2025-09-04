@@ -17,7 +17,7 @@
 
           @if (msg.attachments && msg.attachments.length > 0) {
             <div class="attachments">
-              @for (att of msg.attachments; track att.fileUrl) {
+              @for (att of msg.attachments; track $index) {
                 <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
                   @if (att.fileType.startsWith('image/')) {
                     <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
@@ -32,9 +32,9 @@
 
           <div class="timestamp">
             @if (msg.status === 'sending') {
-              <span nz-icon nzType="clock-circle-o" class="sending-indicator"></span>
+              <span nz-icon nzType="clock-circle-o" class="sending-indicator" nz-tooltip="Sending..."></span>
             } @else if (msg.status === 'error') {
-              <span nz-icon nzType="exclamation-circle" class="error-indicator"></span>
+              <span nz-icon nzType="exclamation-circle" class="error-indicator" nz-tooltip="Failed to send"></span>
             }
             {{ msg.sentAt | timeAgo }}
           </div>
@@ -69,7 +69,7 @@
         formControlName="content"
         placeholder="Type a message..."
         [nzAutosize]="{ minRows: 1, maxRows: 4 }"
-        (keydown.enter)="handleEnterPress($event)"
+        (keydown.enter)="handleEnterPress($any($event))"
       ></textarea>
       <button nz-button nzType="primary" nzShape="circle" type="submit" class="send-btn" [disabled]="isSending() || messageForm.invalid">
         <span nz-icon nzType="send"></span>

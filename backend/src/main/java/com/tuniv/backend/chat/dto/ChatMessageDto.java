@@ -10,11 +10,10 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ChatMessageDto {
-    private Integer messageId; // <-- ADD THIS
+    private Integer messageId;
+    private Long clientTempId; // ✅ ADD THIS: To accept the temporary ID from the client
     private String content;
     private String senderUsername;
     private String sentAt;
-    
-    // --- FIX: Use a list of Attachment DTOs ---
     private List<AttachmentDto> attachments;
 }

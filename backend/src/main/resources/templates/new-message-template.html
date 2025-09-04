@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${subject}">New Chat Message</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .header { text-align: center; padding-bottom: 20px; border-bottom: 1px solid #ddd; }
+        .content { padding: 20px 0; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px; }
+        .footer { text-align: center; padding-top: 20px; border-top: 1px solid #ddd; font-size: 0.9em; color: #777; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>New Chat Message</h2>
+        </div>
+        <div class="content">
+            <p>Hello <strong th:text="${recipientUsername}">User</strong>,</p>
+            <p>You have received a new message from <strong th:text="${actorUsername}">Someone</strong>.</p>
+            
+            <p style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;" th:text="${message}">Message content goes here.</p>
+            
+            <p>Click the button below to view the conversation:</p>
+            <p style="text-align: center;">
+                <a th:href="${actionUrl}" class="button" style="color: #ffffff;">View Message</a>
+            </p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2025 Your Application Name. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

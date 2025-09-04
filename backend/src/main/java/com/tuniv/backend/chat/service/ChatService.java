@@ -1,5 +1,6 @@
 package com.tuniv.backend.chat.service;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List; // <-- IMPORT ADDED
 import java.util.Objects;
@@ -41,30 +42,38 @@ public class ChatService {
     private final AttachmentService attachmentService;
     private final ApplicationEventPublisher eventPublisher;
 
-    /**
-     * Orchestrates sending a message by first saving it to the database
-     * and then broadcasting it via WebSockets.
-     */
+    @Transactional
     public Message sendMessage(
             Integer conversationId,
             ChatMessageDto chatMessageDto,
             String senderUsername,
             List<MultipartFile> files
     ) {
-        Message messageWithAttachments = saveMessageAndAttachments(conversationId, chatMessageDto, senderUsername, files);
-        ChatMessageDto dtoToSend = ChatMapper.toChatMessageDto(messageWithAttachments);
+        Message savedMessage = saveMessageAndAttachments(conversationId, chatMessageDto, senderUsername, files);
+        
+        // ✅ Use the new mapper to include the clientTempId in the DTO for broadcast.
+        // This is the key change that makes the round-trip work.
+        ChatMessageDto dtoToSend = ChatMapper.toChatMessageDto(savedMessage, chatMessageDto.getClientTempId());
 
         String destination = "/topic/conversation/" + conversationId;
         messagingTemplate.convertAndSend(destination, dtoToSend);
-        eventPublisher.publishEvent(new NewMessageEvent(this, messageWithAttachments));
 
-        return messageWithAttachments;
+        // This logic remains the same.
+        Conversation fullConversation = conversationRepository.findByIdWithParticipantsAndUsers(conversationId)
+                .orElseThrow(() -> new IllegalStateException("Conversation not found after sending message"));
+
+        User author = savedMessage.getAuthor();
+
+        List<User> recipients = fullConversation.getParticipants().stream()
+                .map(ConversationParticipant::getUser)
+                .filter(user -> !user.equals(author))
+                .collect(Collectors.toList());
+
+        eventPublisher.publishEvent(new NewMessageEvent(this, savedMessage, recipients));
+
+        return savedMessage;
     }
 
-    /**
-     * Handles all database interactions for saving a message and its attachments
-     * within a single transaction.
-     */
     @Transactional
     public Message saveMessageAndAttachments(
             Integer conversationId,
@@ -83,7 +92,7 @@ public class ChatService {
         message.setAuthor(sender);
         String content = chatMessageDto.getContent();
         message.setBody(content == null ? "" : content);
-        message.setSentAt(LocalDateTime.now());
+        message.setSentAt(Instant.now());
 
         Message savedMessage = messageRepository.save(message);
 
@@ -96,9 +105,6 @@ public class ChatService {
         return savedMessage;
     }
 
-    /**
-     * Fetches the historical messages for a single conversation.
-     */
     @Transactional(readOnly = true)
     public List<ChatMessageDto> getMessagesByConversation(Integer conversationId) {
         if (!conversationRepository.existsById(conversationId)) {
@@ -110,9 +116,6 @@ public class ChatService {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Fetches a single message by its ID.
-     */
     @Transactional(readOnly = true)
     public ChatMessageDto getSingleMessageById(Integer messageId) {
         return messageRepository.findById(messageId)
@@ -120,32 +123,22 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
     }
 
-    /**
-     * Retrieves a summary list of all conversations for a given user.
-     */
     @Transactional(readOnly = true)
     public List<ConversationSummaryDto> getConversationSummaries(String username) {
         User currentUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
-        List<Conversation> conversations = conversationRepository.findConversationsByUserId(currentUser.getUserId());
-        return conversations.stream()
-                .map(conv -> mapToConversationSummaryDto(conv, currentUser))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        return conversationRepository.findConversationSummariesForUser(currentUser.getUserId());
     }
 
-    /**
-     * Finds an existing conversation between two users or creates a new one.
-     */
     @Transactional
     public ConversationSummaryDto findOrCreateConversation(Integer currentUserId, Integer participantId) {
         if (currentUserId.equals(participantId)) {
             throw new IllegalArgumentException("Cannot start a conversation with oneself.");
         }
-
         return conversationRepository.findDirectConversationBetweenUsers(currentUserId, participantId)
                 .map(conversation -> {
-                    User currentUser = userRepository.findById(currentUserId).get();
+                    User currentUser = userRepository.findById(currentUserId)
+                            .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
                     return mapToConversationSummaryDto(conversation, currentUser);
                 })
                 .orElseGet(() -> {
@@ -153,21 +146,23 @@ public class ChatService {
                             .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
                     User otherParticipant = userRepository.findById(participantId)
                             .orElseThrow(() -> new ResourceNotFoundException("Participant user not found"));
-
                     Conversation newConversation = new Conversation();
-                    conversationRepository.save(newConversation);
-
-                    ConversationParticipant currentUserParticipant = new ConversationParticipant(currentUser, newConversation);
-                    ConversationParticipant otherUserParticipant = new ConversationParticipant(otherParticipant, newConversation);
+                    Conversation savedConversation = conversationRepository.save(newConversation);
+                    ConversationParticipant currentUserParticipant = new ConversationParticipant(currentUser, savedConversation);
+                    ConversationParticipant otherUserParticipant = new ConversationParticipant(otherParticipant, savedConversation);
                     conversationParticipantRepository.saveAll(List.of(currentUserParticipant, otherUserParticipant));
-
-                    return mapToConversationSummaryDto(newConversation, currentUser);
+                    return ConversationSummaryDto.builder()
+                            .conversationId(savedConversation.getConversationId())
+                            .participantId(otherParticipant.getUserId())
+                            .participantName(otherParticipant.getUsername())
+                            .participantAvatarUrl(otherParticipant.getProfilePhotoUrl())
+                            .lastMessage("No messages yet...")
+                            .lastMessageTimestamp(savedConversation.getCreatedAt().toString())
+                            .unreadCount(0L)
+                            .build();
                 });
     }
 
-    /**
-     * Marks all messages in a conversation as read for the current user.
-     */
     @Transactional
     public void markConversationAsRead(Integer conversationId, String username) {
         User currentUser = userRepository.findByUsername(username)
@@ -179,30 +174,24 @@ public class ChatService {
         conversationParticipantRepository.save(participant);
     }
 
-    /**
-     * A private helper method to map entity data to the ConversationSummaryDto.
-     */
     private ConversationSummaryDto mapToConversationSummaryDto(Conversation conv, User currentUser) {
         User otherParticipant = conv.getParticipants().stream()
                 .map(ConversationParticipant::getUser)
                 .filter(user -> !user.getUserId().equals(currentUser.getUserId()))
                 .findFirst()
                 .orElse(null);
-
         if (otherParticipant == null) return null;
-
         Optional<Message> lastMessageOpt = messageRepository.findTopByConversationConversationIdOrderBySentAtDesc(conv.getConversationId());
         LocalDateTime lastReadTimestamp = conv.getParticipants().stream()
                 .filter(p -> p.getUser().getUserId().equals(currentUser.getUserId()))
                 .findFirst()
                 .map(ConversationParticipant::getLastReadTimestamp)
                 .orElse(conv.getCreatedAt());
-        long unreadCount = messageRepository.countByConversationConversationIdAndSenderUserIdNotAndSentAtAfter(
+        long unreadCount = messageRepository.countByConversationConversationIdAndAuthorUserIdNotAndSentAtAfter(
                 conv.getConversationId(),
                 currentUser.getUserId(),
                 lastReadTimestamp
         );
-
         return ConversationSummaryDto.builder()
                 .conversationId(conv.getConversationId())
                 .participantId(otherParticipant.getUserId())
@@ -210,7 +199,7 @@ public class ChatService {
                 .participantAvatarUrl(otherParticipant.getProfilePhotoUrl())
                 .lastMessage(lastMessageOpt.map(Message::getBody).orElse("No messages yet..."))
                 .lastMessageTimestamp(lastMessageOpt.map(m -> m.getSentAt().toString()).orElse(conv.getCreatedAt().toString()))
-                .unreadCount((int) unreadCount)
+                .unreadCount(unreadCount)
                 .build();
     }
 }

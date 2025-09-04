@@ -1,6 +1,5 @@
 :host {
   display: flex;
-  /* This is the key fix: ensures the component fills its parent container (the widget body) instead of the whole screen. */
   height: 100%;
   width: 100%;
 }
@@ -25,7 +24,6 @@
 }
 
 .message-container {
-  /* This allows the message area to grow and fill available space, with its own scrollbar. */
   flex-grow: 1;
   overflow-y: auto;
   padding: 1rem;
@@ -46,13 +44,24 @@
       * {
         color: var(--color-on-primary) !important;
       }
+      
+      /* --- MODIFICATION START --- */
+      /* Add specific overrides for attachments within your own messages */
       .attachment-item {
-        background-color: rgba(255, 255, 255, 0.2);
+        background-color: rgba(255, 255, 255, 0.15);
         border-color: rgba(255, 255, 255, 0.3);
+
         &:hover {
-          background-color: rgba(255, 255, 255, 0.3);
+          background-color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Ensure the icon and text are always clearly visible */
+        .file-icon, .file-name {
+          color: var(--color-on-primary) !important;
+          opacity: 0.9;
         }
       }
+      /* --- MODIFICATION END --- */
     }
   }
 }
@@ -111,11 +120,17 @@
   .file-icon {
     font-size: 1.5rem;
     color: var(--color-text-secondary);
+    flex-shrink: 0; /* Prevent icon from shrinking */
   }
   .file-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    /* --- MODIFICATION START --- */
+    /* Give the filename a default color for better consistency */
+    color: var(--color-text-primary);
+    flex-grow: 1; /* Allow filename to take available space */
+    /* --- MODIFICATION END --- */
   }
   .img-preview {
     width: 100%;
@@ -128,7 +143,6 @@
 }
 
 .message-input-area {
-  /* This safeguard prevents the input area from being compressed or pushed out of view. */
   flex-shrink: 0;
   padding: 0.75rem;
   background-color: var(--color-surface);

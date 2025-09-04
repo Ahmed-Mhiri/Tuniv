@@ -13,6 +13,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,7 +25,6 @@ import com.tuniv.backend.chat.model.Message;
 import com.tuniv.backend.chat.service.ChatService;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -53,8 +53,17 @@ public class ChatController {
     ) {
         UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Message finalMessage = chatService.sendMessage(conversationId, chatMessageDto, currentUser.getUsername(), files);
-        return ResponseEntity.ok(ChatMapper.toChatMessageDto(finalMessage));
+
+        // ================== THIS IS THE FIX ==================
+        // The HTTP response also needs to include the clientTempId for the Stage 2 update.
+        // You were calling the old mapper method with only one argument.
+        ChatMessageDto responseDto = ChatMapper.toChatMessageDto(finalMessage, chatMessageDto.getClientTempId());
+        // ======================================================
+        
+        return ResponseEntity.ok(responseDto);
     }
+
+    // --- All other methods below are correct and do not need changes ---
 
     // REST endpoint for fetching message history
     @GetMapping("/api/v1/chat/{conversationId}/messages")

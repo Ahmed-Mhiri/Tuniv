@@ -84,7 +84,7 @@ CREATE TABLE posts (
     question_id INT,
     answer_id INT,
     parent_comment_id INT,
-    sender_id INT,
+    -- sender_id INT, -- ✅ REMOVED: This column is redundant. 'user_id' serves as the author/sender.
     conversation_id INT,
     sent_at TIMESTAMP WITH TIME ZONE,
     CONSTRAINT fk_post_author FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
@@ -150,6 +150,7 @@ CREATE INDEX idx_attachments_post_id ON attachments(post_id);
 -- =================================================================
 -- ✅ PART 2: DATA INSERTION (DML)
 -- Data is inserted in the correct order to satisfy foreign key constraints.
+-- (No changes were needed here as your INSERT statements were already correct)
 -- =================================================================
 
 -- Base Data

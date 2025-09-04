@@ -1,8 +1,9 @@
 import { DestroyRef, inject, Injectable, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { timer, tap } from 'rxjs';
-import { ChatService } from './chat.service'; // ✅ Use your existing ChatService
+import { ChatService } from './chat.service';
 import { Conversation } from '../../../shared/models/conversation.model';
+import { ChatMessage } from '../../../shared/models/chat.model'; // ✅ IMPORTED
 
 @Injectable({
   providedIn: 'root'
@@ -45,7 +46,7 @@ export class ChatWidgetService {
   // --- Public API Methods ---
 
   /**
-   * ✅ [RESTORED] Toggles the visibility of the chat widget.
+   * Toggles the visibility of the chat widget.
    */
   toggleWidget(): void {
     this.isWidgetOpen.update(isOpen => !isOpen);
@@ -112,5 +113,38 @@ export class ChatWidgetService {
 
   closeConversation(): void {
     this.activeConversation.set(null);
+  }
+  
+  /**
+   * ✅ [NEW] Updates a conversation summary when a new message arrives and moves it to the top.
+   * @param newMessage The new chat message from the server.
+   */
+  updateConversationSummary(newMessage: ChatMessage): void {
+    this.conversations.update(currentConvos => {
+      const convoIndex = currentConvos.findIndex(
+        c => c.conversationId === newMessage.conversationId
+      );
+
+      if (convoIndex === -1) {
+        // Conversation not in the list, maybe a new one. Reload all.
+        this.loadConversations();
+        return currentConvos;
+      }
+
+      // Found the conversation, let's update it
+      const updatedConvo = {
+        ...currentConvos[convoIndex],
+        lastMessage: newMessage.content || 'Attachment', // Use a placeholder for file-only messages
+        lastMessageTimestamp: newMessage.sentAt,
+      };
+
+      // Create a new array, removing the old version
+      const filteredConvos = currentConvos.filter(
+        c => c.conversationId !== newMessage.conversationId
+      );
+
+      // Add the updated conversation to the very top and return the new array
+      return [updatedConvo, ...filteredConvos];
+    });
   }
 }
