@@ -380,3 +380,37 @@ button[disabled],
 .ant-alert-error .ant-alert-icon {
   color: var(--color-accent) !important; /* Uses your theme's accent color for errors */
 }
+
+/* ==========================================================================
+   5. NG-ZORRO Component Overrides (Add this section if you don't have it)
+   ========================================================================== */
+
+/* --- Modals --- */
+/* This themes the entire modal window */
+
+// The main content container of the modal
+.ant-modal-content {
+  background-color: var(--color-surface) !important;
+}
+
+// The header section
+.ant-modal-header {
+  background-color: var(--color-surface) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+}
+
+// The title text within the header
+.ant-modal-title {
+  color: var(--color-text-primary) !important;
+}
+
+// The 'X' close button icon
+.ant-modal-close-x {
+  color: var(--color-text-secondary) !important;
+}
+
+// The footer section with the OK/Cancel buttons
+.ant-modal-footer {
+  border-top: 1px solid var(--color-border) !important;
+  background-color: transparent !important; // Footer should match the surface
+}

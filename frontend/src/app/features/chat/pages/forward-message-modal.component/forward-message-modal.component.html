@@ -1,0 +1,20 @@
+<div class="forward-modal-content">
+  <div class="forward-preview">
+    <strong>Forwarding Message:</strong>
+    <p class="preview-text">
+      <em>{{ message.content }}</em>
+    </p>
+  </div>
+
+  <nz-checkbox-group>
+    @for (option of checkboxOptions; track option.value) {
+      <label 
+        nz-checkbox
+        [nzValue]="option.value"
+        [(ngModel)]="option.checked">
+        {{ option.label }}
+      </label>
+    }
+  </nz-checkbox-group>
+
+</div>

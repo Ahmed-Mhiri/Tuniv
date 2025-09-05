@@ -1,0 +1,34 @@
+// Uses theme variables from your global styles.scss for consistency
+
+:host {
+  color: var(--color-text-primary);
+}
+
+.forward-preview {
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+
+  strong {
+    color: var(--color-text-primary);
+  }
+
+  .preview-text {
+    margin: 0.25rem 0 0;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    // For long messages
+    max-height: 100px;
+    overflow-y: auto;
+    word-break: break-word;
+  }
+}
+
+// Gives the checkboxes a clean, vertical layout
+nz-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}

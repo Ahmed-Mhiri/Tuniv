@@ -1,3 +1,4 @@
+// conversation-page.component.ts
 import { ChangeDetectionStrategy, Component, effect, ElementRef, inject, input, SecurityContext, signal, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AbstractControl, FormBuilder, FormGroup, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
@@ -23,6 +24,7 @@ import { ChatWidgetService } from '../../services/chat-widget.service';
 import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
 import { NzModalModule, NzModalService } from 'ng-zorro-antd/modal';
 import { NzPopoverModule } from 'ng-zorro-antd/popover';
+import { ForwardMessageModalComponent } from '../forward-message-modal.component/forward-message-modal.component';
 
 @Component({
   selector: 'app-conversation-page',
@@ -41,7 +43,7 @@ export class ConversationPageComponent {
   conversation = input.required<Conversation>();
   private readonly chatService = inject(ChatService);
   private readonly authService = inject(AuthService);
-  private readonly modal = inject(NzModalService); // ✅ INJECT
+  private readonly modal = inject(NzModalService);
   private readonly fb = inject(FormBuilder);
   readonly sanitizer = inject(DomSanitizer);
   private readonly chatWidgetService = inject(ChatWidgetService);
@@ -55,7 +57,10 @@ export class ConversationPageComponent {
   readonly availableReactions = ['👍', '❤️', '😂', '🎉', '😢', '😮'];
   messageForm: FormGroup;
   private wsSubscription?: Subscription;
-  
+
+  // ✅ Signal to hold the message that the user wants to react to
+  activeMessageForReaction = signal<ChatMessage | null>(null);
+
   // Store pending attachments that haven't been confirmed by server yet
   private pendingAttachments = new Map<number, any[]>();
   
@@ -92,12 +97,10 @@ export class ConversationPageComponent {
               const updatedMessages = [...currentMessages];
               const existingMessage = updatedMessages[existingIndex];
               
-              let updatedMessage: ChatMessage = { ...incomingMessage, attachments: [] }; // Start with empty attachments
+              let updatedMessage: ChatMessage = { ...incomingMessage, attachments: [] };
               
               if (!incomingMessage.attachments || incomingMessage.attachments.length === 0) {
                 const clientTempId = incomingMessage.clientTempId || incomingMessage.messageId;
-                
-                // ✅ FIX: Safely get from the map and check for existence
                 const pending = this.pendingAttachments.get(clientTempId);
                 if (pending) {
                   updatedMessage.attachments = pending;
@@ -148,9 +151,8 @@ export class ConversationPageComponent {
     });
   }
 
-  // Helper to find message index (checks both messageId and clientTempId)
+  // Helper to find message index
   private findMessageIndex(messages: ChatMessage[], incomingMessage: any): number {
-    // First try to match by clientTempId (for messages we sent)
     if (incomingMessage.clientTempId) {
       const index = messages.findIndex(m => 
         m.messageId === incomingMessage.clientTempId || 
@@ -158,29 +160,23 @@ export class ConversationPageComponent {
       );
       if (index !== -1) return index;
     }
-    
-    // Then try to match by messageId
     return messages.findIndex(m => m.messageId === incomingMessage.messageId);
   }
 
-  // Helper method to sanitize attachment URLs in a message
+  // Helper method to sanitize attachment URLs
   private sanitizeMessageAttachments(message: ChatMessage): ChatMessage {
     if (!message.attachments || message.attachments.length === 0) {
       return message;
     }
-
     const sanitizedAttachments = message.attachments.map(att => {
-      // Check if fileUrl needs sanitizing
       if (typeof att.fileUrl === 'string') {
         return {
           ...att,
           fileUrl: this.sanitizer.bypassSecurityTrustUrl(att.fileUrl)
         };
       }
-      // Already sanitized or is a SafeUrl
       return att;
     });
-
     return {
       ...message,
       attachments: sanitizedAttachments
@@ -195,24 +191,21 @@ export class ConversationPageComponent {
     const files = this.filesToUpload();
     const tempMessageId = Date.now() * -1;
     
-    // Create temporary attachments with blob URLs for immediate preview
     const tempAttachments = files.map((file) => {
       const originalUrl = URL.createObjectURL(file);
       return {
         fileName: file.name,
         fileType: file.type,
         fileUrl: this.sanitizer.bypassSecurityTrustUrl(originalUrl),
-        _originalUrl: originalUrl, // Store for cleanup
-        _isTemp: true // Flag to identify temp attachments
+        _originalUrl: originalUrl,
+        _isTemp: true
       };
     });
     
-    // Store attachments in pending map
     if (tempAttachments.length > 0) {
       this.pendingAttachments.set(tempMessageId, tempAttachments);
     }
     
-    // Create temp message with immediate preview
     const tempMessage: ChatMessage = {
       messageId: tempMessageId,
       conversationId: this.conversation().conversationId,
@@ -223,11 +216,9 @@ export class ConversationPageComponent {
       status: 'sending',
     };
     
-    // Add to messages immediately for instant feedback
     this.messages.update((current) => [...current, tempMessage]);
     this.resetForm();
 
-    // Send to server
     this.chatService.sendMessage(
       tempMessage.conversationId, 
       tempMessage.content, 
@@ -238,8 +229,6 @@ export class ConversationPageComponent {
     .subscribe({
       next: (response) => {
         console.log('Message sent successfully:', response);
-        
-        // If the response includes complete attachment data, update immediately
         if (response && response.attachments && response.attachments.length > 0) {
           const sanitizedAttachments = response.attachments.map((att: any) => ({
             ...att,
@@ -248,20 +237,15 @@ export class ConversationPageComponent {
               : att.fileUrl
           }));
           
-          // Update the message with server-confirmed attachments
           this.messages.update((current) =>
             current.map((msg) => {
               if (msg.messageId === tempMessageId) {
-                // Clean up temp blob URLs
                 msg.attachments?.forEach((att: any) => {
                   if (att._originalUrl) {
                     URL.revokeObjectURL(att._originalUrl);
                   }
                 });
-                
-                // Update pending attachments with server URLs
                 this.pendingAttachments.set(tempMessageId, sanitizedAttachments);
-                
                 return {
                   ...msg,
                   attachments: sanitizedAttachments,
@@ -272,15 +256,10 @@ export class ConversationPageComponent {
               return msg;
             })
           );
-        } else {
-          // Server didn't return attachments, keep using temp ones
-          console.log('Server response lacks attachments, keeping temporary preview');
         }
       },
       error: (err) => {
         console.error('Failed to send message:', err);
-        
-        // Mark message as error
         this.messages.update((current) =>
           current.map((msg) => 
             msg.messageId === tempMessageId 
@@ -288,8 +267,6 @@ export class ConversationPageComponent {
               : msg
           )
         );
-        
-        // Clean up on error
         tempAttachments.forEach((att) => {
           if (att._originalUrl) URL.revokeObjectURL(att._originalUrl);
         });
@@ -336,7 +313,6 @@ export class ConversationPageComponent {
   }
 
   ngOnDestroy(): void {
-    // Clean up any remaining blob URLs
     this.messages().forEach(msg => {
       msg.attachments?.forEach((att: any) => {
         if (att._originalUrl) {
@@ -350,69 +326,125 @@ export class ConversationPageComponent {
   deleteMessage(messageId: number): void {
     this.chatService.deleteMessage(messageId).subscribe({
       next: () => {
-        // The WebSocket update will handle the UI change, 
-        // but you could add an optimistic update here for instant feedback.
         console.log(`Deletion request sent for message ${messageId}`);
       },
       error: (err) => {
         console.error('Failed to delete message:', err);
-        // Optionally show a notification to the user
       },
     });
   }
+  
   toggleReaction(message: ChatMessage, emoji: string): void {
-    if (!message.messageId || message.messageId < 0) return;
+    if (!message.messageId || message.messageId < 0) {
+      console.warn('Cannot react to temporary message');
+      return;
+    }
+    const currentUser = this.currentUser()?.username;
+    if (!currentUser) return;
 
-    // We don't need to do anything in the 'next' block,
-    // as the WebSocket broadcast will update the state for all users at once.
-    this.chatService.toggleReaction(message.messageId, emoji).subscribe({
-      error: (err) => console.error('Failed to toggle reaction:', err),
+    this.messages.update(currentMessages => {
+      const messageIndex = currentMessages.findIndex(m => m.messageId === message.messageId);
+      if (messageIndex === -1) return currentMessages;
+
+      const updatedMessages = [...currentMessages];
+      const targetMessage = { ...updatedMessages[messageIndex] };
+      targetMessage.reactions = targetMessage.reactions ? [...targetMessage.reactions] : [];
+      const reactionIndex = targetMessage.reactions.findIndex(r => r.emoji === emoji);
+
+      if (reactionIndex === -1) {
+        targetMessage.reactions.push({
+          emoji: emoji,
+          count: 1,
+          users: [currentUser],
+          reactedByCurrentUser: true
+        });
+      } else {
+        const existingReaction = { ...targetMessage.reactions[reactionIndex] };
+        existingReaction.users = [...existingReaction.users];
+        const userIndex = existingReaction.users.indexOf(currentUser);
+        
+        if (userIndex !== -1) {
+          existingReaction.count--;
+          existingReaction.users.splice(userIndex, 1);
+          existingReaction.reactedByCurrentUser = false;
+        } else {
+          existingReaction.count++;
+          existingReaction.users.push(currentUser);
+          existingReaction.reactedByCurrentUser = true;
+        }
+
+        if (existingReaction.count === 0) {
+          targetMessage.reactions.splice(reactionIndex, 1);
+        } else {
+          targetMessage.reactions[reactionIndex] = existingReaction;
+        }
+      }
+      updatedMessages[messageIndex] = targetMessage;
+      return updatedMessages;
     });
-  
-  
+
+    this.chatService.toggleReaction(message.messageId, emoji).subscribe({
+      next: (response) => console.log('Reaction toggle successful:', response),
+      error: (err) => console.error('Failed to toggle reaction:', err)
+    });
   }
 
   openForwardModal(messageToForward: ChatMessage): void {
-    let selectedConversationIds: number[] = [];
-    const conversations = this.chatWidgetService.conversations();
-    const checkboxOptions = conversations.map(c => ({
-      label: c.participantName,
-      value: c.conversationId,
-      checked: false
-    }));
+    const allConversations = this.chatWidgetService.conversations();
+    const currentConversationId = this.conversation().conversationId;
+    const filteredConversations = allConversations.filter(
+      conv => conv.conversationId !== currentConversationId
+    );
 
     this.modal.create({
       nzTitle: 'Forward message to...',
-      nzContent: `
-        <p class="forward-preview">
-          <strong>Message:</strong><br>
-          <em>${messageToForward.content}</em>
-        </p>
-        <nz-checkbox-group [(ngModel)]="checkboxOptions"></nz-checkbox-group>
-      `,
-      nzOnOk: () => this.forwardMessage(messageToForward, checkboxOptions)
+      nzContent: ForwardMessageModalComponent,
+      nzData: {
+        message: messageToForward,
+        conversations: filteredConversations 
+      },
+      nzOnOk: (componentInstance) => {
+        const selectedIds = componentInstance.getSelectedIds();
+        this.forwardMessage(messageToForward, selectedIds);
+      }
     });
   }
 
-  private forwardMessage(
-    originalMessage: ChatMessage,
-    options: { label: string; value: number; checked: boolean }[]
-  ): void {
-    const selectedIds = options.filter(opt => opt.checked).map(opt => opt.value);
-    
-    if (selectedIds.length === 0) {
-      return; // Or show a message
-    }
-
+  private forwardMessage(originalMessage: ChatMessage, selectedIds: number[]): void {
+    if (selectedIds.length === 0) return;
     const formattedContent = `----------\nForwarded Message:\n${originalMessage.content}\n----------`;
-
     selectedIds.forEach(conversationId => {
-      // NOTE: We pass an empty array for files, as we are only forwarding text.
       this.chatService.sendMessage(conversationId, formattedContent, [], Date.now() * -1)
         .subscribe({
           next: () => console.log(`Message forwarded to conversation ${conversationId}`),
           error: (err) => console.error(`Failed to forward to ${conversationId}`, err)
         });
     });
+  }
+
+  // ✅ New method to store the active message
+  setActiveMessage(message: ChatMessage): void {
+    this.activeMessageForReaction.set(message);
+  }
+
+  // ✅ Final, simplified method that uses the signal
+  handleEmojiClick(emoji: string, event: Event): void {
+    event.stopPropagation();
+    event.preventDefault();
+    
+    // Get the message that was stored when the popover was opened
+    const message = this.activeMessageForReaction();
+  
+    // Guard to ensure the message exists
+    if (!message) {
+      console.error('Could not find the active message to react to.');
+      return;
+    }
+    
+    console.log('Emoji clicked:', emoji, 'for message:', message.messageId);
+    
+    this.toggleReaction(message, emoji);
+    
+    // You might need to add logic here to close the popover manually
   }
 }
