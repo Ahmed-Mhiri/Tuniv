@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -19,9 +20,11 @@ import com.tuniv.backend.chat.mapper.ChatMapper;
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.model.ConversationParticipant;
 import com.tuniv.backend.chat.model.Message;
+import com.tuniv.backend.chat.model.MessageReaction;
 import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
 import com.tuniv.backend.chat.repository.ConversationRepository;
 import com.tuniv.backend.chat.repository.MessageRepository;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.notification.event.NewMessageEvent;
 import com.tuniv.backend.qa.service.AttachmentService;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
@@ -50,25 +53,21 @@ public class ChatService {
             List<MultipartFile> files
     ) {
         Message savedMessage = saveMessageAndAttachments(conversationId, chatMessageDto, senderUsername, files);
-        
-        // ✅ Use the new mapper to include the clientTempId in the DTO for broadcast.
-        // This is the key change that makes the round-trip work.
-        ChatMessageDto dtoToSend = ChatMapper.toChatMessageDto(savedMessage, chatMessageDto.getClientTempId());
+
+        // ✅ Use the updated mapper that includes the clientTempId for the round-trip
+        ChatMessageDto dtoToSend = ChatMapper.toChatMessageDto(savedMessage, senderUsername, chatMessageDto.getClientTempId());
 
         String destination = "/topic/conversation/" + conversationId;
         messagingTemplate.convertAndSend(destination, dtoToSend);
 
-        // This logic remains the same.
+        // Notification logic remains the same
         Conversation fullConversation = conversationRepository.findByIdWithParticipantsAndUsers(conversationId)
                 .orElseThrow(() -> new IllegalStateException("Conversation not found after sending message"));
-
         User author = savedMessage.getAuthor();
-
         List<User> recipients = fullConversation.getParticipants().stream()
                 .map(ConversationParticipant::getUser)
                 .filter(user -> !user.equals(author))
                 .collect(Collectors.toList());
-
         eventPublisher.publishEvent(new NewMessageEvent(this, savedMessage, recipients));
 
         return savedMessage;
@@ -83,7 +82,6 @@ public class ChatService {
     ) {
         User sender = userRepository.findByUsername(senderUsername)
                 .orElseThrow(() -> new ResourceNotFoundException("Sender not found: " + senderUsername));
-
         Conversation conversation = conversationRepository.findById(conversationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Conversation not found: " + conversationId));
 
@@ -93,7 +91,6 @@ public class ChatService {
         String content = chatMessageDto.getContent();
         message.setBody(content == null ? "" : content);
         message.setSentAt(Instant.now());
-
         Message savedMessage = messageRepository.save(message);
 
         if (files != null && !files.isEmpty()) {
@@ -107,21 +104,80 @@ public class ChatService {
 
     @Transactional(readOnly = true)
     public List<ChatMessageDto> getMessagesByConversation(Integer conversationId) {
+        // ✅ Get the current user's context to correctly map reactions
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
         if (!conversationRepository.existsById(conversationId)) {
             throw new ResourceNotFoundException("Conversation not found with id: " + conversationId);
         }
         return messageRepository.findByConversationConversationIdOrderBySentAtAsc(conversationId)
                 .stream()
-                .map(ChatMapper::toChatMessageDto)
+                // ✅ Use the consolidated mapper with the username to include reaction data
+                .map(message -> ChatMapper.toChatMessageDto(message, currentUser.getUsername()))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public ChatMessageDto getSingleMessageById(Integer messageId) {
+        // ✅ Get the current user's context to correctly map reactions
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
         return messageRepository.findById(messageId)
-                .map(ChatMapper::toChatMessageDto)
+                // ✅ Use the consolidated mapper with the username
+                .map(message -> ChatMapper.toChatMessageDto(message, currentUser.getUsername()))
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
     }
+
+    @Transactional
+    public void deleteMessage(Integer messageId, String currentUsername) {
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
+
+        if (!message.getAuthor().getUsername().equals(currentUsername)) {
+            throw new SecurityException("User is not authorized to delete this message.");
+        }
+
+        message.setDeleted(true);
+        message.setBody(""); // Clear content
+        messageRepository.save(message);
+
+        // ✅ Broadcast the deletion event using the mapper with username context
+        ChatMessageDto deletedMessageDto = ChatMapper.toChatMessageDto(message, currentUsername);
+        String destination = "/topic/conversation/" + message.getConversation().getConversationId();
+        messagingTemplate.convertAndSend(destination, deletedMessageDto);
+    }
+
+    @Transactional
+    public void toggleReaction(Integer messageId, String emoji, String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found"));
+
+        Optional<MessageReaction> existingReaction = message.getReactions().stream()
+                .filter(r -> r.getUser().equals(user) && r.getEmoji().equals(emoji))
+                .findFirst();
+
+        if (existingReaction.isPresent()) {
+            message.getReactions().remove(existingReaction.get());
+        } else {
+            MessageReaction newReaction = new MessageReaction();
+            newReaction.setId(new MessageReaction.MessageReactionId(messageId, user.getUserId(), emoji));
+            newReaction.setMessage(message);
+            newReaction.setUser(user);
+            newReaction.setEmoji(emoji);
+            message.getReactions().add(newReaction);
+        }
+
+        Message updatedMessage = messageRepository.save(message);
+
+        // Broadcast the full updated message. This logic is correct.
+        ChatMessageDto messageDto = ChatMapper.toChatMessageDto(updatedMessage, username);
+        String destination = "/topic/conversation/" + message.getConversation().getConversationId();
+        messagingTemplate.convertAndSend(destination, messageDto);
+    }
+
+    // --- Methods below this line did not require changes ---
 
     @Transactional(readOnly = true)
     public List<ConversationSummaryDto> getConversationSummaries(String username) {

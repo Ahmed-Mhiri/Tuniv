@@ -84,9 +84,9 @@ CREATE TABLE posts (
     question_id INT,
     answer_id INT,
     parent_comment_id INT,
-    -- sender_id INT, -- ✅ REMOVED: This column is redundant. 'user_id' serves as the author/sender.
     conversation_id INT,
     sent_at TIMESTAMP WITH TIME ZONE,
+    is_deleted BOOLEAN NOT NULL DEFAULT false, -- ✅ ADDED: For soft-deleting messages
     CONSTRAINT fk_post_author FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
     CONSTRAINT fk_post_module FOREIGN KEY (module_id) REFERENCES modules(module_id),
     CONSTRAINT fk_post_question FOREIGN KEY (question_id) REFERENCES posts(id) ON DELETE CASCADE,
@@ -95,7 +95,7 @@ CREATE TABLE posts (
     CONSTRAINT fk_post_conversation FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE
 );
 
--- Votes & Attachments (Depend on 'posts' table)
+-- Votes, Attachments & Reactions (Depend on 'posts' and 'users' tables)
 CREATE TABLE question_votes (
     user_id INT NOT NULL,
     question_id INT NOT NULL,
@@ -137,6 +137,18 @@ CREATE TABLE attachments (
     CONSTRAINT fk_attachment_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
 
+-- ✅ ADDED: New table for message reactions
+CREATE TABLE message_reactions (
+    message_id INT NOT NULL,
+    user_id INT NOT NULL,
+    emoji VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (message_id, user_id, emoji), -- Composite key to allow one user to add multiple different emojis
+    CONSTRAINT fk_reaction_message FOREIGN KEY (message_id) REFERENCES posts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_reaction_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
+
 -- Indexes
 CREATE INDEX idx_notifications_recipient_id ON notifications(recipient_id);
 CREATE INDEX idx_posts_user_id ON posts(user_id);
@@ -150,7 +162,6 @@ CREATE INDEX idx_attachments_post_id ON attachments(post_id);
 -- =================================================================
 -- ✅ PART 2: DATA INSERTION (DML)
 -- Data is inserted in the correct order to satisfy foreign key constraints.
--- (No changes were needed here as your INSERT statements were already correct)
 -- =================================================================
 
 -- Base Data
@@ -360,23 +371,24 @@ INSERT INTO posts (id, post_type, body, answer_id, user_id, parent_comment_id) V
 (9, 'COMMENT', 'This is a very clear explanation, thank you! It really helped me understand the complexity trade-offs.', 5, 1, NULL),
 (10, 'COMMENT', 'You''re welcome! Glad I could help clarify it.', 5, 2, 9);
 
-INSERT INTO posts (id, post_type, body, conversation_id, user_id, created_at) VALUES
-(11, 'MESSAGE', 'Hello Professor, I had a question about the Dijkstra explanation you provided.', 1, 1, '2025-08-31 23:16:00+01'),
-(12, 'MESSAGE', 'Of course, Amine. How can I help?', 1, 2, '2025-08-31 23:18:00+01'),
-(13, 'MESSAGE', 'In the case of a sparse graph, is it always better to use a priority queue?', 1, 1, '2025-08-31 23:19:00+01'),
-(14, 'MESSAGE', 'Yes, for sparse graphs, O(E log V) is significantly better than O(V^2). The priority queue is key.', 1, 2, '2025-08-31 23:25:00+01');
+-- ✅ MODIFIED: Added 'is_deleted' column for clarity, though it defaults to false.
+INSERT INTO posts (id, post_type, body, conversation_id, user_id, created_at, is_deleted) VALUES
+(11, 'MESSAGE', 'Hello Professor, I had a question about the Dijkstra explanation you provided.', 1, 1, '2025-08-31 23:16:00+01', false),
+(12, 'MESSAGE', 'Of course, Amine. How can I help?', 1, 2, '2025-08-31 23:18:00+01', false),
+(13, 'MESSAGE', 'In the case of a sparse graph, is it always better to use a priority queue?', 1, 1, '2025-08-31 23:19:00+01', false),
+(14, 'MESSAGE', 'Yes, for sparse graphs, O(E log V) is significantly better than O(V^2). The priority queue is key.', 1, 2, '2025-08-31 23:25:00+01', false);
 
--- Attachments and Votes Data (Depends on Posts)
+-- Attachments, Votes, and Reactions Data (Depends on Posts and Users)
 INSERT INTO attachments (attachment_id, file_name, file_url, file_type, file_size, post_id) VALUES
 (1, 'thermo_formulas.pdf', '/uploads/questions/thermo_formulas.pdf', 'application/pdf', 102400, 4),
 (2, 'join_examples.sql', '/uploads/answers/join_examples.sql', 'application/sql', 5120, 7),
 (3, 'clarification.png', '/uploads/comments/clarification.png', 'image/png', 20480, 10);
 
-INSERT INTO question_votes (user_id, question_id, "value") VALUES 
+INSERT INTO question_votes (user_id, question_id, "value") VALUES
 (2, 1, 1),
 (4, 2, 1);
 
-INSERT INTO answer_votes (user_id, answer_id, "value") VALUES 
+INSERT INTO answer_votes (user_id, answer_id, "value") VALUES
 (1, 5, 1),
 (3, 6, 1),
 (4, 6, 1),
@@ -384,6 +396,11 @@ INSERT INTO answer_votes (user_id, answer_id, "value") VALUES
 
 INSERT INTO comment_votes (user_id, comment_id, "value") VALUES
 (3, 9, 1);
+
+-- ✅ ADDED: Sample data for message reactions
+INSERT INTO message_reactions (message_id, user_id, emoji) VALUES
+(12, 1, '👍'), -- Amine thumbs-up the professor's reply
+(13, 2, '❤️'); -- The professor loves Amine's follow-up question
 
 -- Notifications Data
 INSERT INTO notifications (recipient_id, actor_id, type, message, link, is_read, created_at) VALUES
@@ -399,6 +416,7 @@ INSERT INTO notifications (recipient_id, actor_id, type, message, link, is_read,
 
 -- =================================================================
 -- ✅ PART 3: SEQUENCE SYNCHRONIZATION
+-- This ensures the sequences are up-to-date after manual ID insertion.
 -- =================================================================
 SELECT setval('users_user_id_seq', (SELECT MAX(user_id) FROM users));
 SELECT setval('universities_university_id_seq', (SELECT MAX(university_id) FROM universities));

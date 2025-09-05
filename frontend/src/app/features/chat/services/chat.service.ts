@@ -64,4 +64,13 @@ export class ChatService {
   markAsRead(conversationId: number): Observable<void> {
     return this.http.post<void>(`${this.apiUrl}/chat/conversations/${conversationId}/read`, {});
   }
+
+  deleteMessage(messageId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/messages/${messageId}`);
+  }
+
+  toggleReaction(messageId: number, emoji: string): Observable<void> {
+    // The backend expects a simple JSON object with the emoji
+    return this.http.post<void>(`${this.apiUrl}/messages/${messageId}/reactions`, { emoji });
+  }
 }

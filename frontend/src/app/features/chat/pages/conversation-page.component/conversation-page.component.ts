@@ -20,13 +20,17 @@ import { NzSpinModule } from 'ng-zorro-antd/spin';
 import { NzAvatarModule } from 'ng-zorro-antd/avatar';
 import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
 import { ChatWidgetService } from '../../services/chat-widget.service';
+import { NzDropDownModule } from 'ng-zorro-antd/dropdown';
+import { NzModalModule, NzModalService } from 'ng-zorro-antd/modal';
+import { NzPopoverModule } from 'ng-zorro-antd/popover';
 
 @Component({
   selector: 'app-conversation-page',
   standalone: true,
   imports: [
     CommonModule, ReactiveFormsModule, RouterLink, TimeAgoPipe, NzUploadModule,
-    NzButtonModule, NzInputModule, NzIconModule, NzSpinModule, NzAvatarModule, NzToolTipModule
+    NzButtonModule, NzInputModule, NzIconModule, NzSpinModule, NzAvatarModule, NzToolTipModule,NzDropDownModule,
+    NzModalModule,NzPopoverModule
   ],
   templateUrl: './conversation-page.component.html',
   styleUrl: './conversation-page.component.scss',
@@ -37,6 +41,7 @@ export class ConversationPageComponent {
   conversation = input.required<Conversation>();
   private readonly chatService = inject(ChatService);
   private readonly authService = inject(AuthService);
+  private readonly modal = inject(NzModalService); // ✅ INJECT
   private readonly fb = inject(FormBuilder);
   readonly sanitizer = inject(DomSanitizer);
   private readonly chatWidgetService = inject(ChatWidgetService);
@@ -47,6 +52,7 @@ export class ConversationPageComponent {
   readonly fileList = signal<NzUploadFile[]>([]);
   readonly filesToUpload = signal<File[]>([]);
   readonly isSending = signal(false);
+  readonly availableReactions = ['👍', '❤️', '😂', '🎉', '😢', '😮'];
   messageForm: FormGroup;
   private wsSubscription?: Subscription;
   
@@ -339,5 +345,74 @@ export class ConversationPageComponent {
       });
     });
     this.pendingAttachments.clear();
+  }
+
+  deleteMessage(messageId: number): void {
+    this.chatService.deleteMessage(messageId).subscribe({
+      next: () => {
+        // The WebSocket update will handle the UI change, 
+        // but you could add an optimistic update here for instant feedback.
+        console.log(`Deletion request sent for message ${messageId}`);
+      },
+      error: (err) => {
+        console.error('Failed to delete message:', err);
+        // Optionally show a notification to the user
+      },
+    });
+  }
+  toggleReaction(message: ChatMessage, emoji: string): void {
+    if (!message.messageId || message.messageId < 0) return;
+
+    // We don't need to do anything in the 'next' block,
+    // as the WebSocket broadcast will update the state for all users at once.
+    this.chatService.toggleReaction(message.messageId, emoji).subscribe({
+      error: (err) => console.error('Failed to toggle reaction:', err),
+    });
+  
+  
+  }
+
+  openForwardModal(messageToForward: ChatMessage): void {
+    let selectedConversationIds: number[] = [];
+    const conversations = this.chatWidgetService.conversations();
+    const checkboxOptions = conversations.map(c => ({
+      label: c.participantName,
+      value: c.conversationId,
+      checked: false
+    }));
+
+    this.modal.create({
+      nzTitle: 'Forward message to...',
+      nzContent: `
+        <p class="forward-preview">
+          <strong>Message:</strong><br>
+          <em>${messageToForward.content}</em>
+        </p>
+        <nz-checkbox-group [(ngModel)]="checkboxOptions"></nz-checkbox-group>
+      `,
+      nzOnOk: () => this.forwardMessage(messageToForward, checkboxOptions)
+    });
+  }
+
+  private forwardMessage(
+    originalMessage: ChatMessage,
+    options: { label: string; value: number; checked: boolean }[]
+  ): void {
+    const selectedIds = options.filter(opt => opt.checked).map(opt => opt.value);
+    
+    if (selectedIds.length === 0) {
+      return; // Or show a message
+    }
+
+    const formattedContent = `----------\nForwarded Message:\n${originalMessage.content}\n----------`;
+
+    selectedIds.forEach(conversationId => {
+      // NOTE: We pass an empty array for files, as we are only forwarding text.
+      this.chatService.sendMessage(conversationId, formattedContent, [], Date.now() * -1)
+        .subscribe({
+          next: () => console.log(`Message forwarded to conversation ${conversationId}`),
+          error: (err) => console.error(`Failed to forward to ${conversationId}`, err)
+        });
+    });
   }
 }

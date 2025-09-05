@@ -9,8 +9,16 @@ export interface ChatMessage {
   sentAt: string;
   attachments: Attachment[];
   status?: 'sending' | 'sent' | 'error';
-}
+  isDeleted?: boolean; // ✅ ADD THIS
+  reactions?: Reaction[]; // ✅ ADD THIS
 
+}
+export interface Reaction {
+  emoji: string;
+  count: number;
+  users: string[];
+  reactedByCurrentUser: boolean;
+}
 export interface Attachment {
   fileUrl: string | SafeUrl;
   fileName: string;

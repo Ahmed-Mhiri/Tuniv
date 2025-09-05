@@ -16,4 +16,7 @@ public class ChatMessageDto {
     private String senderUsername;
     private String sentAt;
     private List<AttachmentDto> attachments;
+    private boolean isDeleted; // ✅ ADD THIS
+    private List<ReactionDto> reactions; // ✅ ADD THIS
+
 }

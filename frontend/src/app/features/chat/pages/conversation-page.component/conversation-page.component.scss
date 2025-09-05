@@ -9,7 +9,7 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  background-color: var(--color-background);
+  background-color: #f5f7fa; // Lighter background for the chat area
   overflow: hidden;
 }
 
@@ -19,7 +19,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background: rgba(0, 0, 0, 0.1);
+  background: rgba(255, 255, 255, 0.7);
   z-index: 10;
 }
 
@@ -27,70 +27,82 @@
   flex-grow: 1;
   overflow-y: auto;
   padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
 .message-wrapper {
   display: flex;
-  max-width: 70%;
+  max-width: 75%;
+  margin-bottom: 10px;
+  align-items: flex-end;
+  gap: 8px;
 
   &.is-mine {
     align-self: flex-end;
+    flex-direction: row-reverse;
+
     .message-bubble {
-      background-color: var(--color-primary);
-      border-color: var(--color-primary-hover);
-      * {
-        color: var(--color-on-primary) !important;
-      }
-      
-      /* --- MODIFICATION START --- */
-      /* Add specific overrides for attachments within your own messages */
-      .attachment-item {
-        background-color: rgba(255, 255, 255, 0.15);
-        border-color: rgba(255, 255, 255, 0.3);
+      background-color: #1890ff;
+      color: #fff;
+      border-radius: 18px 18px 4px 18px;
+    }
 
-        &:hover {
-          background-color: rgba(255, 255, 255, 0.25);
-        }
+    .sender-name, .timestamp {
+      color: #f0f0f0;
+    }
 
-        /* Ensure the icon and text are always clearly visible */
-        .file-icon, .file-name {
-          color: var(--color-on-primary) !important;
-          opacity: 0.9;
-        }
+    .attachment-item {
+      background-color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.3);
+
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.25);
       }
-      /* --- MODIFICATION END --- */
     }
   }
 }
 
+// ✅ ADDED: Styles for the hover action buttons
+.message-actions {
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+
+  .message-wrapper:hover & {
+    opacity: 1;
+  }
+}
+
 .message-bubble {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 18px;
+  background-color: #fff;
+  border-radius: 18px 18px 18px 4px;
   padding: 0.75rem 1rem;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 
   .sender-name {
-    font-weight: 700;
-    font-size: 0.875rem;
-    margin-bottom: 0.25rem;
-    color: var(--color-text-primary);
+    font-weight: 600;
+    font-size: 0.8rem;
+    margin-bottom: 4px;
+    color: #555;
   }
   .message-content {
     margin: 0;
     white-space: pre-wrap;
     word-break: break-word;
-    color: var(--color-text-primary);
+    color: #333;
   }
   .timestamp {
-    font-size: 0.75rem;
-    color: var(--color-text-secondary);
+    font-size: 0.7rem;
+    color: #999;
     text-align: right;
-    margin-top: 0.5rem;
+    margin-top: 8px;
     opacity: 0.8;
   }
+}
+
+// ✅ ADDED: Style for deleted message placeholder
+.deleted-message {
+  color: #888;
+  font-style: italic;
 }
 
 .attachments {
@@ -104,50 +116,84 @@
   display: inline-flex;
   align-items: center;
   gap: 0.75rem;
-  background-color: var(--color-surface-subtle);
+  background-color: #f0f2f5;
   padding: 0.5rem;
   border-radius: 6px;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-primary);
+  border: 1px solid #e8e8e8;
+  color: #333;
   text-decoration: none;
   max-width: 250px;
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: var(--color-border);
+    background-color: #e9eef5;
   }
 
   .file-icon {
     font-size: 1.5rem;
-    color: var(--color-text-secondary);
-    flex-shrink: 0; /* Prevent icon from shrinking */
+    color: #888;
   }
   .file-name {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    /* --- MODIFICATION START --- */
-    /* Give the filename a default color for better consistency */
-    color: var(--color-text-primary);
-    flex-grow: 1; /* Allow filename to take available space */
-    /* --- MODIFICATION END --- */
   }
   .img-preview {
-    width: 100%;
     max-width: 200px;
     height: auto;
-    object-fit: cover;
     border-radius: 4px;
-    display: block;
   }
 }
 
+// ✅ ADDED: Styles for the reactions display
+.reactions-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+
+  button {
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+    border-radius: 12px;
+    background-color: #f0f2f5;
+    border: 1px solid #d9d9d9;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+      border-color: #1890ff;
+    }
+
+    &.reacted-by-me {
+      background-color: #e6f7ff;
+      border-color: #91d5ff;
+      color: #1890ff;
+    }
+  }
+}
+
+// ✅ ADDED: Styles for the emoji picker in the popover
+.emoji-picker {
+  display: flex;
+  gap: 4px;
+  button {
+    font-size: 20px;
+    padding: 4px;
+    line-height: 1;
+    &:hover {
+      background-color: #f0f2f5;
+    }
+  }
+}
+
+
 .message-input-area {
   flex-shrink: 0;
-  padding: 0.75rem;
-  background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  padding: 0.75rem 1rem;
+  background-color: #ffffff;
+  border-top: 1px solid #e8e8e8;
 }
 
 .file-preview-list {
@@ -155,32 +201,28 @@
   flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
-  padding: 0.5rem;
-  background-color: var(--color-background);
-  border-radius: 6px;
 
   .file-item {
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
     padding: 0.25rem 0.5rem;
-    background-color: var(--color-surface-subtle);
+    background-color: #f0f2f5;
     border-radius: 4px;
     font-size: 0.8rem;
-    border: 1px solid var(--color-border);
+    border: 1px solid #e8e8e8;
   }
 }
 
 .input-form {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.75rem;
   textarea {
     resize: none;
   }
 }
 
-.sending-indicator {
+.sending-indicator, .error-indicator {
   margin-right: 5px;
-  color: var(--ant-text-color-secondary);
 }

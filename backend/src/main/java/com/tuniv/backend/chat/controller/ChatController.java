@@ -10,6 +10,7 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.tuniv.backend.chat.dto.ChatMessageDto;
 import com.tuniv.backend.chat.dto.ConversationSummaryDto;
+import com.tuniv.backend.chat.dto.ReactionRequestDto;
 import com.tuniv.backend.chat.dto.StartConversationRequestDto;
 import com.tuniv.backend.chat.mapper.ChatMapper;
 import com.tuniv.backend.chat.model.Message;
@@ -46,22 +48,23 @@ public class ChatController {
 
     // REST endpoint for sending a message with optional files
     @PostMapping(value = "/api/v1/chat/{conversationId}/message", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
-    public ResponseEntity<ChatMessageDto> sendMessageWithAttachment(
-            @PathVariable Integer conversationId,
-            @RequestPart("message") @Valid ChatMessageDto chatMessageDto,
-            @RequestPart(value = "files", required = false) List<MultipartFile> files
-    ) {
-        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        Message finalMessage = chatService.sendMessage(conversationId, chatMessageDto, currentUser.getUsername(), files);
+public ResponseEntity<ChatMessageDto> sendMessageWithAttachment(
+        @PathVariable Integer conversationId,
+        @RequestPart("message") @Valid ChatMessageDto chatMessageDto,
+        @RequestPart(value = "files", required = false) List<MultipartFile> files
+) {
+    UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    Message finalMessage = chatService.sendMessage(conversationId, chatMessageDto, currentUser.getUsername(), files);
 
-        // ================== THIS IS THE FIX ==================
-        // The HTTP response also needs to include the clientTempId for the Stage 2 update.
-        // You were calling the old mapper method with only one argument.
-        ChatMessageDto responseDto = ChatMapper.toChatMessageDto(finalMessage, chatMessageDto.getClientTempId());
-        // ======================================================
-        
-        return ResponseEntity.ok(responseDto);
-    }
+    // ✅ FIX: Provide all required arguments: Message, Username, and clientTempId
+    ChatMessageDto responseDto = ChatMapper.toChatMessageDto(
+        finalMessage, 
+        currentUser.getUsername(), // The missing String argument
+        chatMessageDto.getClientTempId()
+    );
+    
+    return ResponseEntity.ok(responseDto);
+}
 
     // --- All other methods below are correct and do not need changes ---
 
@@ -105,4 +108,22 @@ public class ChatController {
         chatService.markConversationAsRead(conversationId, currentUser.getUsername());
         return ResponseEntity.ok().build();
     }
+
+    @DeleteMapping("/api/v1/messages/{messageId}")
+    public ResponseEntity<Void> deleteMessage(@PathVariable Integer messageId) {
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        chatService.deleteMessage(messageId, currentUser.getUsername());
+        return ResponseEntity.noContent().build();
+    }
+    @PostMapping("/api/v1/messages/{messageId}/reactions")
+public ResponseEntity<Void> toggleReaction(
+        @PathVariable Integer messageId,
+        // ✅ Use the new DTO
+        @RequestBody ReactionRequestDto reactionRequest
+) {
+    UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    // You can now add validation (e.g., @NotNull) to the DTO
+    chatService.toggleReaction(messageId, reactionRequest.getEmoji(), currentUser.getUsername());
+    return ResponseEntity.ok().build();
+}
 }

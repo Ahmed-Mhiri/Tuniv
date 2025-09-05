@@ -101,7 +101,7 @@ export class NotificationService {
 
   markAllAsRead(): void {
     // ✅ FIX: Use the correct API endpoint from our backend implementation
-    this.http.post(`${this.apiUrl}/read-all`, {}).pipe(
+    this.http.post(`${this.apiUrl}/mark-all-read`, {}).pipe(
       tap(() => {
         this._notifications.update(list => 
           list.map(n => n.isRead ? n : { ...n, isRead: true })

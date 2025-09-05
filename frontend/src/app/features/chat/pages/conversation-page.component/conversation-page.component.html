@@ -8,24 +8,81 @@
   <div class="message-container" #messageContainer>
     @for (msg of messages(); track msg.messageId) {
       <div class="message-wrapper" [class.is-mine]="msg.senderUsername === currentUser()?.username">
+
+        @if (!msg.isDeleted && msg.messageId > 0) {
+          <div class="message-actions">
+            <button
+              nz-button nzType="text" nzShape="circle"
+              nz-popover
+              [nzPopoverContent]="emojiPicker"
+              [nzPopoverContentContext]="{ $implicit: msg }"
+              nzPopoverTrigger="click"
+              nzPopoverPlacement="top"
+              aria-label="Add reaction"
+            >
+              <span nz-icon nzType="smile" nzTheme="outline"></span>
+            </button>
+
+            <button
+              nz-button nzType="text" nzShape="circle"
+              nz-dropdown [nzDropdownMenu]="menu"
+              aria-label="More options"
+            >
+              <span nz-icon nzType="ellipsis" nzTheme="outline"></span>
+            </button>
+            <nz-dropdown-menu #menu="nzDropdownMenu">
+              <ul nz-menu>
+                @if (msg.senderUsername === currentUser()?.username) {
+                  <li nz-menu-item (click)="deleteMessage(msg.messageId)">Delete</li>
+                }
+                @if (msg.content) {
+                  <li nz-menu-item (click)="openForwardModal(msg)">Forward</li>
+                }
+              </ul>
+            </nz-dropdown-menu>
+          </div>
+        }
+
         <div class="message-bubble">
           <div class="sender-name">{{ msg.senderUsername }}</div>
 
-          @if (msg.content) {
-            <p class="message-content" [innerHTML]="sanitizer.bypassSecurityTrustHtml(msg.content)"></p>
+          @if (msg.isDeleted) {
+            <p class="message-content deleted-message">
+              <i>This message was deleted.</i>
+            </p>
+          } @else {
+            @if (msg.content) {
+              <p class="message-content" [innerHTML]="sanitizer.bypassSecurityTrustHtml(msg.content)"></p>
+            }
+
+            @if (msg.attachments && msg.attachments.length > 0) {
+              <div class="attachments">
+                @for (att of msg.attachments; track $index) {
+                  <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
+                    @if (att.fileType.startsWith('image/')) {
+                      <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
+                    } @else {
+                      <span nz-icon nzType="file-text" class="file-icon"></span>
+                      <span class="file-name">{{ att.fileName }}</span>
+                    }
+                  </a>
+                }
+              </div>
+            }
           }
 
-          @if (msg.attachments && msg.attachments.length > 0) {
-            <div class="attachments">
-              @for (att of msg.attachments; track $index) {
-                <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
-                  @if (att.fileType.startsWith('image/')) {
-                    <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
-                  } @else {
-                    <span nz-icon nzType="file-text" class="file-icon"></span>
-                    <span class="file-name">{{ att.fileName }}</span>
-                  }
-                </a>
+          @if (msg.reactions && msg.reactions.length > 0) {
+            <div class="reactions-container">
+              @for (reaction of msg.reactions; track reaction.emoji) {
+                <button
+                  nz-button
+                  nz-tooltip
+                  [nzTooltipTitle]="reaction.users.join(', ')"
+                  [class.reacted-by-me]="reaction.reactedByCurrentUser"
+                  (click)="toggleReaction(msg, reaction.emoji)"
+                >
+                  {{ reaction.emoji }} {{ reaction.count }}
+                </button>
               }
             </div>
           }
@@ -57,7 +114,7 @@
         }
       </div>
     }
-    
+
     <form class="input-form" [formGroup]="messageForm" (ngSubmit)="sendMessage()">
       <nz-upload [nzFileList]="fileList()" [nzBeforeUpload]="beforeUpload" [nzShowUploadList]="false">
         <button nz-button nzType="text" nzShape="circle" type="button" class="attach-btn" nz-tooltip="Attach files">
@@ -77,3 +134,11 @@
     </form>
   </div>
 </div>
+
+<ng-template #emojiPicker let-message>
+  <div class="emoji-picker">
+    @for (emoji of availableReactions; track emoji) {
+      <button nz-button nzType="text" (click)="toggleReaction(message, emoji)">{{ emoji }}</button>
+    }
+  </div>
+</ng-template>
