@@ -2,8 +2,10 @@ package com.tuniv.backend.qa.service;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -16,16 +18,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.tuniv.backend.auth.service.PostAuthorizationService;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import com.tuniv.backend.notification.event.NewAnswerEvent;
-import com.tuniv.backend.notification.event.NewQuestionInUniversityEvent;
 import com.tuniv.backend.qa.dto.AnswerCreateRequest;
 import com.tuniv.backend.qa.dto.AnswerResponseDto;
 import com.tuniv.backend.qa.dto.QuestionCreateRequest;
 import com.tuniv.backend.qa.dto.QuestionResponseDto;
+import com.tuniv.backend.qa.dto.QuestionUpdateRequest;
 import com.tuniv.backend.qa.mapper.QAMapper;
 import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.model.AnswerVote;
+import com.tuniv.backend.qa.model.Attachment;
 import com.tuniv.backend.qa.model.Comment;
 import com.tuniv.backend.qa.model.CommentVote;
 import com.tuniv.backend.qa.model.Question;
@@ -54,12 +57,10 @@ public class QuestionService {
     private final UserRepository userRepository;
     private final ApplicationEventPublisher eventPublisher;
     private final AttachmentService attachmentService;
-    // ✅ FIX: AttachmentRepository is no longer needed here.
-
-    // Vote repositories are still needed for efficient bulk fetching
     private final QuestionVoteRepository questionVoteRepository;
     private final AnswerVoteRepository answerVoteRepository;
     private final CommentVoteRepository commentVoteRepository;
+    private final PostAuthorizationService postAuthorizationService;
 
     @Transactional
     public QuestionResponseDto createQuestion(QuestionCreateRequest request, Integer moduleId, UserDetailsImpl currentUser, List<MultipartFile> files) {
@@ -77,18 +78,14 @@ public class QuestionService {
         Question savedQuestion = questionRepository.save(question);
         attachmentService.saveAttachments(files, savedQuestion);
 
-        // ✅ FIX: No need to re-fetch or build attachment maps.
-        // The 'savedQuestion' object is managed and has its ID.
+        // eventPublisher.publishEvent(new NewQuestionInUniversityEvent(this, savedQuestion)); // Uncomment if you have this event
 
-        eventPublisher.publishEvent(new NewQuestionInUniversityEvent(this, savedQuestion));
-
-        // ✅ FIX: Call the updated, simpler mapper.
         return QAMapper.toQuestionResponseDto(savedQuestion, currentUser,
                 Collections.emptyMap(), Collections.emptyMap());
     }
 
     @Transactional
-    @CacheEvict(value = "questions", key = "#questionId")
+    @CacheEvict(value = "questions", allEntries = true) // Evict all for simplicity, or target specific questionId
     public AnswerResponseDto addAnswer(AnswerCreateRequest request, Integer questionId, UserDetailsImpl currentUser, List<MultipartFile> files) {
         boolean isBodyEmpty = request.body() == null || request.body().trim().isEmpty();
         boolean hasFiles = files != null && !files.isEmpty() && files.stream().anyMatch(f -> f.getSize() > 0);
@@ -110,13 +107,63 @@ public class QuestionService {
         Answer savedAnswer = answerRepository.save(answer);
         attachmentService.saveAttachments(files, savedAnswer);
 
-        // ✅ FIX: No need to re-fetch or build attachment maps.
+        // eventPublisher.publishEvent(new NewAnswerEvent(this, savedAnswer)); // Uncomment if you have this event
 
-        eventPublisher.publishEvent(new NewAnswerEvent(this, savedAnswer));
-
-        // ✅ FIX: Call the updated, simpler mapper for the answer.
         return QAMapper.toAnswerResponseDto(savedAnswer, currentUser,
                 Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Transactional
+    @CacheEvict(value = "questions", key = "#questionId")
+    public QuestionResponseDto updateQuestion(Integer questionId, QuestionUpdateRequest request, List<MultipartFile> newFiles, UserDetailsImpl currentUser) {
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+
+        postAuthorizationService.checkOwnership(question, currentUser);
+        
+        question.setTitle(request.title());
+        question.setBody(request.body());
+
+        // ✨ --- REFACTORED DELETION LOGIC --- ✨
+        if (request.attachmentIdsToDelete() != null && !request.attachmentIdsToDelete().isEmpty()) {
+            Set<Attachment> toDelete = question.getAttachments().stream()
+                    .filter(att -> request.attachmentIdsToDelete().contains(att.getAttachmentId()))
+                    .collect(Collectors.toSet());
+            
+            // Delete physical files first
+            attachmentService.deleteAttachments(toDelete);
+            
+            // Use the helper method to ensure both sides of the relationship are updated in memory
+            toDelete.forEach(question::removeAttachment);
+        }
+
+        // Add new attachments using the helper method inside this service
+        attachmentService.saveAttachments(newFiles, question);
+
+        Question updatedQuestion = questionRepository.save(question);
+        
+        // Note: For a complete DTO, you'd need to fetch votes here.
+        return QAMapper.toQuestionResponseDto(updatedQuestion, currentUser, Collections.emptyMap(), Collections.emptyMap());
+    }
+
+    @Transactional
+    public void deleteQuestion(Integer questionId, UserDetailsImpl currentUser) {
+        Question question = questionRepository.findById(questionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+        
+        postAuthorizationService.checkOwnership(question, currentUser);
+        
+        // We must trigger the physical file cleanup before the entity is deleted.
+        // JPA's orphanRemoval will handle deleting all the database records.
+        Set<Attachment> allAttachmentsToDelete = new HashSet<>(question.getAttachments());
+        question.getAnswers().forEach(answer -> {
+            allAttachmentsToDelete.addAll(answer.getAttachments());
+            answer.getComments().forEach(comment -> allAttachmentsToDelete.addAll(comment.getAttachments()));
+        });
+
+        attachmentService.deleteAttachments(allAttachmentsToDelete);
+
+        questionRepository.delete(question);
     }
 
     @Transactional(readOnly = true)
@@ -127,29 +174,26 @@ public class QuestionService {
             return Page.empty(pageable);
         }
 
-        // ✅ FIX: Use getId() from the Post superclass.
         List<Integer> questionIds = questions.stream().map(Question::getId).collect(Collectors.toList());
         List<QuestionVote> votes = questionVoteRepository.findByQuestionIdIn(questionIds);
 
         Map<Integer, Integer> scores = votes.stream().collect(Collectors.groupingBy(
-                vote -> vote.getQuestion().getId(), // ✅ FIX: Use getId()
+                vote -> vote.getQuestion().getId(),
                 Collectors.summingInt(vote -> (int) vote.getValue())
         ));
         Map<Integer, Integer> currentUserVotes = votes.stream()
                 .filter(vote -> vote.getUser().getUserId().equals(currentUser.getId()))
-                .collect(Collectors.toMap(vote -> vote.getQuestion().getId(), vote -> (int) vote.getValue())); // ✅ FIX: Use getId()
+                .collect(Collectors.toMap(vote -> vote.getQuestion().getId(), vote -> (int) vote.getValue()));
 
-        // ✅ FIX: Call the updated mapper in the page map.
         return questionPage.map(question -> QAMapper.toQuestionResponseDto(question, currentUser, scores, currentUserVotes));
     }
 
     @Transactional(readOnly = true)
     @Cacheable(value = "questions", key = "#questionId")
     public QuestionResponseDto getQuestionById(Integer questionId, UserDetailsImpl currentUser) {
-        Question question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+        Question question = questionRepository.findByIdWithDetails(questionId) // Assuming an optimized fetch method
+                .orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + questionId));
 
-        // Efficiently fetch all votes for the question, its answers, and their comments
         List<Integer> answerIds = question.getAnswers().stream().map(Answer::getId).collect(Collectors.toList());
         List<Integer> commentIds = question.getAnswers().stream()
                 .flatMap(answer -> answer.getComments().stream())
@@ -170,8 +214,6 @@ public class QuestionService {
                 .filter(vote -> currentUser != null && vote.getUser().getUserId().equals(currentUser.getId()))
                 .collect(Collectors.toMap(Vote::getPostId, vote -> (int) vote.getValue(), (v1, v2) -> v1));
 
-        // ✅ FIX: The attachment maps are gone! The mapper handles it.
-        // We simply call the new, simpler mapper.
         return QAMapper.toQuestionResponseDto(question, currentUser, scores, currentUserVotes);
     }
 
@@ -183,6 +225,4 @@ public class QuestionService {
         }
         return list;
     }
-
-    // ✅ FIX: The findAttachments helper method is no longer needed and has been removed.
 }

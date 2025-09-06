@@ -123,6 +123,7 @@ public final class QAMapper {
     public static AttachmentDto toAttachmentDto(Attachment attachment) {
         if (attachment == null) return null;
         return new AttachmentDto(
+                attachment.getAttachmentId(),
                 attachment.getFileName(),
                 attachment.getFileUrl(),
                 attachment.getFileType()

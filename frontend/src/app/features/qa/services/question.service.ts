@@ -9,7 +9,8 @@ import {
   AnswerCreateRequest, 
   Question, 
   QuestionCreateRequest, 
-  QuestionResponseDto 
+  QuestionResponseDto, 
+  QuestionUpdateRequest
 } from '../../../shared/models/qa.model';
 import { Page } from '../../../shared/models/pagination.model';
 
@@ -82,5 +83,22 @@ export class QuestionService {
       .set('size', size.toString());
 
     return this.http.get<Page<Question>>(`${this.apiUrl}/questions/search`, { params });
+  }
+
+  updateQuestion(
+    questionId: number,
+    request: QuestionUpdateRequest,
+    files: File[]
+  ): Observable<Question> {
+    const formData = new FormData();
+    formData.append('question', new Blob([JSON.stringify(request)], { type: 'application/json' }));
+    files.forEach(file => formData.append('files', file, file.name));
+
+    return this.http.put<Question>(`${this.apiUrl}/questions/${questionId}`, formData);
+  }
+
+  // ✨ --- NEW: DELETE A QUESTION --- ✨
+  deleteQuestion(questionId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/questions/${questionId}`);
   }
 }

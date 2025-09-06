@@ -1,6 +1,7 @@
 package com.tuniv.backend.qa.model;
 
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -39,10 +40,32 @@ public class Attachment {
     @Column(name = "uploaded_at")
     private LocalDateTime uploadedAt = LocalDateTime.now();
     
-    // ✅ THE CORE FIX: A single, type-safe relationship to the Post base class.
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "post_id", nullable = false)
     private Post post;
     
-    // ❌ The old postId and postType fields are REMOVED.
+    // ✨ --- THE PERSISTENT FIX: Implement equals() and hashCode() --- ✨
+    // This provides a stable way for Hibernate and Java Sets to manage attachments.
+
+    @Override
+    public boolean equals(Object o) {
+        // 1. Check if it's the exact same object in memory
+        if (this == o) return true;
+        
+        // 2. Check if the other object is null or of a different class
+        if (o == null || getClass() != o.getClass()) return false;
+        
+        // 3. Cast the object to an Attachment
+        Attachment that = (Attachment) o;
+        
+        // 4. Compare by the unique ID. If attachmentId is null, they are not equal.
+        return this.attachmentId != null && Objects.equals(this.attachmentId, that.attachmentId);
+    }
+
+    @Override
+    public int hashCode() {
+        // 5. Generate a hash code based on the class and the ID.
+        // Using getClass() ensures that subclasses are not considered equal.
+        return Objects.hash(getClass(), this.attachmentId);
+    }
 }

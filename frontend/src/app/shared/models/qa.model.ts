@@ -9,6 +9,7 @@ export interface Author {
 
 // Represents an uploaded file attachment.
 export interface Attachment {
+  attachmentId: number; // ✨ ADD THIS ID
   fileName: string;
   fileUrl: string;
   fileType: string;
@@ -81,3 +82,19 @@ export interface VoteRequest {
 
 // The response for a created question is the full question object.
 export type QuestionResponseDto = Question;
+
+export interface QuestionUpdateRequest {
+  title: string;
+  body: string;
+  attachmentIdsToDelete?: number[];
+}
+
+export interface AnswerUpdateRequest {
+  body: string;
+  attachmentIdsToDelete?: number[];
+}
+
+export interface CommentUpdateRequest {
+  body: string;
+  attachmentIdsToDelete?: number[];
+}

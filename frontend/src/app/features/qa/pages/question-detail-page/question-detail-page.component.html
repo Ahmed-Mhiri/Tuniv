@@ -5,46 +5,73 @@
         <app-spinner></app-spinner>
       </div>
     } @else if (question(); as q) {
-      <div class="question-container">
-        <div class="question-header">
-          <h1 nz-typography class="question-title">{{ q.title }}</h1>
-          <div class="meta-info">
-            <span>Asked {{ q.createdAt | timeAgo }} by </span>
-            <a [routerLink]="['/users', q.author.userId]" class="author-link">{{ q.author.username }}</a>
-          </div>
+      
+      @if (isEditing()) {
+        <div class="question-container">
+          <app-post-edit-form
+            [initialTitle]="q.title"
+            [initialBody]="q.body"
+            [initialAttachments]="q.attachments"
+            postType="Question"
+            (save)="handleSave($event)"
+            (cancel)="isEditing.set(false)"
+          ></app-post-edit-form>
         </div>
-        <nz-divider></nz-divider>
-        <div class="question-body-wrapper">
-          <div class="vote-container">
-            <app-vote
-              [score]="q.score"
-              [userVote]="q.currentUserVote"
-              (vote)="handleQuestionVote($event)"
-            ></app-vote>
-          </div>
-          <div class="content-container prose dark:prose-invert max-w-none" [innerHTML]="q.body"></div>
-        </div>
-</div>
 
-@if (q.attachments && q.attachments.length > 0) {
-  <div class="attachments-section">
-    <h4 class="attachments-title">Attachments</h4>
-    <div class="attachments-list">
-      @for (att of q.attachments; track att.fileUrl) {
-        <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
-          @if (att.fileType.startsWith('image/')) {
-            <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
-          } @else {
-            <span nz-icon nzType="file-text" class="file-icon"></span>
-            <span class="file-name">{{ att.fileName }}</span>
-          }
-        </a>
+      } @else {
+        <div class="question-container">
+          <div class="question-header">
+            <div>
+              <h1 nz-typography class="question-title">{{ q.title }}</h1>
+              <div class="meta-info">
+                <span>Asked {{ q.createdAt | timeAgo }} by </span>
+                <a [routerLink]="['/users', q.author.userId]" class="author-link">{{ q.author.username }}</a>
+              </div>
+            </div>
+
+            @if (isCurrentUserQuestionAuthor()) {
+              <div class="header-actions">
+                <button nz-button nzType="text" class="action-button" (click)="isEditing.set(true)">
+                  <span nz-icon nzType="edit"></span> Edit
+                </button>
+                <button nz-button nzType="text" nzDanger class="action-button" (click)="deleteQuestion()">
+                  <span nz-icon nzType="delete"></span> Delete
+                </button>
+              </div>
+            }
+          </div>
+          <nz-divider></nz-divider>
+          <div class="question-body-wrapper">
+            <div class="vote-container">
+              <app-vote
+                [score]="q.score"
+                [userVote]="q.currentUserVote"
+                (vote)="handleQuestionVote($event)"
+              ></app-vote>
+            </div>
+            <div class="content-container prose dark:prose-invert max-w-none" [innerHTML]="q.body"></div>
+          </div>
+        </div>
+
+        @if (q.attachments && q.attachments.length > 0) {
+          <div class="attachments-section">
+            <h4 class="attachments-title">Attachments</h4>
+            <div class="attachments-list">
+              @for (att of q.attachments; track att.fileUrl) {
+                <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
+                  @if (att.fileType.startsWith('image/')) {
+                    <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
+                  } @else {
+                    <span nz-icon nzType="file-text" class="file-icon"></span>
+                    <span class="file-name">{{ att.fileName }}</span>
+                  }
+                </a>
+              }
+            </div>
+          </div>
+        }
       }
-    </div>
-  </div>
-}
-
-<nz-divider></nz-divider>      
+      <nz-divider></nz-divider>
 
       <div class="answers-container">
         @if (authService.isUserLoggedIn()) {
@@ -79,7 +106,10 @@
         </div>
       </div>
     } @else {
-      }
+      <div class="status-container">
+          <nz-empty nzNotFoundContent="Question not found or you do not have permission to view it."></nz-empty>
+      </div>
+    }
   </div>
 
   <div class="sidebar-col">

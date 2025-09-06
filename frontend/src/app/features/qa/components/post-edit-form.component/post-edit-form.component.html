@@ -1,0 +1,62 @@
+<form [formGroup]="editForm" (ngSubmit)="onSave()">
+  @if (postType() === 'Question') {
+    <nz-form-item>
+      <nz-form-control nzErrorTip="Title is required and must be at least 10 characters.">
+        <input nz-input formControlName="title" placeholder="Question Title" />
+      </nz-form-control>
+    </nz-form-item>
+  }
+
+  <nz-form-item>
+    <nz-form-control [nzErrorTip]="bodyErrorTpl">
+      <textarea nz-input formControlName="body" [nzAutosize]="{ minRows: 6, maxRows: 15 }"></textarea>
+    </nz-form-control>
+    
+    <ng-template #bodyErrorTpl>
+      @if (editForm.hasError('atLeastOneRequired')) {
+        You must provide a message or attach a file.
+      } @else if (editForm.hasError('bodyTooShort')) {
+        {{ bodyErrorTip() }}
+      }
+    </ng-template>
+  </nz-form-item>
+
+  @if (existingAttachments().length > 0) {
+    <div class="attachment-section">
+      <p class="attachment-title">Existing Attachments:</p>
+      <div class="file-list-preview">
+        @for (att of existingAttachments(); track att.attachmentId) {
+          <div class="file-item">
+            <span nz-icon nzType="file-text"></span>
+            <span>{{ att.fileName }}</span>
+            <button nz-button nzType="text" nzShape="circle" type="button" (click)="deleteExistingAttachment(att.attachmentId)" aria-label="Remove existing attachment">
+              <span nz-icon nzType="close"></span>
+            </button>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <nz-upload [nzFileList]="newFileList()" [nzShowUploadList]="false" [nzMultiple]="true" [nzBeforeUpload]="beforeUpload">
+    <button nz-button type="button"><span nz-icon nzType="paper-clip"></span> Add Attachments</button>
+  </nz-upload>
+
+  @if (newFileList().length > 0) {
+    <div class="file-list-preview mt-2">
+      @for (file of newFileList(); track file.uid) {
+        <div class="file-item">
+          <span>{{ file.name }}</span>
+          <button nz-button nzType="text" nzShape="circle" type="button" (click)="removeNewFile(file)" aria-label="Remove new attachment">
+            <span nz-icon nzType="close"></span>
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <div class="form-actions">
+    <button nz-button type="button" (click)="cancel.emit()" class="mr-2">Cancel</button>
+    <button nz-button nzType="primary" [disabled]="editForm.invalid">Save Changes</button>
+  </div>
+</form>

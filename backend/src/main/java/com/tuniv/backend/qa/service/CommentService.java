@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.cache.annotation.CacheEvict;
@@ -12,12 +13,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.tuniv.backend.auth.service.PostAuthorizationService;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import com.tuniv.backend.notification.event.NewCommentEvent;
-import com.tuniv.backend.qa.dto.CommentCreateRequest; // <-- IMPORT ADDED
-import com.tuniv.backend.qa.dto.CommentResponseDto;
+import com.tuniv.backend.qa.dto.CommentCreateRequest;
+import com.tuniv.backend.qa.dto.CommentResponseDto; // <-- IMPORT ADDED
+import com.tuniv.backend.qa.dto.CommentUpdateRequest;
 import com.tuniv.backend.qa.mapper.QAMapper;
 import com.tuniv.backend.qa.model.Answer;
+import com.tuniv.backend.qa.model.Attachment;
 import com.tuniv.backend.qa.model.Comment;
 import com.tuniv.backend.qa.model.CommentVote;
 import com.tuniv.backend.qa.repository.AnswerRepository;
@@ -38,8 +41,8 @@ public class CommentService {
     private final AnswerRepository answerRepository;
     private final UserRepository userRepository;
     private final AttachmentService attachmentService;
-    // ✅ FIX: AttachmentRepository is no longer needed here.
     private final ApplicationEventPublisher eventPublisher;
+    private final PostAuthorizationService postAuthorizationService;
 
     @Transactional
     @CacheEvict(value = "questions", allEntries = true)
@@ -59,7 +62,7 @@ public class CommentService {
         User author = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Answer answer = answerRepository.findById(answerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Answer not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Answer not found with id: " + answerId));
 
         Comment comment = new Comment();
         comment.setBody(request.body());
@@ -75,12 +78,8 @@ public class CommentService {
         Comment savedComment = commentRepository.save(comment);
         attachmentService.saveAttachments(files, savedComment);
 
-        // ✅ FIX: No need to re-fetch the comment or manually build attachment maps.
-        // The 'savedComment' object is sufficient.
-        
-        eventPublisher.publishEvent(new NewCommentEvent(this, savedComment));
+        // eventPublisher.publishEvent(new NewCommentEvent(this, savedComment)); // Uncomment if you have this event
 
-        // ✅ FIX: Call the updated, simpler mapper with empty vote maps for the new comment.
         return QAMapper.toCommentResponseDto(savedComment, currentUser, Collections.emptyMap(), Collections.emptyMap());
     }
 
@@ -96,35 +95,74 @@ public class CommentService {
             return Collections.emptyList();
         }
 
-        // Collect all comment IDs (including children) for bulk fetching votes
         List<Integer> allCommentIds = topLevelComments.stream()
                 .flatMap(comment -> flattenComments(comment).stream())
-                .map(Comment::getId) // ✅ FIX: Use getId()
+                .map(Comment::getId)
                 .collect(Collectors.toList());
         
-        // ✅ FIX: The manual fetching of attachments is no longer needed. It's handled by JPA's relationships.
+        List<CommentVote> votes = allCommentIds.isEmpty() ? Collections.emptyList() : commentVoteRepository.findByCommentIdIn(allCommentIds);
 
-        // Fetch all votes for these comments in a single query
-List<CommentVote> votes = allCommentIds.isEmpty() ? Collections.emptyList() : commentVoteRepository.findByCommentIdIn(allCommentIds);
-
-        // Process votes into maps
         Map<Integer, Integer> scores = votes.stream()
                 .collect(Collectors.groupingBy(
-                        vote -> vote.getComment().getId(), // ✅ FIX: Use getId()
+                        vote -> vote.getComment().getId(),
                         Collectors.summingInt(vote -> (int) vote.getValue())
                 ));
 
         Map<Integer, Integer> currentUserVotes = votes.stream()
                 .filter(vote -> currentUser != null && vote.getUser().getUserId().equals(currentUser.getId()))
                 .collect(Collectors.toMap(
-                        vote -> vote.getComment().getId(), // ✅ FIX: Use getId()
+                        vote -> vote.getComment().getId(),
                         vote -> (int) vote.getValue()
                 ));
 
-        // ✅ FIX: Call the updated mapper inside the stream, without the attachment map.
         return topLevelComments.stream()
                 .map(comment -> QAMapper.toCommentResponseDto(comment, currentUser, scores, currentUserVotes))
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    @CacheEvict(value = "questions", allEntries = true)
+    public CommentResponseDto updateComment(Integer commentId, CommentUpdateRequest request, List<MultipartFile> newFiles, UserDetailsImpl currentUser) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+        
+        postAuthorizationService.checkOwnership(comment, currentUser);
+
+        comment.setBody(request.body());
+
+        // ✨ --- REFACTORED DELETION LOGIC --- ✨
+        if (request.attachmentIdsToDelete() != null && !request.attachmentIdsToDelete().isEmpty()) {
+            Set<Attachment> toDelete = comment.getAttachments().stream()
+                    .filter(att -> request.attachmentIdsToDelete().contains(att.getAttachmentId()))
+                    .collect(Collectors.toSet());
+
+            // Delete physical files first
+            attachmentService.deleteAttachments(toDelete);
+
+            // Use the helper method to ensure both sides of the relationship are updated in memory
+            toDelete.forEach(comment::removeAttachment);
+        }
+
+        // Add new attachments using the helper method inside this service
+        attachmentService.saveAttachments(newFiles, comment);
+
+        Comment updatedComment = commentRepository.save(comment);
+
+        return QAMapper.toCommentResponseDto(updatedComment, currentUser, Collections.emptyMap(), Collections.emptyMap());
+    }
+    
+    @Transactional
+    @CacheEvict(value = "questions", allEntries = true)
+    public void deleteComment(Integer commentId, UserDetailsImpl currentUser) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + commentId));
+
+        postAuthorizationService.checkOwnership(comment, currentUser);
+
+        // We must trigger the physical file cleanup before the entity is deleted.
+        attachmentService.deleteAttachments(comment.getAttachments());
+
+        commentRepository.delete(comment);
     }
 
     private List<Comment> flattenComments(Comment comment) {

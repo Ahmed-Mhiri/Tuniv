@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { Comment, CommentCreateRequest } from '../../../shared/models/qa.model';
+import { Comment, CommentCreateRequest, CommentUpdateRequest } from '../../../shared/models/qa.model';
 
 @Injectable({
   providedIn: 'root'
@@ -21,5 +21,22 @@ export class CommentService {
     });
 
     return this.http.post<Comment>(`${this.apiUrl}/answers/${answerId}/comments`, formData);
+  }
+
+  updateComment(
+    commentId: number,
+    request: CommentUpdateRequest,
+    files: File[]
+  ): Observable<Comment> {
+    const formData = new FormData();
+    formData.append('comment', new Blob([JSON.stringify(request)], { type: 'application/json' }));
+    files.forEach(file => formData.append('files', file, file.name));
+
+    return this.http.put<Comment>(`${this.apiUrl}/comments/${commentId}`, formData);
+  }
+
+  // ✨ --- NEW: DELETE A COMMENT --- ✨
+  deleteComment(commentId: number): Observable<void> {
+    return this.http.delete<void>(`${this.apiUrl}/comments/${commentId}`);
   }
 }

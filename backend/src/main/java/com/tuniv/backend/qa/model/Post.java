@@ -60,4 +60,14 @@ public abstract class Post {
         attachments.add(attachment);
         attachment.setPost(this);
     }
+
+
+    /**
+     * Smartly removes an attachment, ensuring both sides of the relationship are cleared.
+     * This helps JPA's orphanRemoval to work reliably.
+     */
+    public void removeAttachment(Attachment attachment) {
+        this.attachments.remove(attachment);
+        attachment.setPost(null);
+    }
 }

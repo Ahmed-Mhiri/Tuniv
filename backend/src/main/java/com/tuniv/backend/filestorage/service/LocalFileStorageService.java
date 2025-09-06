@@ -35,7 +35,6 @@ public class LocalFileStorageService implements FileStorage {
     public String storeFile(MultipartFile file, String subDirectory) {
         String originalFilename = StringUtils.cleanPath(file.getOriginalFilename());
         try {
-            // --- FIX: Create the target subdirectory (e.g., /uploads/questions) ---
             Path targetDirectory = this.rootStorageLocation.resolve(subDirectory);
             Files.createDirectories(targetDirectory);
 
@@ -46,19 +45,52 @@ public class LocalFileStorageService implements FileStorage {
             }
             String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
 
-            // Resolve the final path inside the subdirectory
             Path targetLocation = targetDirectory.resolve(uniqueFileName);
             Files.copy(file.getInputStream(), targetLocation, StandardCopyOption.REPLACE_EXISTING);
-            
-            // Return the web-accessible URL, including the subdirectory
+
             return ServletUriComponentsBuilder.fromCurrentContextPath()
                     .path("/uploads/")
                     .path(subDirectory + "/")
                     .path(uniqueFileName)
                     .toUriString();
-
         } catch (IOException ex) {
             throw new RuntimeException("Could not store file " + originalFilename, ex);
+        }
+    }
+
+    // ✨ --- NEW: DELETE FILE METHOD --- ✨
+    @Override
+    public void deleteFile(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return;
+        }
+
+        try {
+            // Example URL: http://localhost:8080/uploads/questions/abc.jpg
+            // We need to extract the path part: /uploads/questions/abc.jpg
+            String pathPart = new java.net.URL(fileUrl).getPath();
+            
+            // Assuming your context path is "/" and your uploads are served from "/uploads/**"
+            // we need to remove the leading "/uploads/" to get the relative path
+            // For robustness, find the position of "/uploads/"
+            int uploadsIndex = pathPart.indexOf("/uploads/");
+            if (uploadsIndex == -1) {
+                // Or log a warning if the URL format is unexpected
+                return; 
+            }
+            
+            String relativePath = pathPart.substring(uploadsIndex + "/uploads/".length());
+            Path filePath = this.rootStorageLocation.resolve(relativePath).normalize();
+            
+            // Security check: ensure the resolved path is still within the storage directory
+            if (!filePath.startsWith(this.rootStorageLocation)) {
+                throw new SecurityException("Cannot delete file outside of the storage directory.");
+            }
+
+            Files.deleteIfExists(filePath);
+        } catch (Exception e) {
+            // Log the exception, but don't re-throw as a fatal error
+            System.err.println("Error deleting local file: " + fileUrl + " - " + e.getMessage());
         }
     }
 }

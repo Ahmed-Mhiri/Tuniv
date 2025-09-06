@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, ChangeDetectorRef, Component, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, computed, inject, input, output, signal } from '@angular/core';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { Observable, of } from 'rxjs';
@@ -21,13 +21,15 @@ import { NzMessageService } from 'ng-zorro-antd/message';
 import { NzUploadChangeParam, NzUploadFile, NzUploadModule } from 'ng-zorro-antd/upload';
 import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
 import { NzSpaceModule } from 'ng-zorro-antd/space';
+import { NzModalService } from 'ng-zorro-antd/modal';
+import { PostEditFormComponent, PostEditSaveEvent } from '../post-edit-form.component/post-edit-form.component';
 
 @Component({
   selector: 'app-answer-item',
   standalone: true,
   imports: [
     ReactiveFormsModule, RouterLink, TimeAgoPipe, VoteComponent, CommentItemComponent,
-    NzAvatarModule, NzButtonModule, NzFormModule, NzInputModule, NzIconModule,
+    NzAvatarModule, NzButtonModule, NzFormModule, NzInputModule, NzIconModule,PostEditFormComponent,
     NzUploadModule, NzToolTipModule, NzSpaceModule
   ],
   templateUrl: './answer-item.component.html',
@@ -42,13 +44,17 @@ export class AnswerItemComponent {
   private readonly message = inject(NzMessageService);
   public readonly authService = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
-
+  private readonly modal = inject(NzModalService);
   answer = input.required<Answer>();
   isQuestionAuthor = input<boolean>(false);
   updateRequired = output<void>();
   readonly commentFileList = signal<NzUploadFile[]>([]);
   readonly commentFilesToUpload = signal<File[]>([]);
   isCommentFormVisible = signal(false);
+  isEditing = signal(false);
+  isCurrentUserAuthor = computed(() => 
+    this.authService.currentUser()?.userId === this.answer().author.userId
+  );
 
   private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
     const body = control.get('body')?.value;
@@ -127,4 +133,39 @@ export class AnswerItemComponent {
       error: (err) => this.message.error(err.error?.message || 'Failed to post comment.'),
     });
   }
+
+  // --- Delete Logic ---
+  deleteAnswer(): void {
+    this.modal.confirm({
+      nzTitle: 'Delete this answer?',
+      nzContent: 'This action cannot be undone.',
+      nzOkText: 'Delete',
+      nzOkDanger: true,
+      nzOnOk: () =>
+        this.answerService.deleteAnswer(this.answer().answerId).subscribe({
+          next: () => {
+            this.message.success('Answer deleted');
+            this.updateRequired.emit();
+          },
+          error: (err) => this.message.error(err.error?.message || 'Failed to delete answer.'),
+        }),
+    });
+  }
+  
+  // --- Update Logic ---
+  handleSave(event: PostEditSaveEvent): void {
+    const request = {
+      body: event.body,
+      attachmentIdsToDelete: event.attachmentIdsToDelete,
+    };
+    this.answerService.updateAnswer(this.answer().answerId, request, event.newFiles).subscribe({
+      next: () => {
+        this.message.success('Answer updated');
+        this.isEditing.set(false);
+        this.updateRequired.emit(); // Refresh data from parent
+      },
+      error: (err) => this.message.error(err.error?.message || 'Failed to update answer.'),
+    });
+  }
 }
+

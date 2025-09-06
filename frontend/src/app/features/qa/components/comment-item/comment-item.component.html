@@ -25,70 +25,57 @@
           <span class="meta-info">· {{ comment().createdAt | timeAgo }}</span>
         </div>
         
-        <div class="comment-body" [innerHTML]="comment().body"></div>
-
-        @if (comment().attachments && comment().attachments.length > 0) {
-          <div class="attachments-section">
-            <div class="attachments-list">
-              @for (att of comment().attachments; track att.fileUrl) {
-                <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
-                  @if (att.fileType.startsWith('image/')) {
-                    <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
-                  } @else {
-                    <span nz-icon nzType="file-text" class="file-icon"></span>
-                    <span class="file-name">{{ att.fileName }}</span>
-                  }
-                </a>
-              }
-            </div>
+        @if (isEditing()) {
+          <div class="edit-form-wrapper">
+            <app-post-edit-form
+              [initialBody]="comment().body"
+              [initialAttachments]="comment().attachments"
+              postType="Comment"
+              (save)="handleSave($event)"
+              (cancel)="isEditing.set(false)"
+            ></app-post-edit-form>
           </div>
-        }
+        } @else {
+          <div class="comment-body" [innerHTML]="comment().body"></div>
 
+          @if (comment().attachments && comment().attachments.length > 0) {
+            <div class="attachments-section">
+              <div class="attachments-list">
+                @for (att of comment().attachments; track att.fileUrl) {
+                  <a class="attachment-item" [href]="att.fileUrl" target="_blank" [title]="att.fileName">
+                    @if (att.fileType.startsWith('image/')) {
+                      <img [src]="att.fileUrl" alt="{{ att.fileName }}" class="img-preview" />
+                    } @else {
+                      <span nz-icon nzType="file-text" class="file-icon"></span>
+                      <span class="file-name">{{ att.fileName }}</span>
+                    }
+                  </a>
+                }
+              </div>
+            </div>
+          }
+        }
         @if (authService.isUserLoggedIn()) {
           <div class="action-bar">
             <app-vote [score]="comment().score" [userVote]="comment().currentUserVote" (vote)="handleVote($event)" [isVertical]="false"></app-vote>
             <button nz-button nzType="text" class="action-button" (click)="isReplyFormVisible.set(!isReplyFormVisible())">
               <span nz-icon nzType="message"></span> Reply
             </button>
+
+            @if (isCurrentUserAuthor()) {
+              <button nz-button nzType="text" class="action-button" (click)="isEditing.set(true)">
+                <span nz-icon nzType="edit"></span> Edit
+              </button>
+              <button nz-button nzType="text" nzDanger class="action-button" (click)="deleteComment()">
+                <span nz-icon nzType="delete"></span> Delete
+              </button>
+            }
           </div>
         }
 
         <div class="reply-form-wrapper" [hidden]="!isReplyFormVisible()">
           <form [formGroup]="replyForm" (ngSubmit)="submitReply()">
-            <textarea nz-input formControlName="body" placeholder="Write your reply..." [nzAutosize]="{ minRows: 2, maxRows: 5 }"></textarea>
-            
-            <div class="reply-form-actions">
-              <nz-upload
-                [nzFileList]="replyFileList()"
-                (nzChange)="handleReplyFileChange($event)"
-                [nzShowUploadList]="false"
-                [nzMultiple]="true"
-                [nzBeforeUpload]="beforeUpload" >
-                <button nz-button nzType="text" nzShape="circle" type="button" nz-tooltip nzTooltipTitle="Attach files">
-                  <span nz-icon nzType="paper-clip"></span>
-                </button>
-              </nz-upload>
-              
-              <div class="submit-actions">
-                <button nz-button nzType="text" type="button" (click)="isReplyFormVisible.set(false)">Cancel</button>
-                <button nz-button nzType="primary" [disabled]="replyForm.invalid">Reply</button>
-              </div>
-            </div>
-
-            @if (replyFileList().length > 0) {
-              <div class="file-list-preview">
-                @for (file of replyFileList(); track file.uid) {
-                  <div class="file-item">
-                    <span nz-icon nzType="file-text"></span>
-                    <span>{{ file.name }}</span>
-                    <button nz-button nzType="text" nzShape="circle" type="button" (click)="removeReplyFile(file)">
-                      <span nz-icon nzType="close"></span>
-                    </button>
-                  </div>
-                }
-              </div>
-            }
-          </form>
+            </form>
         </div>
 
         <div class="nested-comments">

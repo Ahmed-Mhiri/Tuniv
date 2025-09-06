@@ -1,23 +1,17 @@
-// <-- ADD THIS
-@import '../../components/attachments';
-
 :host {
   display: block;
 }
 
 /* ==========================================================================
    Base Layout (Mobile First)
-   - This is the default for all screen sizes.
-   - The layout is a simple, single column.
    ========================================================================== */
 .page-container-reddit {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 1rem; // Less padding for smaller screens
+  padding: 1rem;
 }
 
 .sidebar-col {
-  // On mobile, the sidebar stacks at the bottom
   margin-top: 2rem;
 }
 
@@ -52,17 +46,57 @@
 }
 
 .question-header {
+  // Turns the header into a flex container
+  display: flex;
+  justify-content: space-between; // Pushes title left, actions right
+  align-items: flex-start;
+  gap: 1rem;
+
   .question-title {
     font-family: var(--font-display);
-    font-size: 1.5rem; // Smaller title for mobile
+    font-size: 1.5rem;
     font-weight: 700;
     line-height: 1.2;
     margin-bottom: 0.75rem;
   }
 }
 
-.meta-info, .author-link {
-  /* Style definitions from previous turn are fine */
+.header-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0; 
+  gap: 0.25rem; // Adds a small space between the buttons
+}
+
+// Targets any button with the .action-button class inside the header
+.header-actions .action-button {
+  color: var(--color-text-secondary) !important;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+
+  &:hover {
+    background-color: var(--color-surface-subtle) !important;
+    color: var(--color-primary) !important;
+  }
+
+  &.ant-btn-dangerous:hover {
+    color: var(--color-accent) !important;
+    background-color: rgba(245, 158, 11, 0.1) !important;
+  }
+}
+
+.meta-info {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.author-link {
+  font-weight: 500;
+  color: var(--color-text-primary);
+  &:hover {
+    color: var(--color-primary);
+  }
 }
 
 .question-body-wrapper {
@@ -71,17 +105,11 @@
   align-items: flex-start;
 }
 
-.vote-container, .content-container, .answers-container, .answers-section {
-  /* Style definitions from previous turn are fine */
-}
-
 /* ==========================================================================
    Tablet & Desktop Overrides
-   - These styles only apply on larger screens.
    ========================================================================== */
 
 @media (min-width: 768px) {
-  // Use more padding on tablets and up
   .page-container-reddit {
     padding: 2rem;
   }
@@ -89,12 +117,11 @@
     padding: 1.5rem;
   }
   .question-header .question-title {
-    font-size: 1.75rem; // Larger title for tablets
+    font-size: 1.75rem;
   }
 }
 
 @media (min-width: 1024px) {
-  // On large screens, switch to the two-column grid layout
   .page-container-reddit {
     display: grid;
     grid-template-columns: 1fr 320px;
@@ -102,17 +129,15 @@
   }
   
   .sidebar-col {
-    // Sidebar no longer needs top margin in grid layout
     margin-top: 0;
   }
   
   .sidebar-widget {
-    // Make the sidebar sticky so it stays in view on scroll
     position: sticky;
-    top: 88px; // 72px header height + 16px margin
+    top: 88px;
   }
   
   .question-header .question-title {
-    font-size: 2.25rem; // Full size title for desktop
+    font-size: 2.25rem;
   }
 }

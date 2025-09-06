@@ -8,9 +8,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType; // <-- IMPORT ADDED
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
@@ -21,6 +23,7 @@ import com.tuniv.backend.qa.dto.AnswerCreateRequest;
 import com.tuniv.backend.qa.dto.AnswerResponseDto;
 import com.tuniv.backend.qa.dto.QuestionCreateRequest;
 import com.tuniv.backend.qa.dto.QuestionResponseDto;
+import com.tuniv.backend.qa.dto.QuestionUpdateRequest;
 import com.tuniv.backend.qa.service.QuestionService;
 
 import jakarta.validation.Valid;
@@ -90,5 +93,26 @@ public ResponseEntity<QuestionResponseDto> getQuestionById(
 
         AnswerResponseDto newAnswerDto = questionService.addAnswer(request, questionId, currentUser, files);
         return new ResponseEntity<>(newAnswerDto, HttpStatus.CREATED);
+    }
+
+    @PutMapping(value = "/questions/{questionId}", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
+    public ResponseEntity<QuestionResponseDto> updateQuestion(
+            @PathVariable Integer questionId,
+            @RequestPart("question") @Valid QuestionUpdateRequest request,
+            @RequestPart(value = "files", required = false) List<MultipartFile> newFiles,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+            
+        QuestionResponseDto updatedQuestion = questionService.updateQuestion(questionId, request, newFiles, currentUser);
+        return ResponseEntity.ok(updatedQuestion);
+    }
+
+    // ✨ FIX: Specify the full "/questions/{questionId}" path here
+    @DeleteMapping("/questions/{questionId}")
+    public ResponseEntity<Void> deleteQuestion(
+            @PathVariable Integer questionId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+            
+        questionService.deleteQuestion(questionId, currentUser);
+        return ResponseEntity.noContent().build();
     }
 }
