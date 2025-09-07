@@ -24,12 +24,19 @@ target/
 /nbbuild/
 /dist/
 /nbdist/
-/.nb-gradle/
+/nb-gradle/
 build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
 ### VS Code ###
 .vscode/
+
 # Application Secrets - DO NOT COMMIT
 /backend/src/main/resources/application.properties
+
+# Ignore migration folder (SQL, TXT, etc.)
+/backend/src/main/resources/db/migration/
+
+# Ignore uploaded files
+/uploads/

@@ -1,43 +1,40 @@
-# ===================================================================
-# General
-# ===================================================================
-.DS_Store
-Thumbs.db
-*.log
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 
-# ===================================================================
-# IDEs & Editors (IntelliJ, VSCode, Eclipse)
-# ===================================================================
-.idea/
-.vscode/
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
 *.iml
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
+*.ipr
 
-# ===================================================================
-# Java / Spring Boot (Maven & Gradle)
-# ===================================================================
-/backend/target/
-/backend/build/
-/backend/.gradle/
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
 
-# ===================================================================
-# Node.js / Angular
-# ===================================================================
-/frontend/node_modules/
-/frontend/dist/
-/frontend/.angular/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+### VS Code ###
+.vscode/
 
-# ===================================================================
-# Secrets - IMPORTANT!
-# Never commit your environment variables.
-# ===================================================================
-.env
+# Application Secrets - DO NOT COMMIT
+/backend/src/main/resources/application.properties
 
-# Note: You SHOULD commit a template file so others know what variables are needed.
-# For example, create a file named '.env.example' and commit that instead.
+# Migration files to ignore
+/backend/src/main/resources/db/migration/V1__Initial_Schema_and_Data.sql
+/backend/src/main/resources/db/migration/data.txt
