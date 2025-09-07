@@ -21,6 +21,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class University {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer universityId;
@@ -33,6 +34,6 @@ public class University {
     private Set<Module> modules;
 
     @OneToMany(mappedBy = "university", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference("university-members")
-    private Set<UniversityMembership> members;
+    @JsonManagedReference("university-memberships")
+    private Set<UniversityMembership> memberships;
 }

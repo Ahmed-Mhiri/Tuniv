@@ -14,34 +14,39 @@ import { Page, PageInfo } from '../../../shared/models/pagination.model';
 })
 export class PaginatorComponent {
   // --- INPUTS ---
-  // Allow binding the full Page object or just PageInfo for flexibility
-  data = input.required<Page<any> | PageInfo>({ alias: 'page' }); 
-  
-  // New: Make the page size options configurable
+  data = input.required<Page<any> | PageInfo | null>({ alias: 'page' }); 
   pageSizeOptions = input<number[]>([10, 20, 50, 100]);
 
   // --- OUTPUTS ---
   pageChange = output<number>();
-  pageSizeChange = output<number>(); // New: Emit when page size changes
+  pageSizeChange = output<number>();
 
-  // --- COMPUTED SIGNALS to centralize logic ---
+  // --- COMPUTED SIGNALS ---
 
   // Safely extracts PageInfo from either a full Page object or a PageInfo object
-  readonly pageInfo = computed<PageInfo>(() => {
+  readonly pageInfo = computed<PageInfo | null>(() => {
     const pageData = this.data();
-    if ('content' in pageData) { // Check if it's a full Page<T> object
+    if (!pageData) {
+      return null;
+    }
+
+    // Check if it's a full Page<T> object from the API
+    if ('content' in pageData) {
       return {
-        pageNumber: pageData.pageable.pageNumber,
-        pageSize: pageData.pageable.pageSize,
+        // ✅ CORRECTED: Read from the new flattened structure
+        pageNumber: pageData.pageNumber,
+        pageSize: pageData.pageSize,
         totalElements: pageData.totalElements,
       };
     }
-    return pageData; // It's already a PageInfo object
+    // It's already a PageInfo object
+    return pageData;
   });
 
   // Determines if the paginator should be visible
   readonly shouldShowPaginator = computed(() => {
     const info = this.pageInfo();
+    // Show if there is more than one page
     return info && info.totalElements > info.pageSize;
   });
 

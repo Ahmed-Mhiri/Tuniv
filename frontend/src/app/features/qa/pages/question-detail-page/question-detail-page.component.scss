@@ -46,9 +46,8 @@
 }
 
 .question-header {
-  // Turns the header into a flex container
   display: flex;
-  justify-content: space-between; // Pushes title left, actions right
+  justify-content: space-between;
   align-items: flex-start;
   gap: 1rem;
 
@@ -65,10 +64,9 @@
   display: flex;
   align-items: center;
   flex-shrink: 0; 
-  gap: 0.25rem; // Adds a small space between the buttons
+  gap: 0.25rem;
 }
 
-// Targets any button with the .action-button class inside the header
 .header-actions .action-button {
   color: var(--color-text-secondary) !important;
   font-weight: 500;
@@ -103,6 +101,19 @@
   display: flex;
   gap: 1rem;
   align-items: flex-start;
+}
+
+/* ==========================================================================
+   NEW: Call to Action (CTA) for Anonymous Users
+   ========================================================================== */
+.cta-container {
+  margin-bottom: 2rem;
+}
+
+.cta-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 /* ==========================================================================

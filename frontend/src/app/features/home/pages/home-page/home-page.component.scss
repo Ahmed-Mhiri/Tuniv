@@ -1,138 +1,89 @@
 :host {
   display: block;
   background-color: var(--color-background);
-  min-height: calc(100vh - 64px); /* Full height minus header */
+  min-height: calc(100vh - 64px);
+  overflow-x: hidden;
 }
 
 .page-container {
-  max-width: 1280px; // Slightly wider for a more spacious feel
-  margin: 0 auto;
-  padding: 24px 16px; // Adjust padding for mobile
-}
-
-/* --- Main Content Feed Styling --- */
-.feed-list {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding-block: 1rem;
+  padding-inline: clamp(1rem, 4vw, 2rem);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 1rem;
 }
 
-.spinner-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
+.main-content {
+  grid-column: auto;
 }
 
-.empty-feed-card {
-  .empty-subtext {
-    color: var(--color-text-secondary);
-    font-size: 14px;
-    max-width: 300px;
-    margin: 8px auto 16px;
-  }
-}
-
-.load-more-container {
-  display: flex;
-  justify-content: center;
-  padding: 24px 0;
-}
-
-/* --- Sidebar Styling --- */
 .sidebar {
-  // This wrapper enables the sticky effect on larger screens
-  .sticky-sidebar-content {
+  position: static;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.hero-section {
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-subtle) 100%);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 2rem 1.5rem;
+  text-align: center;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+
+  .hero-title {
+    font-size: 1.625rem;
+    font-weight: 800;
+  }
+  .hero-subtitle {
+    font-size: 0.9375rem;
+    max-width: 600px;
+    margin: 0.75rem auto 1.5rem;
+    line-height: 1.6;
+  }
+  .hero-actions {
     display: flex;
     flex-direction: column;
-    gap: 24px;
-    
-    // The magic happens here!
-    @media (min-width: 992px) { // nzLg breakpoint
-      position: sticky;
-      top: 88px; // 64px header + 24px padding
-    }
+    justify-content: center;
+    gap: 0.75rem;
   }
 }
 
 .sidebar-card {
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: 12px;
   background-color: var(--color-surface);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 4px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
 
-  // Remove default card padding to have more control
-  ::ng-deep .ant-card-body {
-    padding: 0;
-  }
-}
-
-// "Home" Info Card Specifics
-.info-card {
-  overflow: hidden; // Keep the banner contained
-
-  .sidebar-header {
-    .sidebar-banner {
-      width: 100%;
-      height: 80px;
-      object-fit: cover;
-      display: block;
-    }
-    .sidebar-title {
-      font-size: 20px;
-      font-weight: 700;
-      padding: 16px 16px 8px;
-    }
-  }
-
-  .sidebar-description {
-    padding: 0 16px 16px;
-    font-size: 14px;
-    color: var(--color-text-secondary);
-  }
-
-  .sidebar-actions {
-    padding: 0 16px 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  // Use the theme variable for the divider
-  ::ng-deep .ant-divider {
-    border-top-color: var(--color-border);
-    margin: 12px 0;
-  }
-}
-
-// "Top Universities" Card Specifics
-.community-card {
   ::ng-deep .ant-card-head {
-    padding: 0 16px;
-    border-bottom: 1px solid var(--color-border);
+    min-height: 44px;
+    padding: 0 1rem;
+    border-bottom: 1px solid var(--color-border-subtle);
   }
   .card-title-wrapper {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 0.5rem;
     font-weight: 600;
-    color: var(--color-text-primary);
-    span[nz-icon] {
-      color: var(--color-primary);
-    }
+    font-size: 0.875rem;
   }
   ::ng-deep .ant-card-body {
-    padding: 8px;
+    padding: 0.25rem 0.25rem 0.5rem 0.25rem;
   }
 }
 
-/* --- Community List Styling (Top Universities) --- */
 .community-link {
   display: flex;
   width: 100%;
   align-items: center;
-  padding: 10px 8px;
-  border-radius: 6px;
+  padding: 0.5rem;
+  border-radius: 8px;
   transition: background-color 0.2s ease-in-out;
   text-decoration: none;
 
@@ -141,46 +92,115 @@
   }
 
   .community-rank {
-    font-weight: bold;
-    font-size: 16px;
-    width: 24px;
-    text-align: center;
-    color: var(--color-text-secondary);
+    width: 20px;
+    margin-right: 0.5rem;
   }
-
+  nz-avatar {
+    width: 28px !important;
+    height: 28px !important;
+    line-height: 28px !important;
+    font-size: 14px !important;
+    margin-right: 0.5rem;
+  }
   .community-icon {
-    font-size: 20px;
-    margin: 0 12px;
-    color: var(--color-primary);
+    font-size: 1.125rem;
+    margin-right: 0.5rem;
   }
-
   .community-info {
     display: flex;
     flex-direction: column;
+    gap: 2px;
     flex-grow: 1;
-
+    overflow: hidden;
     .community-name {
+      font-size: 0.875rem;
       font-weight: 500;
-      color: var(--color-text-primary);
-      transition: color 0.2s ease-in-out;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
     .community-meta {
-      font-size: 12px;
+      font-size: 0.8125rem;
       color: var(--color-text-secondary);
     }
   }
-  
-  // Make arrow appear on hover for a cleaner look
   .community-arrow {
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    opacity: 0;
-    transform: translateX(-5px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    display: none;
+  }
+}
+
+@media (min-width: 992px) {
+  .page-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 1.5rem;
+    padding-block: 1.5rem;
   }
 
-  &:hover .community-arrow {
-    opacity: 1;
-    transform: translateX(0);
+  .main-content {
+    grid-column: 1 / 2;
+  }
+
+  .sidebar {
+    grid-column: 2 / 3;
+    position: sticky;
+    top: 88px;
+    align-self: start;
+    gap: 1.5rem;
+  }
+
+  .hero-section {
+    padding: 3rem 2rem;
+    margin-bottom: 1.5rem;
+
+    .hero-title {
+      font-size: 2rem;
+    }
+    .hero-subtitle {
+      font-size: 1rem;
+    }
+    .hero-actions {
+      flex-direction: row;
+      gap: 1rem;
+    }
+  }
+
+  .sidebar-card {
+    ::ng-deep .ant-card-head {
+      padding: 0 1rem;
+    }
+    .card-title-wrapper {
+      gap: 0.625rem;
+      font-size: 0.9375rem;
+    }
+    ::ng-deep .ant-card-body {
+      padding: 0.5rem;
+    }
+  }
+
+  .community-link {
+    padding: 0.625rem 0.5rem;
+
+    .community-rank, .community-icon, nz-avatar {
+      margin-right: 0.75rem;
+    }
+    .community-info {
+      gap: 4px;
+      .community-name {
+        font-weight: 600;
+      }
+      .community-meta {
+        font-size: 0.875rem;
+      }
+    }
+    .community-arrow {
+      display: block;
+    }
+  }
+}
+
+@media (min-width: 1280px) {
+  .page-container {
+    grid-template-columns: minmax(0, 1fr) 340px;
   }
 }

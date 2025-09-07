@@ -44,26 +44,34 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            // =========================================================================
-            // ✅ THE FIX: Explicitly apply your CorsConfigurationSource bean.
-            // =========================================================================
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // ... other permitAll() matchers for auth, ws, etc.
                 .requestMatchers(
-                    "/api/v1/auth/login",
-                    "/api/v1/auth/register",
-                    "/api/v1/auth/verify",
-                    "/api/v1/auth/forgot-password",
-                    "/api/v1/auth/reset-password",
-                    "/ws/**", // This correctly permits the WebSocket endpoint
+                    "/api/v1/auth/**",
+                    "/api/v1/feed/popular",
+                    "/ws/**",
                     "/uploads/**",
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/universities/**", "/api/v1/modules/**", "/api/v1/questions/**", "/api/v1/users/**", "/api/v1/answers/*/comments").permitAll()
+
+                // ✅ PUBLIC READ-ONLY ACCESS
+                .requestMatchers(HttpMethod.GET,
+                    "/api/v1/universities/**",
+                    "/api/v1/modules/**",
+                    "/api/v1/questions/**",
+                    "/api/v1/answers/*/comments",
+                    "/api/v1/users/leaderboard", // <-- ADD THIS LINE
+                    "/api/v1/users/**"
+                ).permitAll()
+                
+                // Allow pre-flight OPTIONS requests
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                // ✅ SECURE ALL OTHER REQUESTS
                 .anyRequest().authenticated()
             )
             .authenticationProvider(authenticationProvider())
@@ -75,7 +83,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+        configuration.setAllowedOrigins(List.of("http://localhost:4200")); 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(true);

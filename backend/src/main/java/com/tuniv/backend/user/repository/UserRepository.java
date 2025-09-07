@@ -19,4 +19,6 @@ public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByVerificationToken(String token);
     @Query("SELECT m.user FROM UniversityMembership m WHERE m.university.universityId = :universityId AND m.user.userId != :authorId")
     List<User> findAllMembersOfUniversityExcludingAuthor(Integer universityId, Integer authorId);
+    List<User> findTop5ByOrderByReputationScoreDesc();
+
 }

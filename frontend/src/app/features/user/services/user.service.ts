@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { UserProfile, UserProfileUpdateRequest } from '../../../shared/models/user.model';
+import { LeaderboardUser, UserCommunity, UserProfile, UserProfileUpdateRequest } from '../../../shared/models/user.model';
 import { UserActivityItem } from '../../../shared/models/activity.model';
 
 @Injectable({
@@ -10,22 +10,26 @@ import { UserActivityItem } from '../../../shared/models/activity.model';
 })
 export class UserService {
   private readonly http = inject(HttpClient);
-  private readonly apiUrl = environment.apiUrl;
+  // --- IMPROVEMENT ---
+  // Centralize the base URL for the user controller for consistency
+  private readonly userApiUrl = `${environment.apiUrl}/users`;
 
   /**
    * Fetches the profile of the currently authenticated user.
-   * Corresponds to: GET /api/v1/me
+   * Corresponds to: GET /api/v1/users/me
    */
   getCurrentUserProfile(): Observable<UserProfile> {
-    return this.http.get<UserProfile>(`${this.apiUrl}/me`);
+    // Corrected path
+    return this.http.get<UserProfile>(`${this.userApiUrl}/me`);
   }
 
   /**
    * Updates the profile of the currently authenticated user.
-   * Corresponds to: PUT /api/v1/me
+   * Corresponds to: PUT /api/v1/users/me
    */
   updateCurrentUserProfile(updateData: UserProfileUpdateRequest): Observable<UserProfile> {
-    return this.http.put<UserProfile>(`${this.apiUrl}/me`, updateData);
+    // Corrected path
+    return this.http.put<UserProfile>(`${this.userApiUrl}/me`, updateData);
   }
 
   /**
@@ -33,10 +37,33 @@ export class UserService {
    * Corresponds to: GET /api/v1/users/{userId}
    */
   getUserProfileById(userId: number): Observable<UserProfile> {
-    return this.http.get<UserProfile>(`${this.apiUrl}/users/${userId}`);
+    return this.http.get<UserProfile>(`${this.userApiUrl}/${userId}`);
   }
 
+  /**
+   * Fetches the activity feed for a specific user.
+   * Corresponds to: GET /api/v1/users/{userId}/activity
+   */
   getUserActivity(userId: number): Observable<UserActivityItem[]> {
-    return this.http.get<UserActivityItem[]>(`${this.apiUrl}/${userId}/activity`);
+    // Corrected path
+    return this.http.get<UserActivityItem[]>(`${this.userApiUrl}/${userId}/activity`);
+  }
+
+  // --- NEW METHOD ---
+  /**
+   * Fetches the communities for the currently authenticated user.
+   * Corresponds to: GET /api/v1/users/me/communities
+   */
+  getUserCommunities(): Observable<UserCommunity[]> {
+    return this.http.get<UserCommunity[]>(`${this.userApiUrl}/me/communities`);
+  }
+
+  // --- NEW METHOD ---
+  /**
+   * Fetches the top users for the leaderboard.
+   * Corresponds to: GET /api/v1/users/leaderboard
+   */
+  getLeaderboard(): Observable<LeaderboardUser[]> {
+    return this.http.get<LeaderboardUser[]>(`${this.userApiUrl}/leaderboard`);
   }
 }

@@ -23,6 +23,7 @@ import com.tuniv.backend.qa.dto.AnswerCreateRequest;
 import com.tuniv.backend.qa.dto.AnswerResponseDto;
 import com.tuniv.backend.qa.dto.QuestionCreateRequest;
 import com.tuniv.backend.qa.dto.QuestionResponseDto;
+import com.tuniv.backend.qa.dto.QuestionSummaryDto;
 import com.tuniv.backend.qa.dto.QuestionUpdateRequest;
 import com.tuniv.backend.qa.service.QuestionService;
 
@@ -47,8 +48,9 @@ public class QuestionController {
         return new ResponseEntity<>(newQuestionDto, HttpStatus.CREATED);
     }
 
-    @GetMapping("/modules/{moduleId}/questions")
-    public ResponseEntity<Page<QuestionResponseDto>> getQuestionsByModule(
+     @GetMapping("/modules/{moduleId}/questions")
+    // ✅ UPDATED return type in the ResponseEntity
+    public ResponseEntity<Page<QuestionSummaryDto>> getQuestionsByModule(
             @PathVariable Integer moduleId,
             Pageable pageable,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {

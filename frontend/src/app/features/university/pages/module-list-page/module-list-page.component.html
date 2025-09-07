@@ -25,9 +25,21 @@
           </nz-card>
         </a>
       }
-      @if (modules().length === 0) {
-        <p class="no-modules-message">No modules have been added for this university yet.</p>
-      }
     </div>
+
+    @if (modules().length === 0) {
+      <p class="no-modules-message">No modules have been added for this university yet.</p>
+    }
+
+    @if (pageInfo().totalElements > pageInfo().pageSize) {
+      <div class="paginator-container">
+        <nz-pagination
+          [nzPageIndex]="pageInfo().pageNumber + 1"
+          [nzPageSize]="pageInfo().pageSize"
+          [nzTotal]="pageInfo().totalElements"
+          (nzPageIndexChange)="onPageChange($event)">
+        </nz-pagination>
+      </div>
+    }
   }
 </div>

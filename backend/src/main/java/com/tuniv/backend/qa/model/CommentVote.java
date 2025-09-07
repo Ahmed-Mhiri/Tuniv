@@ -102,4 +102,8 @@ public Integer getPostId() {
             return Objects.hash(userId, commentId);
         }
     }
+    @Override
+public Post getPost() { // ✅ ADD THIS METHOD
+    return this.comment;
+}
 }

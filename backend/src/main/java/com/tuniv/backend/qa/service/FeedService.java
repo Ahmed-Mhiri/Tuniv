@@ -1,19 +1,34 @@
 package com.tuniv.backend.qa.service;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.qa.dto.QuestionResponseDto;
+import com.tuniv.backend.qa.dto.QuestionSummaryDto;
 import com.tuniv.backend.qa.mapper.QAMapper;
+import com.tuniv.backend.qa.model.Answer;
+import com.tuniv.backend.qa.model.AnswerVote;
+import com.tuniv.backend.qa.model.Comment;
+import com.tuniv.backend.qa.model.CommentVote;
+import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.qa.model.Question;
 import com.tuniv.backend.qa.model.QuestionVote;
+import com.tuniv.backend.qa.model.Vote;
+import com.tuniv.backend.qa.repository.AnswerRepository;
+import com.tuniv.backend.qa.repository.AnswerVoteRepository;
+import com.tuniv.backend.qa.repository.CommentRepository;
+import com.tuniv.backend.qa.repository.CommentVoteRepository;
 import com.tuniv.backend.qa.repository.QuestionRepository;
 import com.tuniv.backend.qa.repository.QuestionVoteRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
@@ -33,51 +48,54 @@ public class FeedService {
     private final QuestionVoteRepository questionVoteRepository;
 
     @Transactional(readOnly = true)
-    public Page<QuestionResponseDto> getPersonalizedFeed(UserDetailsImpl currentUser, Pageable pageable) {
+    public Page<QuestionSummaryDto> getPersonalizedFeed(UserDetailsImpl currentUser, Pageable pageable) {
         User user = userRepository.findById(currentUser.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         List<Integer> memberModuleIds = user.getMemberships().stream()
                 .flatMap(membership -> membership.getUniversity().getModules().stream())
                 .map(Module::getModuleId)
-                .collect(Collectors.toList());
+                .toList();
 
         if (memberModuleIds.isEmpty()) {
             return Page.empty(pageable);
         }
 
-        Page<Question> questionPage = questionRepository.findByModule_ModuleIdIn(memberModuleIds, pageable);
+        Page<QuestionSummaryDto> summaryPage = questionRepository.findQuestionSummariesByModuleIdIn(memberModuleIds, pageable);
 
-        List<Question> questions = questionPage.getContent();
-        if (questions.isEmpty()) {
-            return Page.empty(pageable);
+        if (!summaryPage.isEmpty()) {
+            List<Integer> questionIds = summaryPage.stream().map(QuestionSummaryDto::id).toList();
+            List<QuestionVote> userVotes = questionVoteRepository.findByUserIdAndQuestionIdIn(currentUser.getId(), questionIds);
+            Map<Integer, Integer> userVoteMap = userVotes.stream()
+                    .collect(Collectors.toMap(v -> v.getQuestion().getId(), v -> (int) v.getValue()));
+
+            List<QuestionSummaryDto> updatedSummaries = summaryPage.getContent().stream()
+                    .map(summary -> summary.withCurrentUserVote(userVoteMap.getOrDefault(summary.id(), 0)))
+                    .toList();
+            
+            return new PageImpl<>(updatedSummaries, pageable, summaryPage.getTotalElements());
         }
 
-        // ✅ FIX: Use getId() from the Post superclass.
-        List<Integer> questionIds = questions.stream().map(Question::getId).collect(Collectors.toList());
+        return summaryPage;
+    }
 
-        List<QuestionVote> votes = questionVoteRepository.findByQuestionIdIn(questionIds);
+    @Transactional(readOnly = true)
+    public Page<QuestionSummaryDto> getPopularFeed(Pageable pageable, UserDetailsImpl currentUser) {
+        Page<QuestionSummaryDto> summaryPage = questionRepository.findPopularQuestionSummaries(pageable);
 
-        // Process votes into maps for scores and the current user's vote
-        Map<Integer, Integer> scores = votes.stream()
-                .collect(Collectors.groupingBy(
-                        vote -> vote.getQuestion().getId(), // ✅ FIX: Use getId()
-                        Collectors.summingInt(vote -> (int) vote.getValue())
-                ));
+        if (currentUser != null && !summaryPage.isEmpty()) {
+            List<Integer> questionIds = summaryPage.stream().map(QuestionSummaryDto::id).toList();
+            List<QuestionVote> userVotes = questionVoteRepository.findByUserIdAndQuestionIdIn(currentUser.getId(), questionIds);
+            Map<Integer, Integer> userVoteMap = userVotes.stream()
+                    .collect(Collectors.toMap(v -> v.getQuestion().getId(), v -> (int) v.getValue()));
+            
+            List<QuestionSummaryDto> updatedSummaries = summaryPage.getContent().stream()
+                    .map(summary -> summary.withCurrentUserVote(userVoteMap.getOrDefault(summary.id(), 0)))
+                    .toList();
 
-        Map<Integer, Integer> currentUserVotes = votes.stream()
-                .filter(vote -> vote.getUser().getUserId().equals(currentUser.getId()))
-                .collect(Collectors.toMap(
-                        vote -> vote.getQuestion().getId(), // ✅ FIX: Use getId()
-                        vote -> (int) vote.getValue()
-                ));
+            return new PageImpl<>(updatedSummaries, pageable, summaryPage.getTotalElements());
+        }
 
-        // ✅ FIX: Call the updated, simpler mapper signature.
-        return questionPage.map(question -> QAMapper.toQuestionResponseDto(
-                question,
-                currentUser,
-                scores,
-                currentUserVotes
-        ));
+        return summaryPage;
     }
 }

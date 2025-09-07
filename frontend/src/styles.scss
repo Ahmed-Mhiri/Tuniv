@@ -1,16 +1,21 @@
-/* src/styles.scss */
-
 /* ==========================================================================
-   1. Imports & Global Setup
+   1. IMPORTS & GLOBAL SETUP
    ========================================================================== */
 @use "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap');
 
-*, *::before, *::after {
+:root {
+  --font-body: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --focus-ring-color: #4f46e5;
+  --focus-ring: 2px solid var(--focus-ring-color);
+  --focus-ring-offset: 2px;
+}
+
+*,
+*::before,
+*::after {
   box-sizing: border-box;
-  transition-property: color, background-color, border-color;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
 }
 
 body {
@@ -18,23 +23,23 @@ body {
   padding: 0;
   font-family: var(--font-body);
   background-color: var(--color-background);
-  color: var(--color-text-primary); // Base color
+  color: var(--color-text-primary);
   line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 /* ==========================================================================
-   2. Theme Variable Definitions
+   2. THEME VARIABLE DEFINITIONS
    ========================================================================== */
-@theme {
-  /* Font */
-  --font-body: "Plus Jakarta Sans", sans-serif;
-  --font-display: "Plus Jakarta Sans", sans-serif;
-
+:root {
   /* Light Mode */
   --color-primary: #4338CA;
   --color-primary-hover: #3730A3;
-  --color-accent: #f59e0b;        /* Amber 500 */
-  --color-accent-hover: #d97706;  /* Amber 600 */
+  --color-accent: #f59e0b;
+  --color-accent-hover: #d97706;
   --color-background: #F9FAFB;
   --color-surface: #FFFFFF;
   --color-surface-subtle: #F3F4F6;
@@ -42,375 +47,344 @@ body {
   --color-text-secondary: #6B7280;
   --color-border: #E5E7EB;
   --color-on-primary: #ffffff;
-  --color-success: #16A34A; // A nice green
-  --color-warning: #F59E0B; // A vibrant amber/orange
+  --color-success: #16A34A;
+  --color-warning: #F59E0B;
+  --color-error: #DC2626;
 }
 
 html.dark {
   /* Dark Mode */
   --color-primary: #818CF8;
   --color-primary-hover: #6366F1;
-  --color-accent: #fbbf24;        /* Amber 400 */
-  --color-accent-hover: #f59e0b;  /* Amber 500 */
+  --color-accent: #fbbf24;
+  --color-accent-hover: #f59e0b;
   --color-background: #111827;
   --color-surface: #1F2937;
   --color-surface-subtle: #374151;
   --color-text-primary: #F3F4F6;
   --color-text-secondary: #9CA3AF;
   --color-border: #374151;
-  --color-on-primary: #ffffff;
-  --color-success: #4ADE80; // A lighter green for dark mode
-  --color-warning: #FBBF24; // A lighter amber for dark mode
+  --color-on-primary: #111827;
+  --color-success: #4ADE80;
+  --color-warning: #FBBF24;
+  --color-error: #F87171;
 }
 
 /* ==========================================================================
-   3. Base Element & Typography Reset (The "Stronger Pattern")
+   3. TYPOGRAPHY & BASE ELEMENT STYLES
    ========================================================================== */
-/*
- * This ensures all common text elements inherit the correct theme
- * color by default, preventing issues with unstyled <p> or <h2> tags.
-*/
-h1, h2, h3, h4, h5, h6, p, span, div, li, strong {
-  color: var(--color-text-primary); /* FIX: Apply the theme color directly */
+p, span, div, li, strong {
+  color: var(--color-text-primary);
+  transition: color 0.2s ease;
 }
 
-/* Ensure links also use a primary color and are readable */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 800;
+  color: var(--color-text-primary);
+  transition: color 0.2s ease;
+}
+
 a {
   color: var(--color-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
   &:hover {
     color: var(--color-primary-hover);
+    text-decoration: underline;
   }
 }
 
 /* ==========================================================================
-   4. Global NG-ZORRO Theming Overrides
+   4. NG-ZORRO COMPONENT THEME OVERRIDES
    ========================================================================== */
+
+/* --- Base Containers --- */
+.ant-card,
+.ant-modal-content,
+.ant-dropdown-menu,
+.ant-menu,
+.ant-popover-inner,
+.ant-message-notice-content,
+.ant-select-dropdown {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
 
 /* --- Typography --- */
-.ant-typography, [nz-typography] {
-  color: var(--color-text-primary) !important;
+h1.ant-typography,
+h2.ant-typography,
+h3.ant-typography,
+h4.ant-typography,
+h5.ant-typography,
+h6.ant-typography {
+  color: var(--color-text-primary);
 }
-.ant-typography[nztype='secondary'] {
-  color: var(--color-text-secondary) !important;
+
+.ant-typography.ant-typography-secondary {
+  color: var(--color-text-secondary);
 }
 
-/* ==========================================================================
-   Global Button Styles (Final Version)
-   ========================================================================== */
-/*
- * This provides a robust base style for all antd buttons and specific
- * overrides for custom variants like primary and accent.
-*/
-
-// --- Base/Default Button Style ---
-// Targets any button or link with the ant-btn class that IS NOT a primary or accent button.
-// This will fix your "Edit Profile" button.
-.ant-btn:not(.btn-primary):not(.btn-accent):not([nztype='primary']) {
-  background-color: var(--color-surface) !important;
-  border-color: var(--color-border) !important;
-  color: var(--color-text-secondary) !important;
-
-  &:hover,
-  &:focus {
-    border-color: var(--color-primary) !important;
-    color: var(--color-primary) !important;
+/* --- Buttons --- */
+.ant-btn {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+  &:focus-visible {
+    outline: var(--focus-ring);
+    outline-offset: var(--focus-ring-offset);
   }
-}
-
-// --- Primary Button ---
-.btn-primary,
-button[nzType='primary'].ant-btn {
-  background-color: var(--color-primary) !important;
-  border-color: var(--color-primary) !important;
-  color: var(--color-on-primary) !important;
-
-  &:hover,
-  &:focus {
-    background-color: var(--color-primary-hover) !important;
-    border-color: var(--color-primary-hover) !important;
+  &:not([nztype='primary']):not([nztype='link']):not([nztype='text']):not(.btn-accent) {
+    background-color: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text-primary);
+    &:hover, &:focus {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
   }
-}
-
-// --- Accent Button ---
-// This will now correctly style your "Ask Question" button.
-.btn-accent {
-  background-color: var(--color-accent) !important;
-  border-color: var(--color-accent) !important;
-  color: var(--color-on-primary) !important;
-
-  &:hover,
-  &:focus {
-    background-color: var(--color-accent-hover) !important;
-    border-color: var(--color-accent-hover) !important;
+  &[nztype='primary'], &.btn-accent {
+    color: var(--color-on-primary);
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    &:hover, &:focus {
+      background-color: var(--color-primary-hover);
+      border-color: var(--color-primary-hover);
+    }
   }
-}
-
-// --- Global Disabled State ---
-button[disabled],
-.ant-btn[disabled] {
-  background-color: var(--color-surface-subtle) !important;
-  border-color: var(--color-border) !important;
-  color: var(--color-text-secondary) !important;
-  opacity: 0.6;
+  &.btn-accent {
+    background-color: var(--color-accent);
+    border-color: var(--color-accent);
+    &:hover, &:focus {
+      background-color: var(--color-accent-hover);
+      border-color: var(--color-accent-hover);
+    }
+  }
+  &[disabled] {
+    background-color: var(--color-surface-subtle);
+    border-color: var(--color-border);
+    color: var(--color-text-secondary);
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 /* --- Forms & Inputs --- */
 .ant-form-item-label > label {
-  color: var(--color-text-secondary) !important;
+  color: var(--color-text-secondary);
   font-weight: 500;
 }
-.ant-input, .ant-input-affix-wrapper {
-  background-color: var(--color-background) !important;
-  border-color: var(--color-border) !important;
-  color: var(--color-text-primary) !important;
+
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector {
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+  border-radius: 6px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
   input {
-    background-color: transparent !important;
-    color: var(--color-text-primary) !important;
+    background-color: transparent;
+    color: var(--color-text-primary);
   }
-  &::placeholder {
-    color: var(--color-text-secondary) !important;
+  &::placeholder, .ant-select-selection-placeholder {
+    color: var(--color-text-secondary);
   }
-  &:hover, &:focus-within {
-    border-color: var(--color-primary) !important;
+  &:hover {
+    border-color: var(--color-primary);
   }
-}
-.ant-input-prefix .anticon {
-  color: var(--color-text-secondary) !important;
 }
 
-/* --- Cards & Menus --- */
-.ant-card, .ant-dropdown-menu, .ant-menu {
-  background-color: var(--color-surface) !important;
-  border-color: var(--color-border) !important;
-}
-.ant-card-head { border-bottom-color: var(--color-border) !important; }
-.ant-card-head-title { color: var(--color-text-primary) !important; }
-.ant-menu-item {
-  color: var(--color-text-secondary) !important;
-  &:hover { color: var(--color-primary) !important; }
-}
-.ant-menu-item-selected {
-  background-color: var(--color-surface-subtle) !important;
-  color: var(--color-primary) !important;
-}
-// --- THEMED SVG LOGO ---
-.themed-logo {
-  display: inline-block;
-  // Use the primary text color of your theme as the logo color
-  background-color: var(--color-text-primary);
-  
-  // Use the SVG file as a mask (stencil)
-  mask-image: url('/assets/images/TunivLogo.svg');
-  -webkit-mask-image: url('/assets/images/TunivLogo.svg'); // For broader browser compatibility
-  
-  // Ensure the mask scales correctly
-  mask-size: contain;
-  mask-repeat: no-repeat;
-  mask-position: center;
-
-  // Set the size to match your original <img> tag (h-10 is 2.5rem)
-  width: 2.5rem;
-  height: 2.5rem;
+.ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-focused,
+.ant-select-focused .ant-select-selector {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
-/* --- Upload --- */
-.ant-upload-drag {
-  background-color: var(--color-background) !important;
-  border-color: var(--color-border) !important;
-  transition: border-color 0.3s;
+// ✅ Added: Style for the clear icon in search inputs
+.ant-input-clear-icon {
+  color: var(--color-text-secondary);
+  transition: color 0.2s ease;
+  cursor: pointer;
 
   &:hover {
-    border-color: var(--color-primary) !important;
-  }
-}
-.ant-upload-drag-icon .anticon {
-  color: var(--color-primary) !important;
-}
-.ant-upload-text {
-  color: var(--color-text-primary) !important;
-}
-.ant-upload-hint {
-  color: var(--color-text-secondary) !important;
-}
-.ant-upload-list-item {
-  background-color: var(--color-surface-subtle) !important;
-  border: 1px solid var(--color-border) !important;
-  color: var(--color-text-primary) !important;
-
-  &:hover {
-    background-color: var(--color-surface) !important;
-  }
-}
-/* --- Popovers & Messages (The Fix) --- */
-.ant-popover-inner,
-.ant-message-notice-content {
-  background-color: var(--color-surface) !important;
-  color: var(--color-text-primary) !important;
-}
-
-.ant-popover-message-title {
-  color: var(--color-text-primary) !important;
-}
-
-/* Theme the icons based on their type */
-.ant-popover-message-icon .anticon-exclamation-circle {
-  color: var(--color-warning) !important;
-}
-
-.ant-message-success .anticon {
-  color: var(--color-success) !important;
-}
-.ant-message-error .anticon {
-  color: var(--color-accent) !important; /* Use your accent red for errors */
-}
-.ant-message-warning .anticon {
-  color: var(--color-warning) !important;
-}
-/* --- Badges --- */
-.ant-badge-status-text {
-  color: var(--color-text-secondary) !important;
-}
-.ant-badge-status-dot {
-  // This uses the theme color we defined earlier
-  background-color: var(--color-success) !important;
-}
-/* Add this to your src/styles.scss file */
-
-/* --- 1. The Main Selector Box --- */
-
-// --- Style for the selector when it is ENABLED ---
-.ant-select:not(.ant-select-disabled) .ant-select-selector {
-  background-color: var(--color-background) !important;
-  border-color: var(--color-border) !important;
-
-  &:hover {
-    border-color: var(--color-primary) !important;
-  }
-
-  // The placeholder text inside an enabled selector
-  .ant-select-selection-placeholder {
-    color: var(--color-text-secondary) !important;
-  }
-
-  // The selected item text inside an enabled selector
-  .ant-select-selection-item {
-    color: var(--color-text-primary) !important;
+    color: var(--color-text-primary);
   }
 }
 
-// --- Style for the selector when it is FOCUSED ---
-.ant-select-focused:not(.ant-select-disabled) .ant-select-selector {
-   border-color: var(--color-primary) !important;
+
+/* --- Modals --- */
+.ant-modal-header {
+  background-color: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+.ant-modal-title {
+  color: var(--color-text-primary);
+}
+.ant-modal-footer {
+  border-top: 1px solid var(--color-border);
 }
 
-// --- Style for the selector when it is DISABLED ---
-.ant-select-disabled .ant-select-selector {
-  background-color: var(--color-surface-subtle) !important;
-  border-color: var(--color-border) !important;
-  cursor: not-allowed;
-
-  // Make placeholder and selected item text look disabled
-  .ant-select-selection-placeholder,
-  .ant-select-selection-item {
-    color: var(--color-text-secondary) !important;
-    opacity: 0.75;
-  }
+/* --- Alerts & Messages --- */
+.ant-alert {
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  .ant-alert-message { color: var(--color-text-primary); }
+  .ant-alert-description { color: var(--color-text-secondary); }
+  .ant-alert-info .ant-alert-icon { color: var(--color-primary); }
+  .ant-alert-success .ant-alert-icon { color: var(--color-success); }
+  .ant-alert-warning .ant-alert-icon { color: var(--color-warning); }
+  .ant-alert-error .ant-alert-icon { color: var(--color-error); }
 }
 
-/* --- 2. The Dropdown Panel & Options --- */
+.ant-message-success .anticon { color: var(--color-success); }
+.ant-message-error .anticon { color: var(--color-error); }
+.ant-message-warning .anticon { color: var(--color-warning); }
 
-// --- Style for the dropdown arrow icon ---
-.ant-select-arrow .anticon {
-    color: var(--color-text-secondary) !important;
-}
-
-// --- Style for the panel that opens ---
-.ant-select-dropdown {
-  background-color: var(--color-surface) !important;
-  border: 1px solid var(--color-border) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-// --- Style for the individual items in the dropdown ---
+/* --- Select Dropdown Options --- */
 .ant-select-item-option {
-  color: var(--color-text-primary) !important;
-  
-  // Style for an item on hover
+  color: var(--color-text-primary);
   &.ant-select-item-option-active {
-    background-color: var(--color-surface-subtle) !important;
+    background-color: var(--color-surface-subtle);
   }
-  
-  // Style for the currently selected item
   &.ant-select-item-option-selected {
-    background-color: var(--color-surface-subtle) !important;
-    color: var(--color-primary) !important;
+    background-color: var(--color-surface-subtle);
+    color: var(--color-primary);
     font-weight: 600;
   }
 }
-/* --- Alert --- */
-// This themes the nz-alert component for a consistent look.
-.ant-alert {
-  background-color: var(--color-surface-subtle) !important;
-  border: 1px solid var(--color-border) !important;
-  border-radius: 8px; /* Optional: adds a soft radius to match other elements */
+
+/* --- Pagination --- */
+.ant-pagination {
+  .ant-pagination-item {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    a {
+      color: var(--color-text-primary);
+    }
+    &:hover, &:focus-visible {
+      border-color: var(--color-primary);
+      a {
+        color: var(--color-primary);
+      }
+    }
+  }
+  .ant-pagination-item-active {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+    a {
+      color: var(--color-on-primary);
+    }
+    &:hover, &:focus-visible {
+      background-color: var(--color-primary-hover);
+      border-color: var(--color-primary-hover);
+      a {
+        color: var(--color-on-primary);
+      }
+    }
+  }
+  .ant-pagination-prev,
+  .ant-pagination-next {
+    .ant-pagination-item-link {
+      background-color: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      color: var(--color-text-secondary);
+      transition: all 0.2s ease;
+      &:hover, &:focus-visible {
+        border-color: var(--color-primary);
+        color: var(--color-primary);
+      }
+    }
+  }
+  & .ant-pagination-disabled {
+    .ant-pagination-item-link {
+      background-color: var(--color-surface-subtle);
+      border-color: var(--color-border);
+      cursor: not-allowed;
+      .anticon {
+        color: var(--color-text-secondary);
+        opacity: 0.6;
+      }
+    }
+    &:hover .ant-pagination-item-link {
+      border-color: var(--color-border);
+      .anticon {
+        color: var(--color-text-secondary);
+      }
+    }
+  }
+  .ant-pagination-jump-prev,
+  .ant-pagination-jump-next {
+    .ant-pagination-item-ellipsis {
+      color: var(--color-text-secondary);
+      transition: all 0.2s ease;
+    }
+    .ant-pagination-item-link-icon {
+      color: var(--color-text-secondary);
+    }
+    &:hover {
+      .ant-pagination-item-ellipsis {
+        opacity: 0;
+      }
+      .ant-pagination-item-link-icon {
+        color: var(--color-primary);
+      }
+    }
+  }
+  .ant-pagination-options {
+    .ant-select-selector {
+      background-color: var(--color-background) !important;
+      border: 1px solid var(--color-border) !important;
+      border-radius: 6px;
+      &:hover {
+        border-color: var(--color-primary) !important;
+      }
+    }
+    .ant-select-selection-item {
+      color: var(--color-text-primary);
+    }
+    .ant-select-arrow {
+      color: var(--color-text-secondary);
+    }
+  }
 }
 
-// Theme the text inside the alert
-.ant-alert-message {
-  color: var(--color-text-primary) !important;
-}
-
-.ant-alert-description {
-  color: var(--color-text-secondary) !important;
-}
-
-// Theme the icons based on the alert type
-.ant-alert-info .ant-alert-icon {
-  color: var(--color-primary) !important;
-}
-
-.ant-alert-success .ant-alert-icon {
-  color: var(--color-success) !important;
-}
-
-.ant-alert-warning .ant-alert-icon {
-  color: var(--color-warning) !important;
-}
-
-.ant-alert-error .ant-alert-icon {
-  color: var(--color-accent) !important; /* Uses your theme's accent color for errors */
+/* --- Themed SVG Logo --- */
+.themed-logo {
+  display: inline-block;
+  background-color: var(--color-text-primary);
+  mask-image: url('/assets/images/TunivLogo.svg');
+  -webkit-mask-image: url('/assets/images/TunivLogo.svg');
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  transition: background-color 0.2s ease;
 }
 
 /* ==========================================================================
-   5. NG-ZORRO Component Overrides (Add this section if you don't have it)
+   5. UX POLISH & UTILITIES
    ========================================================================== */
 
-/* --- Modals --- */
-/* This themes the entire modal window */
-
-// The main content container of the modal
-.ant-modal-content {
-  background-color: var(--color-surface) !important;
+/* --- Themed Scrollbar --- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
-
-// The header section
-.ant-modal-header {
-  background-color: var(--color-surface) !important;
-  border-bottom: 1px solid var(--color-border) !important;
+::-webkit-scrollbar-track {
+  background: var(--color-background);
 }
-
-// The title text within the header
-.ant-modal-title {
-  color: var(--color-text-primary) !important;
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 10px;
+  border: 2px solid var(--color-background);
 }
-
-// The 'X' close button icon
-.ant-modal-close-x {
-  color: var(--color-text-secondary) !important;
-}
-
-// The footer section with the OK/Cancel buttons
-.ant-modal-footer {
-  border-top: 1px solid var(--color-border) !important;
-  background-color: transparent !important; // Footer should match the surface
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
 }

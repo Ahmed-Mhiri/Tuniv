@@ -1,19 +1,36 @@
 package com.tuniv.backend.qa.repository;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.tuniv.backend.qa.model.Comment;
 
 @Repository
 public interface CommentRepository extends JpaRepository<Comment, Integer> {
-    // ✅ FIX: Changed from AnswerAnswerId to AnswerId
+
     List<Comment> findByAnswerIdOrderByCreatedAtAsc(Integer answerId);
-    
-    // ✅ FIX: Changed from AnswerAnswerId to AnswerId
     List<Comment> findByAnswerIdAndParentCommentIsNullOrderByCreatedAtAsc(Integer answerId);
-    
     List<Comment> findByAuthorUserIdOrderByCreatedAtDesc(Integer userId);
+
+    // --- ⬇️ NEW OPTIMIZED METHOD TO ADD ⬇️ ---
+
+    /**
+     * Fetches all top-level comments for a given list of answer IDs.
+     * It also eagerly fetches the comment's author and attachments.
+     * Another key batch-fetching method.
+     */
+    @Query("SELECT c FROM Comment c " +
+           "JOIN FETCH c.author " +
+           "LEFT JOIN FETCH c.attachments " +
+           "WHERE c.answer.id IN :answerIds AND c.parentComment IS NULL")
+    List<Comment> findTopLevelByAnswerIdsWithDetails(@Param("answerIds") List<Integer> answerIds);
+
+
+    @Query("SELECT c FROM Comment c JOIN FETCH c.author WHERE c.id = :commentId")
+    Optional<Comment> findWithAuthorById(@Param("commentId") Integer commentId);
 }

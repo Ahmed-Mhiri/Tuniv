@@ -1,92 +1,125 @@
+// --- Main Page Layout ---
+
 .page-container {
-  max-width: 1280px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 2rem 1.5rem;
 }
 
 .page-header {
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   h1 {
-    font-family: var(--font-display);
-    font-size: 2.25rem;
-    font-weight: 700;
+    margin-bottom: 0.5rem;
   }
+}
+
+// --- Toolbar and Search ---
+
+.toolbar {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 1.5rem;
+  gap: 1rem;
+}
+
+.search-input {
+  max-width: 400px;
+  width: 100%;
+}
+
+// --- Content and Status Containers ---
+
+.content-container {
+  // This is crucial for the spinner overlay to be contained correctly
+  position: relative;
 }
 
 .status-container {
   display: flex;
   justify-content: center;
-  padding: 4rem;
+  align-items: center;
+  min-height: 400px; // A bit more height for better vertical centering
 }
+
+.empty-state {
+  // university-grid is a grid container, so this makes the empty state span all columns
+  grid-column: 1 / -1;
+}
+
+// --- University Grid & Cards ---
 
 .university-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 1.5rem;
+  min-height: 400px; // Prevents layout shift when loading the first page
 }
 
 .university-card {
-  height: 100%;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-}
 
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
 
-.card-title {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: 0.25rem;
-}
+    .card-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      line-height: 1.4;
+      margin: 0;
+      color: var(--color-text-primary);
+      transition: color 0.2s;
 
-// --- REMOVED: The .card-subtitle class is no longer in use ---
+      &:hover {
+        color: var(--color-primary);
+      }
+    }
+  }
 
-// =========================================================================
-// ✅ NEW STYLES ADDED for the metadata section
-// =========================================================================
-.card-meta {
-  display: flex;
-  gap: 1.5rem;
-  color: var(--color-text-secondary);
-  font-size: 0.875rem; /* 14px */
-  margin-top: 0.75rem;
-  padding-bottom: 1.25rem;
-  border-bottom: 1px solid var(--color-border);
-}
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    color: var(--color-text-secondary);
+    font-size: 0.875rem;
+    margin-bottom: 1.5rem;
+    flex-grow: 1; // Pushes actions to the bottom
 
-.meta-item,
-.meta-item-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
+    [nz-icon] {
+      margin-right: 0.5rem;
+      font-size: 1rem;
+    }
 
-.meta-item-link {
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  transition: color 0.2s;
+    .meta-item,
+    .meta-item-link {
+      display: flex;
+      align-items: center;
+    }
 
-  &:hover {
-    color: var(--color-primary);
+    .meta-item-link {
+      color: var(--color-text-secondary);
+      transition: color 0.2s ease;
+      &:hover {
+        color: var(--color-primary);
+        text-decoration: none;
+      }
+    }
+  }
+
+  .card-actions {
+    display: flex;
   }
 }
-// =========================================================================
 
-.card-actions {
-  margin-top: auto; // Push actions to the bottom
-  padding-top: 1.25rem; // Spacing from the border above
-  text-align: right;
-  // border-top has been removed as .card-meta now provides the separator
-}
 
-.joined-badge {
-  white-space: nowrap;
+// --- Paginator ---
+
+app-paginator {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
 }

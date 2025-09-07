@@ -1,5 +1,6 @@
 package com.tuniv.backend.user.mapper;
 
+import com.tuniv.backend.user.dto.LeaderboardUserDto;
 import com.tuniv.backend.user.dto.UserProfileDto;
 import com.tuniv.backend.user.model.User;
 
@@ -17,6 +18,14 @@ public class UserMapper {
                 user.getBio(),
                 user.getMajor(),
                 user.getReputationScore()
+        );
+    }
+    public static LeaderboardUserDto toLeaderboardUserDto(User user) {
+        return new LeaderboardUserDto(
+            user.getUserId(),
+            user.getUsername(),
+            user.getReputationScore(),
+            user.getProfilePhotoUrl()
         );
     }
 }

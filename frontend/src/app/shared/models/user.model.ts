@@ -14,3 +14,21 @@ export interface UserProfileUpdateRequest {
   major?: string;
   profilePhotoUrl?: string;
 }
+
+// --- NEW ---
+// Matches the CommunityDto from the backend for the "My Communities" feature.
+export interface UserCommunity {
+  id: number;
+  type: 'UNIVERSITY'; // Currently only supports University
+  name: string;
+  memberCount: number;
+}
+
+// --- NEW ---
+// Matches the LeaderboardUserDto from the backend.
+export interface LeaderboardUser {
+  userId: number;
+  username: string;
+  reputationScore: number;
+  profilePhotoUrl: string | null;
+}

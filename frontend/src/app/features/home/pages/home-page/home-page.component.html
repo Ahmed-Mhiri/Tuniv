@@ -1,6 +1,23 @@
-<div class="page-container" nz-row [nzGutter]="[24, 24]">
+<div class="page-container">
+  <main class="main-content">
+    @if (!authService.isUserLoggedIn()) {
+      <div class="hero-section">
+        <h1 class="hero-title">The Answer to Your University Questions</h1>
+        <p class="hero-subtitle">
+          Stop searching, start learning. Tuniv is the Q&A hub for Tunisian students. Join your university's community, get expert answers, and build a powerful knowledge base.
+        </p>
+        <div class="hero-actions">
+          <a routerLink="/auth/register" nz-button nzType="primary" nzSize="large" class="btn-accent">Create a Free Account</a>
+          <a routerLink="/universities" nz-button nzType="default" nzSize="large">Explore Universities</a>
+        </div>
+      </div>
+    } @else {
+      <a class="create-post-card" (click)="handleAskQuestionClick(authModalFooter)">
+        <span nz-icon nzType="plus-circle" nzTheme="outline" class="create-post-icon"></span>
+        <div class="create-post-input" role="textbox">Ask a Question</div>
+      </a>
+    }
 
-  <div class="main-content" nz-col nzXs="24" nzLg="16">
     @if (isLoading()) {
       <div class="spinner-container">
         <nz-spin nzSimple nzSize="large"></nz-spin>
@@ -11,11 +28,23 @@
           <app-question-list-item [question]="item"></app-question-list-item>
         } @empty {
           <nz-card class="empty-feed-card">
-            <nz-empty nzNotFoundImage="https-gw.alipayobjects.com/zos/antfincdn/ZHrcdLPrvN/empty.svg"
-              nzNotFoundContent="Your home feed is empty.">
-              <p class="empty-subtext">Join universities and modules to see questions from your communities here.</p>
+            <nz-empty nzNotFoundImage="https://gw.alipayobjects.com/zos/antfincdn/ZHrcdLPrvN/empty.svg"
+                      [nzNotFoundContent]="emptyFeedContent">
+              <ng-template #emptyFeedContent>
+                @if (authService.isUserLoggedIn()) {
+                  <p>Your home feed is empty.</p>
+                  <p class="empty-subtext">Join universities to see questions from your communities here.</p>
+                } @else {
+                  <p>There are no popular posts right now.</p>
+                  <p class="empty-subtext">Be the first to ask a question and get the conversation started!</p>
+                }
+              </ng-template>
               <div nz-empty-footer>
-                <a routerLink="/universities" nz-button nzType="primary">Explore Universities</a>
+                @if (authService.isUserLoggedIn()) {
+                  <a routerLink="/universities" nz-button nzType="primary">Explore Universities</a>
+                } @else {
+                  <a (click)="handleAskQuestionClick(authModalFooter)" nz-button nzType="primary">Ask a Question</a>
+                }
               </div>
             </nz-empty>
           </nz-card>
@@ -30,51 +59,90 @@
         </div>
       }
     }
-  </div>
+  </main>
 
-  <div class="sidebar" nz-col nzXs="24" nzLg="8">
-    <div class="sticky-sidebar-content">
-    
-      <nz-card class="sidebar-card info-card">
-        <div class="sidebar-header">
-          <img src="/assets/images/home-banner.png" alt="Community Banner" class="sidebar-banner"/>
-          <h2 class="sidebar-title">Home</h2>
-        </div>
-        <p class="sidebar-description">
-          Your personal frontpage. Come here to check in with your
-          favorite communities.
-        </p>
-        <nz-divider></nz-divider>
-        <div class="sidebar-actions">
-          <a routerLink="/qa/ask" nz-button nzType="primary" nzBlock class="btn-accent">Ask a Question</a>
-          <a routerLink="/universities" nz-button nzType="default" nzBlock>Explore Universities</a>
-        </div>
-      </nz-card>
-
-      <nz-card class="sidebar-card community-card" [nzTitle]="topUniversitiesTitle" [nzBordered]="false">
-        <ng-template #topUniversitiesTitle>
-          <div class="card-title-wrapper">
-            <span nz-icon nzType="fire" nzTheme="fill"></span>
-            Top Universities
-          </div>
-        </ng-template>
-        <nz-list [nzDataSource]="topUniversities()" [nzRenderItem]="uniItem" [nzSplit]="false">
-          <ng-template #uniItem let-uni let-i="index">
-            <nz-list-item>
-              <a [routerLink]="['/universities', uni.universityId, 'modules']" class="community-link">
-                <span class="community-rank">{{ i + 1 }}</span>
-                <span nz-icon nzType="bank" class="community-icon"></span>
-                <div class="community-info">
-                  <span class="community-name">{{ uni.name }}</span>
-                  <span class="community-meta">{{ uni.memberCount | number }} members</span>
-                </div>
-                <span nz-icon nzType="right" class="community-arrow"></span>
-              </a>
-            </nz-list-item>
+  <aside class="sidebar">
+    @if (authService.isUserLoggedIn()) {
+      @if(myCommunities().length > 0) {
+        <nz-card class="sidebar-card" [nzTitle]="myCommunitiesTitle" [nzBordered]="false">
+          <ng-template #myCommunitiesTitle>
+            <div class="card-title-wrapper">
+              <span nz-icon nzType="book" nzTheme="fill"></span>
+              My Communities
+            </div>
           </ng-template>
-        </nz-list>
-      </nz-card>
+          <nz-list [nzDataSource]="myCommunities()" [nzRenderItem]="communityItem" [nzSplit]="false">
+            <ng-template #communityItem let-community>
+              <nz-list-item>
+                <a [routerLink]="['/universities', community.id, 'modules']" class="community-link">
+                  <span nz-icon nzType="bank" class="community-icon"></span>
+                  <div class="community-info">
+                    <span class="community-name">{{ community.name }}</span>
+                  </div>
+                  <span nz-icon nzType="right" class="community-arrow"></span>
+                </a>
+              </nz-list-item>
+            </ng-template>
+          </nz-list>
+          <div class="sidebar-actions">
+              <a routerLink="/universities" nz-button nzType="default" nzBlock>Explore More</a>
+          </div>
+        </nz-card>
+      }
+    }
 
-    </div>
-  </div>
+    <nz-card class="sidebar-card" [nzTitle]="leaderboardTitle" [nzBordered]="false">
+      <ng-template #leaderboardTitle>
+        <div class="card-title-wrapper">
+          <span nz-icon nzType="trophy" nzTheme="fill"></span>
+          Leaderboard
+        </div>
+      </ng-template>
+      <nz-list [nzDataSource]="leaderboard()" [nzRenderItem]="leaderboardItem" [nzSplit]="false">
+        <ng-template #leaderboardItem let-user let-i="index">
+          <nz-list-item>
+            <a [routerLink]="['/users', user.userId]" class="community-link">
+              <span class="community-rank">{{ i + 1 }}</span>
+              <nz-avatar [nzSize]="32" nzIcon="user" [nzSrc]="user.profilePhotoUrl ?? undefined"></nz-avatar>
+              <div class="community-info">
+                <span class="community-name">{{ user.username }}</span>
+                <span class="community-meta">{{ user.reputationScore | number }} reputation</span>
+              </div>
+              <span nz-icon nzType="right" class="community-arrow"></span>
+            </a>
+          </nz-list-item>
+        </ng-template>
+      </nz-list>
+    </nz-card>
+
+    <nz-card class="sidebar-card" [nzTitle]="topUniversitiesTitle" [nzBordered]="false">
+      <ng-template #topUniversitiesTitle>
+        <div class="card-title-wrapper">
+          <span nz-icon nzType="fire" nzTheme="fill"></span>
+          Top Communities
+        </div>
+      </ng-template>
+      <nz-list [nzDataSource]="topUniversities()" [nzRenderItem]="uniItem" [nzSplit]="false">
+        <ng-template #uniItem let-uni let-i="index">
+          <nz-list-item>
+            <a [routerLink]="['/universities', uni.universityId, 'modules']" class="community-link">
+              <span class="community-rank">{{ i + 1 }}</span>
+              <span nz-icon nzType="bank" class="community-icon"></span>
+              <div class="community-info">
+                <span class="community-name">{{ uni.name }}</span>
+                <span class="community-meta">{{ uni.memberCount | number }} members</span>
+              </div>
+              <span nz-icon nzType="right" class="community-arrow"></span>
+            </a>
+          </nz-list-item>
+        </ng-template>
+      </nz-list>
+    </nz-card>
+  </aside>
 </div>
+
+<ng-template #authModalFooter>
+  <button nz-button (click)="handleCancel()">Cancel</button>
+  <button nz-button (click)="handleRegister()">Register</button>
+  <button nz-button nzType="primary" (click)="handleLogin()">Log In</button>
+</ng-template>

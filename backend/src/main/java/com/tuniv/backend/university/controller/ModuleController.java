@@ -1,7 +1,7 @@
 package com.tuniv.backend.university.controller;
 
-import java.util.List;
-
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,32 +17,29 @@ import com.tuniv.backend.university.service.ModuleService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/v1") // A common base path
+@RequestMapping("/api/v1/modules") // All endpoints start with /modules
 @RequiredArgsConstructor
 public class ModuleController {
 
     private final ModuleService moduleService;
 
     /**
-     * Endpoint to get all modules for a specific university.
+     * GET /api/v1/modules
+     * Get a paginated list of all modules across all universities.
      */
-    @GetMapping("/universities/{universityId}/modules")
-    public ResponseEntity<List<ModuleDto>> getModulesByUniversity(@PathVariable Integer universityId) {
-        return ResponseEntity.ok(moduleService.getModulesByUniversity(universityId));
+    @GetMapping
+    public ResponseEntity<Page<ModuleDto>> getAllModules(Pageable pageable) {
+        return ResponseEntity.ok(moduleService.getAllModules(pageable));
     }
 
     /**
-     * Endpoint to get a list of all modules.
+     * GET /api/v1/modules/{moduleId}
+     * Get detailed information for a single module by its ID.
      */
-    @GetMapping("/modules")
-    public ResponseEntity<List<ModuleDto>> getAllModules() {
-        return ResponseEntity.ok(moduleService.getAllModules());
-    }
-    @GetMapping("/modules/{moduleId}")
+    @GetMapping("/{moduleId}")
     public ResponseEntity<ModuleDetailDto> getModuleById(
-        @PathVariable Integer moduleId,
-        @AuthenticationPrincipal UserDetailsImpl currentUser
-    ) {
+            @PathVariable Integer moduleId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
         return ResponseEntity.ok(moduleService.getModuleDetails(moduleId, currentUser));
     }
 }

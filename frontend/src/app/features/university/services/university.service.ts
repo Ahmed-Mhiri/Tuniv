@@ -1,9 +1,10 @@
 // src/app/features/universities/services/university.service.ts
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { University, Module } from '../../../shared/models/university.model';
+import { Page } from '../../../shared/models/pagination.model';
 
 @Injectable({
   providedIn: 'root'
@@ -16,8 +17,16 @@ export class UniversityService {
    * Fetches all universities and their modules.
    * Corresponds to: GET /api/v1/universities
    */
-  getAllUniversities(): Observable<University[]> {
-    return this.http.get<University[]>(`${this.apiUrl}/universities`);
+  getAllUniversities(page: number, size: number, searchTerm: string): Observable<Page<University>> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('size', size.toString());
+
+    if (searchTerm) {
+      params = params.set('search', searchTerm);
+    }
+
+    return this.http.get<Page<University>>(`${this.apiUrl}/universities`, { params });
   }
 
   // --- METHOD REMOVED ---
@@ -38,4 +47,11 @@ export class UniversityService {
   unjoinUniversity(universityId: number): Observable<unknown> {
     return this.http.delete(`${this.apiUrl}/universities/${universityId}/members`);
   }
+  getJoinedUniversities(): Observable<University[]> {
+  return this.http.get<University[]>(`${this.apiUrl}/universities/joined`);
+}
+
+getTopUniversities(): Observable<University[]> {
+  return this.http.get<University[]>(`${this.apiUrl}/universities/top`);
+}
 }

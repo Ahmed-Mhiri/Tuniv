@@ -76,6 +76,25 @@
       <div class="answers-container">
         @if (authService.isUserLoggedIn()) {
           <app-answer-form (answerSubmit)="handleAnswerSubmit($event)"></app-answer-form>
+          <nz-divider></nz-divider>
+        }
+
+        @if (!authService.isUserLoggedIn()) {
+          <div class="cta-container">
+            <nz-alert
+              nzType="info"
+              nzMessage="Have an answer? Join the conversation!"
+              nzDescription="Log in or create an account to share your knowledge with the community."
+              [nzAction]="loginActions"
+              nzShowIcon
+            ></nz-alert>
+            <ng-template #loginActions>
+              <div class="cta-actions">
+                <a routerLink="/login" nz-button nzType="primary">Log In</a>
+                <a routerLink="/register" nz-button>Sign Up</a>
+              </div>
+            </ng-template>
+          </div>
         }
         
         <div class="answers-section">
@@ -88,19 +107,7 @@
             ></app-answer-item>
           } @empty {
             <div class="py-8">
-              @if(!authService.isUserLoggedIn()){
-                <nz-alert
-                  nzType="info"
-                  nzMessage="You must be logged in to post an answer."
-                  [nzAction]="loginAction"
-                  nzShowIcon
-                ></nz-alert>
-                <ng-template #loginAction>
-                  <a routerLink="/login" nz-button nzType="primary" nzSize="small">Login</a>
-                </ng-template>
-              } @else {
-                <nz-empty nzNotFoundContent="No answers yet. Be the first to help!"></nz-empty>
-              }
+              <nz-empty nzNotFoundContent="No answers yet. Be the first to help!"></nz-empty>
             </div>
           }
         </div>

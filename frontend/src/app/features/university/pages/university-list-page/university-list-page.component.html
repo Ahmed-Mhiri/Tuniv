@@ -6,61 +6,101 @@
     </p>
   </div>
 
-  @if (isLoading()) {
+  <div class="toolbar">
+    <nz-input-group nzSearch [nzSuffix]="inputClearTpl" class="search-input">
+      <input
+        type="text"
+        nz-input
+        placeholder="Search for a university..."
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchSubject.next($event)"
+      />
+    </nz-input-group>
+    <ng-template #inputClearTpl>
+      <span
+        nz-icon
+        class="ant-input-clear-icon"
+        nzTheme="fill"
+        nzType="close-circle"
+        *ngIf="searchTerm()"
+        (click)="searchSubject.next(''); searchTerm.set('')"
+      ></span>
+    </ng-template>
+  </div>
+
+  @if (isLoading() && universities().length === 0) {
     <div class="status-container">
-      <app-spinner></app-spinner>
+      <app-spinner [overlay]="false" tip="Loading Universities..."></app-spinner>
     </div>
   } @else if (error()) {
     <nz-alert nzType="error" [nzMessage]="error()"></nz-alert>
   } @else {
-    <div class="university-grid">
-      @for (uni of universities(); track uni.universityId) {
-        <nz-card class="university-card">
-  <div class="card-header">
-    <a [routerLink]="['/universities', uni.universityId, 'modules']" [state]="{ universityName: uni.name }">
-      <h3 class="card-title">{{ uni.name }}</h3>
-    </a>
-    @if (uni.isMember) {
-      <nz-badge nzStatus="success" nzText="Joined" class="joined-badge"></nz-badge>
-    }
-  </div>
+    <div class="content-container">
+      <div class="university-grid">
+        @for (uni of universities(); track uni.universityId) {
+          <nz-card class="university-card">
+            <div class="card-header">
+              <a [routerLink]="['/universities', uni.universityId, 'modules']" [state]="{ universityName: uni.name }">
+                <h3 class="card-title">{{ uni.name }}</h3>
+              </a>
+              @if (uni.isMember) {
+                <nz-badge nzStatus="success" nzText="Joined" class="joined-badge"></nz-badge>
+              }
+            </div>
+      
+            <div class="card-meta">
+              <a class="meta-item-link" [routerLink]="['/universities', uni.universityId, 'modules']" [state]="{ universityName: uni.name }">
+                <span nz-icon nzType="book"></span>
+                {{ uni.modules.length }} modules
+              </a>
+              <span class="meta-item">
+                <span nz-icon nzType="team"></span>
+                {{ uni.memberCount }} members
+              </span>
+            </div>
+            <div class="card-actions">
+              @if (uni.isMember) {
+                <button
+                  nz-button
+                  nzType="default"
+                  nzDanger
+                  [nzLoading]="actionInProgress() === uni.universityId"
+                  nz-popconfirm
+                  nzPopconfirmTitle="Are you sure you want to unjoin?"
+                  (nzOnConfirm)="unjoin(uni)"
+                >
+                  Unjoin
+                </button>
+              } @else {
+                <button
+                  nz-button
+                  nzType="primary"
+                  [nzLoading]="actionInProgress() === uni.universityId"
+                  (click)="join(uni)"
+                >
+                  <span nz-icon nzType="plus"></span>
+                  Join
+                </button>
+              }
+            </div>
+          </nz-card>
+        } @empty {
+          <div class="status-container empty-state">
+            <nz-empty nzNotFoundContent="No universities found matching your search."></nz-empty>
+          </div>
+        }
+      </div>
 
-  <div class="card-meta">
-    <a class="meta-item-link" [routerLink]="['/universities', uni.universityId, 'modules']" [state]="{ universityName: uni.name }">
-      <span nz-icon nzType="book"></span>
-      {{ uni.modules.length }} modules
-    </a>
-    <span class="meta-item">
-      <span nz-icon nzType="team"></span>
-      {{ uni.memberCount }} members
-    </span>
-  </div>
-  <div class="card-actions">
-    @if (uni.isMember) {
-      <button
-        nz-button
-        nzType="default"
-        nzDanger
-        [nzLoading]="actionInProgress() === uni.universityId"
-        nz-popconfirm
-        nzPopconfirmTitle="Are you sure you want to unjoin?"
-        (nzOnConfirm)="unjoin(uni)"
-      >
-        Unjoin
-      </button>
-    } @else {
-      <button
-        nz-button
-        nzType="primary"
-        [nzLoading]="actionInProgress() === uni.universityId"
-        (click)="join(uni)"
-      >
-        <span nz-icon nzType="plus"></span>
-        Join
-      </button>
-    }
-  </div>
-</nz-card>
+      @if (pageInfo()) {
+        <app-paginator 
+          [page]="pageInfo()!" 
+          (pageChange)="onPageChange($event)" 
+          (pageSizeChange)="onPageSizeChange($event)"
+        ></app-paginator>
+      }
+
+      @if (isLoading()) {
+        <app-spinner [overlay]="true"></app-spinner>
       }
     </div>
   }

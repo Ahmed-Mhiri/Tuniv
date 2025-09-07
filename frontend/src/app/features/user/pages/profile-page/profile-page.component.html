@@ -27,14 +27,21 @@
             Edit Profile
           </a>
         } @else {
-          <button nz-button nzType="primary" class="message-button" (click)="startConversation()">
+          <button 
+            nz-button 
+            nzType="primary" 
+            class="message-button"
+            [disabled]="!authService.isUserLoggedIn()"
+            nz-tooltip 
+            nzTooltipTitle="You must be logged in to send a message"
+            (click)="startConversation()">
             <span nz-icon nzType="message"></span>
             Message
           </button>
         }
       </div>
 
-      <nz-tabset (nzSelectChange)="loadActivity()">
+      <nz-tabset (nzSelectChange)="onTabChange($event, authModalFooter)">
         <nz-tab nzTitle="Profile Details">
           <div class="tab-content">
             <h2>Bio</h2>
@@ -104,3 +111,9 @@
     </nz-card>
   }
 </div>
+
+<ng-template #authModalFooter>
+  <button nz-button (click)="handleCancel()">Cancel</button>
+  <button nz-button (click)="handleRegister()">Register</button>
+  <button nz-button nzType="primary" (click)="handleLogin()">Log In</button>
+</ng-template>

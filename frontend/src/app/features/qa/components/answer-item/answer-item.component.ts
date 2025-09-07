@@ -87,6 +87,12 @@ export class AnswerItemComponent {
   }
 
   handleVote(voteValue: number): void {
+    // ✅ ADD THIS CHECK
+    if (!this.authService.isUserLoggedIn()) {
+      this.message.info('You must be logged in to vote.');
+      return;
+    }
+    
     const valueToSubmit = voteValue >= 0 ? 1 : -1;
     this.voteService.voteOnAnswer(this.answer().answerId, valueToSubmit).subscribe({
       next: () => {

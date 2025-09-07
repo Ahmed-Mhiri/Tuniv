@@ -1,13 +1,15 @@
-@if (shouldShowPaginator()) {
-  <div class="paginator-container">
-    <nz-pagination
-      [nzPageIndex]="pageInfo().pageNumber + 1"
-      [nzPageSize]="pageInfo().pageSize"
-      [nzTotal]="pageInfo().totalElements"
-      [nzPageSizeOptions]="pageSizeOptions()"
-      [nzShowSizeChanger]="true"
-      (nzPageIndexChange)="onPageIndexChange($event)"
-      (nzPageSizeChange)="onPageSizeChange($event)"
-    ></nz-pagination>
-  </div>
+@if (pageInfo(); as info) {
+  @if (info.totalElements > info.pageSize) {
+    <div class="paginator-container">
+      <nz-pagination
+        [nzPageIndex]="info.pageNumber + 1"
+        [nzPageSize]="info.pageSize"
+        [nzTotal]="info.totalElements"
+        [nzPageSizeOptions]="pageSizeOptions()"
+        [nzShowSizeChanger]="true"
+        (nzPageIndexChange)="onPageIndexChange($event)"
+        (nzPageSizeChange)="onPageSizeChange($event)"
+      ></nz-pagination>
+    </div>
+  }
 }

@@ -13,4 +13,7 @@ public interface QuestionVoteRepository extends JpaRepository<QuestionVote, Ques
 
     // ✅ FIX: Changed from QuestionQuestionIdIn to QuestionIdIn
     List<QuestionVote> findByQuestionIdIn(List<Integer> questionIds);
+
+    List<QuestionVote> findByUserIdAndQuestionIdIn(Integer userId, List<Integer> questionIds);
+
 }

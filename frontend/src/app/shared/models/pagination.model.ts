@@ -1,3 +1,5 @@
+// src/app/shared/models/pagination.model.ts
+
 /**
  * Interface for making paginated API REQUESTS.
  * Tells the backend which page and size to return.
@@ -5,7 +7,7 @@
 export interface Pageable {
   page: number;
   size: number;
-  sort: string;
+  sort?: string; // Sort is often optional
 }
 
 /**
@@ -15,14 +17,14 @@ export interface Pageable {
  */
 export interface Page<T> {
   content: T[];
-  pageable: {
-    pageNumber: number;
-    pageSize: number;
-  };
+  
+  // ✅ CORRECTED: Properties are now at the top level
+  pageNumber: number;
+  pageSize: number;
+  
   totalElements: number;
   totalPages: number;
-    last: boolean; // ✅ ADD THIS LINE
-
+  last: boolean;
 }
 
 /**

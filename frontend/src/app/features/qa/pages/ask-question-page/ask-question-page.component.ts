@@ -138,27 +138,36 @@ export class AskQuestionPageComponent implements OnInit {
 
   private handleGlobalPost(): void {
     this.isContextualPost.set(false);
-    this.universityService.getAllUniversities().pipe(
-      map(universities => universities.filter(u => u.isMember))
-    ).subscribe({
-      next: (joinedUniversities) => this.universities.set(joinedUniversities),
-      error: () => this.message.error('Failed to load your universities.'),
-      complete: () => this.isLoading.set(false),
+    this.isLoading.set(true); // Start loading
+
+    // ✅ REPLACED THE OLD, INEFFICIENT CODE
+    this.universityService.getJoinedUniversities().subscribe({
+      next: (joinedUniversities) => {
+        this.universities.set(joinedUniversities);
+        this.isLoading.set(false);
+      },
+      error: () => {
+        this.message.error('Failed to load your universities.');
+        this.isLoading.set(false);
+      },
     });
 
+    // This valueChanges subscription can remain exactly as it is
     this.questionForm.get('universityId')?.valueChanges.subscribe(universityId => {
-      this.questionForm.get('moduleId')?.reset();
-      this.modules.set([]);
-      if (universityId) {
-        this.isLoadingModules.set(true);
-        this.moduleService.getModulesByUniversity(universityId).subscribe({
-          next: (data) => this.modules.set(data),
-          error: () => this.message.error('Failed to load modules for this university.'),
-          complete: () => this.isLoadingModules.set(false),
-        });
-      }
+  this.questionForm.get('moduleId')?.reset();
+  this.modules.set([]);
+  if (universityId) {
+    this.isLoadingModules.set(true);
+    // ✅ Call the new, correct method
+    this.moduleService.getModulesForDropdown(universityId).subscribe({
+      next: (data) => this.modules.set(data), // 'data' is now the Module[] array you expect
+      error: () => this.message.error('Failed to load modules for this university.'),
+      complete: () => this.isLoadingModules.set(false),
     });
   }
+});
+  }
+
 
   beforeUpload = (file: NzUploadFile): Observable<boolean> => {
     this.filesToUpload.update(list => [...list, file as unknown as File]);

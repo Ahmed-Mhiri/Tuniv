@@ -10,31 +10,30 @@ import com.tuniv.backend.university.dto.UniversityDto;
 import com.tuniv.backend.university.model.Module;
 import com.tuniv.backend.university.model.University;
 
-public final class UniversityMapper { // Use 'final' for utility classes with only static methods
+public final class UniversityMapper {
 
     private UniversityMapper() {
         // Private constructor to prevent instantiation
     }
 
     public static UniversityDto toUniversityDto(University university, boolean isMember) {
-    if (university == null) {
-        return null;
+        if (university == null) {
+            return null;
+        }
+
+        return new UniversityDto(
+            university.getUniversityId(),
+            university.getName(),
+            university.getModules() != null ?
+                university.getModules().stream()
+                    .map(UniversityMapper::toModuleDto)
+                    .collect(Collectors.toList()) :
+                Collections.emptyList(),
+            isMember,
+            // ✅ CORRECTED METHOD CALL
+            university.getMemberships() != null ? university.getMemberships().size() : 0
+        );
     }
-
-    return new UniversityDto(
-        university.getUniversityId(),
-        university.getName(),
-        university.getModules() != null ?
-            university.getModules().stream()
-                .map(UniversityMapper::toModuleDto)
-                .collect(Collectors.toList()) :
-            Collections.emptyList(),
-        isMember,
-        // ✅ ADD THIS LINE: Calculate the size of the members set
-        university.getMembers() != null ? university.getMembers().size() : 0
-    );
-}
-
 
     public static UniversityDto toUniversityDto(University university) {
         return toUniversityDto(university, false);
@@ -55,14 +54,12 @@ public final class UniversityMapper { // Use 'final' for utility classes with on
             return null;
         }
 
-        // Create the nested University DTO, now including the isMember flag
         UniversityBasicDto universityDto = new UniversityBasicDto(
             module.getUniversity().getUniversityId(),
             module.getUniversity().getName(),
-            isMember // <-- Pass the calculated status here
+            isMember
         );
 
-        // Create the main Module Detail DTO
         return new ModuleDetailDto(
             module.getModuleId(),
             module.getName(),

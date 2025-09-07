@@ -1,5 +1,21 @@
-.paginator-container {
+// Add this to spinner.component.scss
+
+:host {
+  display: contents; // Allows the spinner to position itself correctly within the parent
+}
+
+.spinner-overlay {
+  position: absolute;
+  inset: 0; // Covers the entire parent (top: 0, right: 0, bottom: 0, left: 0)
+  z-index: 10;
+  
+  // Creates a semi-transparent backdrop
+  background-color: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  backdrop-filter: blur(2px);
+
+  // Centers the nz-spin component within the overlay
   display: flex;
   justify-content: center;
-  margin-top: 2rem;
+  align-items: center;
+  border-radius: 8px; // Optional: match parent's border-radius
 }

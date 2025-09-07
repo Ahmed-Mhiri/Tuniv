@@ -187,8 +187,15 @@ export class QuestionDetailPageComponent implements OnInit {
   // The key is that `refreshData` itself is now immediate and reliable.
 
   handleQuestionVote(voteValue: 1 | -1): void {
+    // ✅ ADD THIS CHECK
+    if (!this.authService.isUserLoggedIn()) {
+      this.message.info('You must be logged in to vote.');
+      return;
+    }
+
     const questionId = this.question()?.questionId;
     if (!questionId) return;
+
     this.voteService.voteOnQuestion(questionId, voteValue).subscribe({
       next: () => {
         this.message.success('Vote registered!');
@@ -197,4 +204,5 @@ export class QuestionDetailPageComponent implements OnInit {
       error: (err) => this.message.error(err.error?.message || 'Failed to register vote.'),
     });
   }
+
 }

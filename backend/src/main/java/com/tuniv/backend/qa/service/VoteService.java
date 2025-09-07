@@ -16,6 +16,7 @@ import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.model.AnswerVote;
 import com.tuniv.backend.qa.model.Comment;
 import com.tuniv.backend.qa.model.CommentVote;
+import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.qa.model.Question;
 import com.tuniv.backend.qa.model.QuestionVote;
 import com.tuniv.backend.qa.model.Vote;
@@ -53,45 +54,43 @@ public class VoteService {
     @CacheEvict(value = "questions", key = "#questionId")
     public void voteOnQuestion(Integer questionId, UserDetailsImpl currentUser, short value) {
         User voter = findVoter(currentUser);
-        Question question = questionRepository.findById(questionId)
+        Question question = questionRepository.findWithAuthorById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
-        
+
         if (voter.getUserId().equals(question.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
         }
-        
+
         QuestionVote.QuestionVoteId voteId = new QuestionVote.QuestionVoteId(voter.getUserId(), questionId);
         Optional<QuestionVote> existingVote = questionVoteRepository.findById(voteId);
-        
-        QuestionVote newVote = QuestionVote.builder().id(voteId).user(voter).question(question).value(value).build();
 
+        QuestionVote newVote = QuestionVote.builder().id(voteId).user(voter).question(question).value(value).build();
         processVote(question.getAuthor(), existingVote, newVote, value, QUESTION_UPVOTE_REP, questionVoteRepository);
     }
 
     @Transactional
-    @CacheEvict(value = "questions", allEntries = true)
+    @CacheEvict(value = "questions", key = "#answer.question.id")
     public void voteOnAnswer(Integer answerId, UserDetailsImpl currentUser, short value) {
         User voter = findVoter(currentUser);
-        Answer answer = answerRepository.findById(answerId)
+        Answer answer = answerRepository.findWithAuthorById(answerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Answer not found"));
 
         if (voter.getUserId().equals(answer.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
         }
-        
+
         AnswerVote.AnswerVoteId voteId = new AnswerVote.AnswerVoteId(voter.getUserId(), answerId);
         Optional<AnswerVote> existingVote = answerVoteRepository.findById(voteId);
-
         AnswerVote newVote = AnswerVote.builder().id(voteId).user(voter).answer(answer).value(value).build();
-        
+
         processVote(answer.getAuthor(), existingVote, newVote, value, ANSWER_UPVOTE_REP, answerVoteRepository);
     }
 
     @Transactional
-    @CacheEvict(value = "questions", allEntries = true)
+    @CacheEvict(value = "questions", key = "#comment.answer.question.id")
     public void voteOnComment(Integer commentId, UserDetailsImpl currentUser, short value) {
         User voter = findVoter(currentUser);
-        Comment comment = commentRepository.findById(commentId)
+        Comment comment = commentRepository.findWithAuthorById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
 
         if (voter.getUserId().equals(comment.getAuthor().getUserId())) {
@@ -101,14 +100,12 @@ public class VoteService {
         CommentVote.CommentVoteId voteId = new CommentVote.CommentVoteId(voter.getUserId(), commentId);
         Optional<CommentVote> existingVote = commentVoteRepository.findById(voteId);
 
-        // --- THE FIX: Use the builder pattern for consistency and to avoid constructor errors. ---
         CommentVote newVote = CommentVote.builder()
                 .id(voteId)
                 .user(voter)
                 .comment(comment)
                 .value(value)
                 .build();
-
         processVote(comment.getAuthor(), existingVote, newVote, value, COMMENT_UPVOTE_REP, commentVoteRepository);
     }
 
@@ -121,44 +118,42 @@ public class VoteService {
             JpaRepository<V, ID> voteRepository
     ) {
         int reputationChange = 0;
+        Post post = newVote.getPost();
 
         if (existingVoteOpt.isPresent()) {
             V existingVote = existingVoteOpt.get();
             if (existingVote.getValue() == value) {
-                // User is retracting their vote
                 reputationChange = (existingVote.getValue() == 1) ? -upvoteReputation : -DOWNVOTE_REP;
                 voteRepository.delete(existingVote);
+                post.setScore(post.getScore() - value);
             } else {
-                // User is changing their vote (e.g., from up to down)
                 reputationChange = calculateReputationChange(existingVote.getValue(), value, upvoteReputation);
-                if (existingVote instanceof QuestionVote) ((QuestionVote) existingVote).setValue(value);
-                if (existingVote instanceof AnswerVote) ((AnswerVote) existingVote).setValue(value);
-                if (existingVote instanceof CommentVote) ((CommentVote) existingVote).setValue(value);
+                post.setScore(post.getScore() - existingVote.getValue() + value);
+
+                if (existingVote instanceof QuestionVote qv) qv.setValue(value);
+                if (existingVote instanceof AnswerVote av) av.setValue(value);
+                if (existingVote instanceof CommentVote cv) cv.setValue(value);
                 voteRepository.save(existingVote);
             }
         } else {
-            // This is a new vote
             voteRepository.save(newVote);
             reputationChange = (value == 1) ? upvoteReputation : DOWNVOTE_REP;
-            
-            if (value == 1) { // Publish event only for new upvotes
+            post.setScore(post.getScore() + value);
+
+            if (value == 1) {
                 User voter = (User) newVote.getUser();
-                
                 if (newVote instanceof QuestionVote qv) {
                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
-                        PostType.QUESTION, qv.getPostId(), qv.getQuestion().getTitle(), qv.getPostId()));
-                
+                            PostType.QUESTION, qv.getPostId(), qv.getQuestion().getTitle(), qv.getPostId()));
                 } else if (newVote instanceof AnswerVote av) {
                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
-                        PostType.ANSWER, av.getPostId(), av.getAnswer().getQuestion().getTitle(), av.getAnswer().getQuestion().getId()));
-                
+                            PostType.ANSWER, av.getPostId(), av.getAnswer().getQuestion().getTitle(), av.getAnswer().getQuestion().getId()));
                 } else if (newVote instanceof CommentVote cv) {
                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(),
-                        PostType.COMMENT, cv.getPostId(), cv.getComment().getAnswer().getQuestion().getTitle(), cv.getComment().getAnswer().getQuestion().getId()));
+                            PostType.COMMENT, cv.getPostId(), cv.getComment().getAnswer().getQuestion().getTitle(), cv.getComment().getAnswer().getQuestion().getId()));
                 }
             }
         }
-
         author.setReputationScore(author.getReputationScore() + reputationChange);
         userRepository.save(author);
     }

@@ -25,4 +25,12 @@ export class FeedService {
 
     return this.http.get<Page<Question>>(`${this.apiUrl}/feed`, { params });
   }
+
+  getPopularFeed(page: number = 0, size: number = 10): Observable<Page<Question>> {
+    let params = new HttpParams()
+      .set('page', page.toString())
+      .set('size', size.toString());
+    // No sort needed, the backend 'hot' algorithm handles it
+    return this.http.get<Page<Question>>(`${this.apiUrl}/feed/popular`, { params });
+  }
 }

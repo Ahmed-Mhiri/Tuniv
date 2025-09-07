@@ -107,4 +107,9 @@ public Integer getPostId() {
             return Objects.hash(userId, answerId);
         }
     }
+    
+    @Override
+public Post getPost() { // ✅ ADD THIS METHOD
+    return this.answer;
+}
 }

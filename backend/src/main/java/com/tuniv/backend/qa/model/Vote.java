@@ -6,4 +6,6 @@ public interface Vote {
     User getUser();
     short getValue();
     Integer getPostId(); // This is the key for generic processing
+    Post getPost(); // ✅ ADD THIS LINE
+
 }

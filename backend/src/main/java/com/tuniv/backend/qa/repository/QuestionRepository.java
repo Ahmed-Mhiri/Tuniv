@@ -10,25 +10,85 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.tuniv.backend.qa.dto.QuestionSummaryDto;
 import com.tuniv.backend.qa.model.Question;
 
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, Integer> {
-    // --- METHOD SIGNATURE CHANGED ---
-    // It now accepts a Pageable object and returns a Page of Questions
+    
+    // --- EXISTING METHODS (We will change where these are used later) ---
     Page<Question> findByModuleModuleId(Integer moduleId, Pageable pageable);
     Page<Question> findByModule_ModuleIdIn(List<Integer> moduleIds, Pageable pageable);
     List<Question> findByAuthorUserIdOrderByCreatedAtDesc(Integer userId);
 
-    @Query("SELECT q FROM Question q " +
-           "LEFT JOIN FETCH q.attachments " +
-           "LEFT JOIN FETCH q.answers a " +
-           "LEFT JOIN FETCH a.attachments " +
-           "LEFT JOIN FETCH a.comments c " +
-           "LEFT JOIN FETCH c.attachments " +
-           "LEFT JOIN FETCH c.children " +
-           "WHERE q.id = :questionId")
+    @Query("SELECT q FROM Question q LEFT JOIN FETCH q.attachments WHERE q.id = :questionId")
     Optional<Question> findByIdWithDetails(@Param("questionId") Integer questionId);
 
+    // --- ⬇️ NEW OPTIMIZED METHODS TO USE INSTEAD ⬇️ ---
 
+    /**
+     * Replaces findByModuleModuleId.
+     * Eagerly fetches the author for each question in the result set.
+     */
+    @Query(value = "SELECT q FROM Question q JOIN FETCH q.author WHERE q.module.moduleId = :moduleId",
+           countQuery = "SELECT COUNT(q) FROM Question q WHERE q.module.moduleId = :moduleId")
+    Page<Question> findByModuleIdWithAuthor(@Param("moduleId") Integer moduleId, Pageable pageable);
+
+    /**
+     * Replaces the old native findPopularQuestions query.
+     * This JPQL version is cleaner, more portable, and also fetches the author.
+     */
+    @Query(value = "SELECT q FROM Question q JOIN FETCH q.author LEFT JOIN q.votes v GROUP BY q.id, q.author.id ORDER BY SUM(COALESCE(v.value, 0)) DESC, q.createdAt DESC",
+           countQuery = "SELECT COUNT(q) FROM Question q")
+    Page<Question> findPopularQuestionsWithAuthor(Pageable pageable);
+
+    /**
+     * A new utility method for batch-loading attachments for a list of questions.
+     */
+    @Query("SELECT DISTINCT q FROM Question q LEFT JOIN FETCH q.attachments WHERE q.id IN :questionIds")
+    List<Question> findWithAttachmentsByIdIn(@Param("questionIds") List<Integer> questionIds);
+
+    @Query("SELECT q FROM Question q JOIN FETCH q.author WHERE q.id = :questionId")
+    Optional<Question> findWithAuthorById(@Param("questionId") Integer questionId);
+
+
+    @Query("SELECT q FROM Question q JOIN FETCH q.author WHERE q.module.moduleId IN :moduleIds")
+Page<Question> findByModule_ModuleIdInWithAuthor(@Param("moduleIds") List<Integer> moduleIds, Pageable pageable);
+
+
+@Query("""
+        SELECT NEW com.tuniv.backend.qa.dto.QuestionSummaryDto(
+            q.id, q.title, q.author.id, q.author.username, q.createdAt,
+            q.score, COUNT(a.id), 0
+        )
+        FROM Question q
+        LEFT JOIN q.answers a
+        GROUP BY q.id, q.author.id, q.author.username
+        ORDER BY q.score DESC, q.createdAt DESC
+    """)
+    Page<QuestionSummaryDto> findPopularQuestionSummaries(Pageable pageable);
+
+    @Query("""
+        SELECT NEW com.tuniv.backend.qa.dto.QuestionSummaryDto(
+            q.id, q.title, q.author.id, q.author.username, q.createdAt,
+            q.score, COUNT(a.id), 0
+        )
+        FROM Question q
+        LEFT JOIN q.answers a
+        WHERE q.module.moduleId = :moduleId
+        GROUP BY q.id, q.author.id, q.author.username
+    """)
+    Page<QuestionSummaryDto> findQuestionSummariesByModuleId(@Param("moduleId") Integer moduleId, Pageable pageable);
+
+    @Query("""
+        SELECT NEW com.tuniv.backend.qa.dto.QuestionSummaryDto(
+            q.id, q.title, q.author.id, q.author.username, q.createdAt,
+            q.score, COUNT(a.id), 0
+        )
+        FROM Question q
+        LEFT JOIN q.answers a
+        WHERE q.module.moduleId IN :moduleIds
+        GROUP BY q.id, q.author.id, q.author.username
+    """)
+    Page<QuestionSummaryDto> findQuestionSummariesByModuleIdIn(@Param("moduleIds") List<Integer> moduleIds, Pageable pageable);
 }
