@@ -7,7 +7,7 @@
 :root {
   --font-body: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-display: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  --focus-ring-color: #4f46e5;
+  --focus-ring-color: #2563EB; /* ✨ MODIFIED: Changed to match the new primary color */
   --focus-ring: 2px solid var(--focus-ring-color);
   --focus-ring-offset: 2px;
 }
@@ -34,26 +34,37 @@ body {
 /* ==========================================================================
    2. THEME VARIABLE DEFINITIONS
    ========================================================================== */
+/* ✨ MODIFIED: This entire block has been updated for a softer, more modern feel. */
 :root {
-  /* Light Mode */
-  --color-primary: #4338CA;
-  --color-primary-hover: #3730A3;
-  --color-accent: #f59e0b;
-  --color-accent-hover: #d97706;
-  --color-background: #F9FAFB;
+  /* --- Light Mode --- */
+  /* Primary & Accent */
+  --color-primary: #2563EB;
+  --color-primary-hover: #1D4ED8;
+  --color-accent: #EA580C;
+  --color-accent-hover: #C2410C;
+
+  /* Backgrounds & Surfaces */
+  --color-background: #F8F9FA;
   --color-surface: #FFFFFF;
-  --color-surface-subtle: #F3F4F6;
-  --color-text-primary: #1F2937;
-  --color-text-secondary: #6B7280;
-  --color-border: #E5E7EB;
+  --color-surface-subtle: #F1F3F5;
+
+  /* Typography */
+  --color-text-primary: #212529;
+  --color-text-secondary: #6C757D;
+
+  /* Borders & Dividers */
+  --color-border: #DEE2E6;
+
+  /* System Colors */
   --color-on-primary: #ffffff;
-  --color-success: #16A34A;
-  --color-warning: #F59E0B;
-  --color-error: #DC2626;
+  --color-success: #198754;
+  --color-warning: #FFC107;
+  --color-error: #DC3545;
 }
 
+
 html.dark {
-  /* Dark Mode */
+  /* --- Dark Mode (Unchanged) --- */
   --color-primary: #818CF8;
   --color-primary-hover: #6366F1;
   --color-accent: #fbbf24;
@@ -80,9 +91,14 @@ p, span, div, li, strong {
 
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 700; /* ✨ MODIFIED: Reduced default weight for a less aggressive look */
   color: var(--color-text-primary);
   transition: color 0.2s ease;
+}
+
+/* ✨ ADDED: Give your main page title more impact */
+h1 {
+  font-weight: 800;
 }
 
 a {
@@ -108,7 +124,15 @@ a {
 .ant-message-notice-content,
 .ant-select-dropdown {
   background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
+  /* ✨ MODIFIED: Replaced hard border with a modern, soft shadow for a "floating" effect */
+  border: none;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+
+  /* ✨ ADDED: Re-apply a border and stronger shadow for pop-overs where clear separation is needed */
+  &.ant-modal-content, &.ant-dropdown-menu, &.ant-popover-inner {
+    border: 1px solid var(--color-border);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
 }
 
 /* --- Typography --- */
@@ -124,7 +148,19 @@ h6.ant-typography {
 .ant-typography.ant-typography-secondary {
   color: var(--color-text-secondary);
 }
+/* ✨ ADDED: Fix for error state inputs to follow the theme */
+.ant-input-affix-wrapper-status-error:not(.ant-input-affix-wrapper-disabled):not(.ant-input-affix-wrapper-borderless).ant-input-affix-wrapper,
+.ant-input-affix-wrapper-status-error:not(.ant-input-affix-wrapper-disabled):not(.ant-input-affix-wrapper-borderless).ant-input-affix-wrapper:hover {
+  background-color: var(--color-background);
+  border-color: var(--color-error);
+}
 
+/* Also handle the focused error state */
+.ant-input-affix-wrapper-status-error:not(.ant-input-affix-wrapper-disabled):not(.ant-input-affix-wrapper-borderless).ant-input-affix-wrapper:focus,
+.ant-input-affix-wrapper-status-error:not(.ant-input-affix-wrapper-disabled):not(.ant-input-affix-wrapper-borderless).ant-input-affix-wrapper-focused {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-error) 20%, transparent);
+}
 /* --- Buttons --- */
 .ant-btn {
   border-radius: 6px;
@@ -202,7 +238,6 @@ h6.ant-typography {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 
-// ✅ Added: Style for the clear icon in search inputs
 .ant-input-clear-icon {
   color: var(--color-text-secondary);
   transition: color 0.2s ease;
@@ -387,4 +422,56 @@ h6.ant-typography {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-secondary);
+}
+
+/* This assumes you have a .dark class on a parent element like <body> */
+
+/* 1. General dark mode styles for ng-zorro inputs */
+.dark .ant-input-affix-wrapper,
+.dark input.ant-input {
+  background-color: #1a202c !important; /* Dark background */
+  color: #e2e8f0 !important;             /* Light text */
+  border-color: #4a5568 !important;     /* Mid-tone border */
+}
+
+/* 2. Style the placeholder text in dark mode */
+.dark input.ant-input::placeholder {
+  color: #718096;
+}
+
+/* 3. Style the icon inside the input group in dark mode */
+.dark .ant-input-affix-wrapper .ant-input-prefix nz-icon {
+  color: #a0aec0;
+}
+
+/* 4. Style for when the input is focused in dark mode */
+.dark .ant-input-affix-wrapper:focus,
+.dark .ant-input-affix-wrapper-focused,
+.dark input.ant-input:focus {
+  border-color: #4299e1 !important; /* Highlight color (e.g., blue) */
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.2);
+}
+
+/* 5. ✅ NEW: Fix for the validation error state in dark mode */
+.dark .ant-input-affix-wrapper-status-error:not(.ant-input-affix-wrapper-disabled),
+.dark .ant-input-status-error:not(.ant-input-disabled) {
+    background-color: #2d2020 !important; /* Dark reddish background for error */
+    border-color: #e53e3e !important;     /* Bright red border for error */
+}
+/* ✨ ADDED: Override for .ant-select-selector to follow the theme */
+.ant-select:not(.ant-select-customize-input) .ant-select-selector {
+  background-color: var(--color-background) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 6px !important;
+}
+
+/* Handle hover state */
+.ant-select:not(.ant-select-disabled):hover .ant-select-selector {
+  border-color: var(--color-primary) !important;
+}
+
+/* Handle focus state */
+.ant-select-focused:not(.ant-select-disabled).ant-select:not(.ant-select-customize-input) .ant-select-selector {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 20%, transparent) !important;
 }

@@ -15,22 +15,20 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
 
     List<Comment> findByAnswerIdOrderByCreatedAtAsc(Integer answerId);
     List<Comment> findByAnswerIdAndParentCommentIsNullOrderByCreatedAtAsc(Integer answerId);
-    List<Comment> findByAuthorUserIdOrderByCreatedAtDesc(Integer userId);
+    List<Comment> findByAuthor_IdOrderByCreatedAtDesc(Integer userId);
 
-    // --- ⬇️ NEW OPTIMIZED METHOD TO ADD ⬇️ ---
-
-    /**
-     * Fetches all top-level comments for a given list of answer IDs.
-     * It also eagerly fetches the comment's author and attachments.
-     * Another key batch-fetching method.
-     */
     @Query("SELECT c FROM Comment c " +
            "JOIN FETCH c.author " +
            "LEFT JOIN FETCH c.attachments " +
            "WHERE c.answer.id IN :answerIds AND c.parentComment IS NULL")
     List<Comment> findTopLevelByAnswerIdsWithDetails(@Param("answerIds") List<Integer> answerIds);
 
-
     @Query("SELECT c FROM Comment c JOIN FETCH c.author WHERE c.id = :commentId")
     Optional<Comment> findWithAuthorById(@Param("commentId") Integer commentId);
+
+    @Query("SELECT c FROM Comment c JOIN FETCH c.answer a JOIN FETCH a.question WHERE c.id = :commentId")
+    Optional<Comment> findWithParentsById(@Param("commentId") Integer commentId);
+
+    @Query("SELECT c.answer.question.id FROM Comment c WHERE c.id = :commentId")
+    Optional<Integer> findQuestionIdById(@Param("commentId") Integer commentId);
 }

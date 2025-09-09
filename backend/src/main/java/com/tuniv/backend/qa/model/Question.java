@@ -37,8 +37,4 @@ public class Question extends Post { // ✅ EXTENDS Post
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference("question-answers")
     private Set<Answer> answers = new HashSet<>();
-
-    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("question-votes")
-    private Set<QuestionVote> votes = new HashSet<>();
 }

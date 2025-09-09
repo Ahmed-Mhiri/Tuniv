@@ -1,109 +1,20 @@
 package com.tuniv.backend.qa.model;
 
-import java.io.Serializable;
-import java.time.Instant;
-import java.util.Objects;
-
-import org.hibernate.annotations.CreationTimestamp;
-
 import com.tuniv.backend.user.model.User;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Embeddable;
-import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.MapsId;
-import jakarta.persistence.Table;
-import jakarta.persistence.Transient;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 
 @Entity
-@Table(name = "comment_votes")
-@Getter
-@Setter
+@DiscriminatorValue("COMMENT") // Identifies this as a comment vote
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class CommentVote implements Vote {
+public class CommentVote extends Vote {
 
-    @EmbeddedId
-    private CommentVoteId id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("userId")
-    @JoinColumn(name = "user_id")
-    private User user;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @MapsId("commentId")
-    @JoinColumn(name = "comment_id")
-    private Comment comment;
-
-    @Column(nullable = false)
-    private short value;
-
-    @CreationTimestamp
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt;
-
-    // --- ADD THESE METHODS MANUALLY TO FIX THE ERROR ---
-    @Override
-    public User getUser() {
-        return this.user;
+    public CommentVote(User user, Post post, short value) {
+        this.setUser(user);
+        this.setPost(post);
+        this.setValue(value);
     }
-    
-    @Override
-    public short getValue() {
-        return this.value;
-    }
-
-    public Comment getComment() {
-        return this.comment;
-    }
-    
-    @Override
-@Transient
-public Integer getPostId() {
-    // ✅ CHANGE: Use getId() from the Post superclass
-    return this.comment != null ? this.comment.getId() : null;
-}
-    // --- END OF ADDED METHODS ---
-
-
-    @Embeddable
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class CommentVoteId implements Serializable {
-        @Column(name = "user_id")
-        private Integer userId;
-        @Column(name = "comment_id")
-        private Integer commentId;
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            CommentVoteId that = (CommentVoteId) o;
-            return Objects.equals(userId, that.userId) && Objects.equals(commentId, that.commentId);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(userId, commentId);
-        }
-    }
-    @Override
-public Post getPost() { // ✅ ADD THIS METHOD
-    return this.comment;
-}
 }

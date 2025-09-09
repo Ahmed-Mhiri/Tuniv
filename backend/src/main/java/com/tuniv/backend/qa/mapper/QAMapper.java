@@ -1,5 +1,6 @@
 package com.tuniv.backend.qa.mapper;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -15,103 +16,97 @@ import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.model.Attachment;
 import com.tuniv.backend.qa.model.Comment;
 import com.tuniv.backend.qa.model.Question;
-import com.tuniv.backend.user.model.User;
+import com.tuniv.backend.university.dto.ModuleDto;
+import com.tuniv.backend.university.model.Module;
+import com.tuniv.backend.user.model.User; // ✅ ADD THIS LINE
+
 
 public final class QAMapper {
 
     private QAMapper() {}
 
-    // ✅ CHANGE: Attachment maps are no longer needed in the signature.
-    public static QuestionResponseDto toQuestionResponseDto(
+    /**
+     * This is the main high-performance entry point for building the full question response.
+     */
+    public static QuestionResponseDto buildQuestionResponseDto(
             Question question,
+            List<Answer> answers,
+            Map<Integer, List<Comment>> commentsByAnswerId,
             UserDetailsImpl currentUser,
-            Map<Integer, Integer> scores,
             Map<Integer, Integer> currentUserVotes
     ) {
         if (question == null) return null;
 
-        // ✅ CHANGE: Get attachments directly from the question object.
-        List<AttachmentDto> attachments = question.getAttachments().stream()
-                .map(QAMapper::toAttachmentDto)
+        List<AnswerResponseDto> answerDtos = answers.stream()
+                .map(answer -> toAnswerResponseDto(
+                        answer,
+                        commentsByAnswerId.getOrDefault(answer.getId(), Collections.emptyList()),
+                        currentUser,
+                        currentUserVotes
+                ))
+                .sorted(Comparator.comparing(AnswerResponseDto::isSolution).reversed()
+                        .thenComparing(AnswerResponseDto::score, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
 
         return new QuestionResponseDto(
-                question.getId(), // ✅ CHANGE: Use getId()
+                question.getId(),
                 question.getTitle(),
                 question.getBody(),
                 question.getCreatedAt(),
                 toAuthorDto(question.getAuthor()),
-                question.getAnswers().stream()
-                        // ✅ CHANGE: Pass fewer arguments to the nested mapper call.
-                        .map(answer -> toAnswerResponseDto(answer, currentUser, scores, currentUserVotes))
-                        .sorted(Comparator.comparing(AnswerResponseDto::isSolution).reversed()
-                                .thenComparing(AnswerResponseDto::score, Comparator.reverseOrder()))
-                        .collect(Collectors.toList()),
-                scores.getOrDefault(question.getId(), 0), // ✅ CHANGE: Use getId()
-                currentUserVotes.getOrDefault(question.getId(), 0), // ✅ CHANGE: Use getId()
-                attachments
+                toModuleDto(question.getModule()), // ✅ Module information is now included
+                answerDtos,
+                question.getScore(),
+                currentUserVotes.getOrDefault(question.getId(), 0),
+                question.getAttachments().stream().map(QAMapper::toAttachmentDto).collect(Collectors.toList())
         );
     }
 
-    // ✅ CHANGE: Attachment maps are no longer needed in the signature.
     public static AnswerResponseDto toAnswerResponseDto(
             Answer answer,
+            List<Comment> comments,
             UserDetailsImpl currentUser,
-            Map<Integer, Integer> scores,
             Map<Integer, Integer> currentUserVotes
     ) {
         if (answer == null) return null;
 
-        // ✅ CHANGE: Get attachments directly from the answer object.
-        List<AttachmentDto> attachments = answer.getAttachments().stream()
-                .map(QAMapper::toAttachmentDto)
+        List<CommentResponseDto> commentDtos = comments.stream()
+                .map(comment -> toCommentResponseDto(comment, currentUser, currentUserVotes))
+                .sorted(Comparator.comparing(CommentResponseDto::score).reversed())
                 .collect(Collectors.toList());
 
         return new AnswerResponseDto(
-                answer.getId(), // ✅ CHANGE: Use getId()
+                answer.getId(),
                 answer.getBody(),
                 answer.getIsSolution(),
                 answer.getCreatedAt(),
                 toAuthorDto(answer.getAuthor()),
-                scores.getOrDefault(answer.getId(), 0), // ✅ CHANGE: Use getId()
-                currentUserVotes.getOrDefault(answer.getId(), 0), // ✅ CHANGE: Use getId()
-                answer.getComments().stream()
-                        .filter(c -> c.getParentComment() == null)
-                        // ✅ CHANGE: Pass fewer arguments to the nested mapper call.
-                        .map(comment -> toCommentResponseDto(comment, currentUser, scores, currentUserVotes))
-                        .sorted(Comparator.comparing(CommentResponseDto::score).reversed())
-                        .collect(Collectors.toList()),
-                attachments
+                answer.getScore(),
+                currentUserVotes.getOrDefault(answer.getId(), 0),
+                commentDtos,
+                answer.getAttachments().stream().map(QAMapper::toAttachmentDto).collect(Collectors.toList())
         );
     }
 
-    // ✅ CHANGE: Attachment map is no longer needed in the signature.
     public static CommentResponseDto toCommentResponseDto(
             Comment comment,
             UserDetailsImpl currentUser,
-            Map<Integer, Integer> scores,
             Map<Integer, Integer> currentUserVotes
     ) {
         if (comment == null) return null;
 
-        // ✅ CHANGE: Get attachments directly from the comment object.
-        List<AttachmentDto> attachments = comment.getAttachments().stream()
-                .map(QAMapper::toAttachmentDto)
-                .collect(Collectors.toList());
-
         return new CommentResponseDto(
-                comment.getId(), // ✅ CHANGE: Use getId()
+                comment.getId(),
                 comment.getBody(),
                 comment.getCreatedAt(),
                 toAuthorDto(comment.getAuthor()),
-                scores.getOrDefault(comment.getId(), 0), // ✅ CHANGE: Use getId()
-                currentUserVotes.getOrDefault(comment.getId(), 0), // ✅ CHANGE: Use getId()
+                comment.getScore(),
+                currentUserVotes.getOrDefault(comment.getId(), 0),
                 comment.getChildren().stream()
-                        // ✅ CHANGE: Pass fewer arguments to the nested mapper call.
-                        .map(child -> toCommentResponseDto(child, currentUser, scores, currentUserVotes))
+                        .map(child -> toCommentResponseDto(child, currentUser, currentUserVotes))
                         .sorted(Comparator.comparing(CommentResponseDto::score).reversed())
                         .collect(Collectors.toList()),
-                attachments
+                comment.getAttachments().stream().map(QAMapper::toAttachmentDto).collect(Collectors.toList())
         );
     }
 
@@ -129,4 +124,19 @@ public final class QAMapper {
                 attachment.getFileType()
         );
     }
+    
+    /**
+    * ✅ NEW HELPER METHOD
+    * Converts a Module entity into a ModuleDto.
+    */
+    public static ModuleDto toModuleDto(Module module) {
+        if (module == null) return null;
+        return new ModuleDto(module.getModuleId(), module.getName());
+    }
 }
+
+
+
+
+
+

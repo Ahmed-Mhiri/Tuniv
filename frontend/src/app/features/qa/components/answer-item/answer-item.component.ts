@@ -3,12 +3,10 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Va
 import { RouterLink } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { AuthService } from '../../../../core/services/auth.service';
-import { Answer, CommentCreateRequest } from '../../../../shared/models/qa.model';
+import { Answer, CommentCreateRequest, Question } from '../../../../shared/models/qa.model';
 import { TimeAgoPipe } from '../../../../shared/pipes/time-ago.pipe';
 import { VoteComponent } from '../../../../shared/components/vote/vote.component';
 import { CommentItemComponent } from '../comment-item/comment-item.component';
-import { AnswerService } from '../../services/answer.service';
-import { VoteService } from '../../services/vote.service';
 import { CommentService } from '../../services/comment.service';
 
 // NG-ZORRO Modules
@@ -23,6 +21,7 @@ import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
 import { NzSpaceModule } from 'ng-zorro-antd/space';
 import { NzModalService } from 'ng-zorro-antd/modal';
 import { PostEditFormComponent, PostEditSaveEvent } from '../post-edit-form.component/post-edit-form.component';
+import { QuestionService } from '../../services/question.service';
 
 @Component({
   selector: 'app-answer-item',
@@ -37,17 +36,28 @@ import { PostEditFormComponent, PostEditSaveEvent } from '../post-edit-form.comp
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AnswerItemComponent {
+  // --- Injections ---
   private readonly fb = inject(FormBuilder);
-  private readonly voteService = inject(VoteService);
   private readonly commentService = inject(CommentService);
-  private readonly answerService = inject(AnswerService);
   private readonly message = inject(NzMessageService);
   public readonly authService = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly modal = inject(NzModalService);
+  
+  // ✅ REMOVED AnswerService and VoteService, ADDED QuestionService
+  private readonly questionService = inject(QuestionService);
+
+  // --- Inputs & Outputs ---
   answer = input.required<Answer>();
   isQuestionAuthor = input<boolean>(false);
-  updateRequired = output<void>();
+  
+  // ✅ NEW: The questionId is now required for all API calls.
+  questionId = input.required<number>();
+  
+  updated = output<Question>();
+  deleted = output<void>();
+
+  // --- State ---
   readonly commentFileList = signal<NzUploadFile[]>([]);
   readonly commentFilesToUpload = signal<File[]>([]);
   isCommentFormVisible = signal(false);
@@ -56,20 +66,110 @@ export class AnswerItemComponent {
     this.authService.currentUser()?.userId === this.answer().author.userId
   );
 
+  // --- Forms & Validation ---
   private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
     const body = control.get('body')?.value;
     const hasFiles = this.commentFileList().length > 0;
     return !body?.trim() && !hasFiles ? { atLeastOneRequired: true } : null;
   };
-  commentForm = this.fb.group({
-    body: [''],
-  }, {
-    validators: this.atLeastOneFieldValidator
-  });
+  commentForm = this.fb.group({ body: [''] }, { validators: this.atLeastOneFieldValidator });
 
+  /**
+   * Handles a vote on this answer.
+   */
+  handleVote(voteValue: 1 | -1): void {
+    if (!this.authService.isUserLoggedIn()) {
+      this.message.info('You must be logged in to vote.');
+      return;
+    }
+    // ✅ UPDATED: Call QuestionService's voteOnAnswer method
+    this.questionService.voteOnAnswer(this.questionId(), this.answer().answerId, voteValue).subscribe({
+      next: (updatedQuestion) => this.updated.emit(updatedQuestion),
+      error: (err) => this.message.error(err.error?.message || 'Failed to vote.'),
+    });
+  }
+
+  /**
+   * Marks this answer as the solution for the question.
+   */
+  markAsSolution(): void {
+    // ✅ UPDATED: Call QuestionService's markAsSolution method
+    this.questionService.markAsSolution(this.questionId(), this.answer().answerId).subscribe({
+      next: (updatedQuestion) => this.updated.emit(updatedQuestion),
+      error: (err) => this.message.error(err.error?.message || 'Action failed.'),
+    });
+  }
+
+  /**
+   * Submits a new top-level comment to this answer.
+   */
+  submitComment(): void {
+    if (this.commentForm.invalid) {
+      Object.values(this.commentForm.controls).forEach(control => {
+        control.markAsDirty();
+        control.updateValueAndValidity({ onlySelf: true });
+      });
+      return;
+    }
+    const request: CommentCreateRequest = {
+  body: this.commentForm.value.body!,
+  parentCommentId: null,
+  answerId: this.answer().answerId, // ✅ ADD THIS LINE
+};
+    // ✅ UPDATED: Call CommentService with the required answerId parameter
+    this.commentService.createComment(this.answer().answerId, request, this.commentFilesToUpload()).subscribe({
+      next: (updatedQuestion) => {
+        this.commentForm.reset();
+        this.commentFileList.set([]);
+        this.commentFilesToUpload.set([]);
+        this.isCommentFormVisible.set(false);
+        this.updated.emit(updatedQuestion);
+      },
+      error: (err) => this.message.error(err.error?.message || 'Failed to post comment.'),
+    });
+  }
+
+  /**
+   * Deletes this answer.
+   */
+  deleteAnswer(): void {
+    this.modal.confirm({
+      nzTitle: 'Delete this answer?',
+      nzContent: 'This action cannot be undone.',
+      nzOkText: 'Delete',
+      nzOkDanger: true,
+      nzOnOk: () =>
+        // ✅ UPDATED: Call QuestionService's deleteAnswer method
+        this.questionService.deleteAnswer(this.questionId(), this.answer().answerId).subscribe({
+          next: () => this.deleted.emit(),
+          error: (err) => this.message.error(err.error?.message || 'Failed to delete answer.'),
+        }),
+    });
+  }
+  
+  /**
+   * Saves edits made to this answer.
+   */
+  handleSave(event: PostEditSaveEvent): void {
+    const request = {
+      body: event.body,
+      attachmentIdsToDelete: event.attachmentIdsToDelete,
+    };
+    // ✅ UPDATED: Call QuestionService's updateAnswer method
+    this.questionService.updateAnswer(this.questionId(), this.answer().answerId, request, event.newFiles).subscribe({
+      next: (updatedQuestion) => {
+        this.isEditing.set(false);
+        this.updated.emit(updatedQuestion);
+      },
+      error: (err) => this.message.error(err.error?.message || 'Failed to update answer.'),
+    });
+  }
+
+  // --- File Handling Methods (Unchanged) ---
   beforeUpload = (file: NzUploadFile): Observable<boolean> => {
     this.commentFilesToUpload.update(list => [...list, file as unknown as File]);
     this.commentFileList.update(list => [...list, file]);
+    this.commentForm.updateValueAndValidity(); // Ensure form validation runs
     this.cdr.detectChanges();
     return of(false);
   };
@@ -83,95 +183,7 @@ export class AnswerItemComponent {
   removeCommentFile(fileToRemove: NzUploadFile): void {
     this.commentFileList.update(list => list.filter(f => f.uid !== fileToRemove.uid));
     this.commentFilesToUpload.update(list => (list as unknown as NzUploadFile[]).filter(f => f.uid !== fileToRemove.uid) as unknown as File[]);
+    this.commentForm.updateValueAndValidity(); // Ensure form validation runs
     this.cdr.detectChanges();
   }
-
-  handleVote(voteValue: number): void {
-    // ✅ ADD THIS CHECK
-    if (!this.authService.isUserLoggedIn()) {
-      this.message.info('You must be logged in to vote.');
-      return;
-    }
-    
-    const valueToSubmit = voteValue >= 0 ? 1 : -1;
-    this.voteService.voteOnAnswer(this.answer().answerId, valueToSubmit).subscribe({
-      next: () => {
-        this.message.success('Vote registered');
-        this.updateRequired.emit();
-      },
-      error: (err) => this.message.error(err.error?.message || 'Failed to vote.'),
-    });
-  }
-
-  // ✅ CORRECTED AND SIMPLIFIED
-  markAsSolution(): void {
-    this.answerService.markAsSolution(this.answer().answerId).subscribe({
-      next: () => {
-        this.message.success('Answer marked as solution!');
-        // Just like handleVote(), we only emit to the parent.
-        this.updateRequired.emit();
-      },
-      error: (err) => this.message.error(err.error?.message || 'Action failed.'),
-    });
-  }
-
-  submitComment(): void {
-    if (this.commentForm.invalid) {
-      Object.values(this.commentForm.controls).forEach(control => {
-        control.markAsDirty();
-        control.updateValueAndValidity({ onlySelf: true });
-      });
-      return;
-    }
-    const request: CommentCreateRequest = {
-      body: this.commentForm.value.body!,
-      parentCommentId: null,
-    };
-    this.commentService.createComment(this.answer().answerId.toString(), request, this.commentFilesToUpload()).subscribe({
-      next: () => {
-        this.commentForm.reset();
-        this.commentFileList.set([]);
-        this.commentFilesToUpload.set([]);
-        this.isCommentFormVisible.set(false);
-        this.message.success('Comment posted');
-        this.updateRequired.emit();
-      },
-      error: (err) => this.message.error(err.error?.message || 'Failed to post comment.'),
-    });
-  }
-
-  // --- Delete Logic ---
-  deleteAnswer(): void {
-    this.modal.confirm({
-      nzTitle: 'Delete this answer?',
-      nzContent: 'This action cannot be undone.',
-      nzOkText: 'Delete',
-      nzOkDanger: true,
-      nzOnOk: () =>
-        this.answerService.deleteAnswer(this.answer().answerId).subscribe({
-          next: () => {
-            this.message.success('Answer deleted');
-            this.updateRequired.emit();
-          },
-          error: (err) => this.message.error(err.error?.message || 'Failed to delete answer.'),
-        }),
-    });
-  }
-  
-  // --- Update Logic ---
-  handleSave(event: PostEditSaveEvent): void {
-    const request = {
-      body: event.body,
-      attachmentIdsToDelete: event.attachmentIdsToDelete,
-    };
-    this.answerService.updateAnswer(this.answer().answerId, request, event.newFiles).subscribe({
-      next: () => {
-        this.message.success('Answer updated');
-        this.isEditing.set(false);
-        this.updateRequired.emit(); // Refresh data from parent
-      },
-      error: (err) => this.message.error(err.error?.message || 'Failed to update answer.'),
-    });
-  }
 }
-

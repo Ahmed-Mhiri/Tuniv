@@ -30,7 +30,7 @@
 
   @if (isLoading() && universities().length === 0) {
     <div class="status-container">
-      <app-spinner [overlay]="false" tip="Loading Universities..."></app-spinner>
+      <app-spinner [isLoading]="isLoading()" [overlay]="false" tip="Loading Universities..."></app-spinner>
     </div>
   } @else if (error()) {
     <nz-alert nzType="error" [nzMessage]="error()"></nz-alert>
@@ -100,7 +100,7 @@
       }
 
       @if (isLoading()) {
-        <app-spinner [overlay]="true"></app-spinner>
+        <app-spinner [isLoading]="isLoading()" [overlay]="true"></app-spinner>
       }
     </div>
   }

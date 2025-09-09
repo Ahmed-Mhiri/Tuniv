@@ -12,11 +12,11 @@
         </div>
       </div>
     } @else {
-      <a class="create-post-card" (click)="handleAskQuestionClick(authModalFooter)">
-        <span nz-icon nzType="plus-circle" nzTheme="outline" class="create-post-icon"></span>
-        <div class="create-post-input" role="textbox">Ask a Question</div>
-      </a>
-    }
+  <a class="create-post-card" (click)="handleAskQuestionClick(authModalFooter)">
+<nz-avatar nzIcon="user" [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"></nz-avatar>
+    <div class="create-post-input" role="textbox">Ask a question or share something new...</div>
+  </a>
+}
 
     @if (isLoading()) {
       <div class="spinner-container">
@@ -24,7 +24,7 @@
       </div>
     } @else {
       <div class="feed-list">
-        @for (item of feedItems(); track item.questionId) {
+        @for (item of feedItems(); track item.id) {
           <app-question-list-item [question]="item"></app-question-list-item>
         } @empty {
           <nz-card class="empty-feed-card">

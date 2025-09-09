@@ -9,9 +9,9 @@
     </div>
   </div>
 
-  @if (isLoading()) {
+  @if (isLoading() && modules().length === 0) {
     <div class="status-container">
-      <app-spinner></app-spinner>
+      <app-spinner [isLoading]="isLoading()" [overlay]="false" tip="Loading modules..."></app-spinner>
     </div>
   } @else if (error()) {
     <nz-alert nzType="error" [nzMessage]="error()"></nz-alert>
@@ -31,15 +31,18 @@
       <p class="no-modules-message">No modules have been added for this university yet.</p>
     }
 
-    @if (pageInfo().totalElements > pageInfo().pageSize) {
-      <div class="paginator-container">
-        <nz-pagination
-          [nzPageIndex]="pageInfo().pageNumber + 1"
-          [nzPageSize]="pageInfo().pageSize"
-          [nzTotal]="pageInfo().totalElements"
-          (nzPageIndexChange)="onPageChange($event)">
-        </nz-pagination>
-      </div>
-    }
+    @if (pageInfo() && pageInfo().totalElements > pageInfo().pageSize) {
+       <div class="paginator-container">
+         <app-paginator
+           [page]="pageInfo()!"
+           (pageChange)="onPageChange($event)"
+           (pageSizeChange)="onPageSizeChange($event)"
+         ></app-paginator>
+       </div>
+     }
+ 
+     @if (isLoading()) {
+       <app-spinner [isLoading]="isLoading()" [overlay]="true"></app-spinner>
+     }
   }
 </div>

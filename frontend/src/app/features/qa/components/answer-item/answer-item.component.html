@@ -116,11 +116,13 @@
     
     <div class="comments-section">
       @for (comment of answer().comments; track comment.commentId) {
-        <app-comment-item
-          [comment]="comment"
-          [answerId]="answer().answerId"
-          (updateRequired)="updateRequired.emit()"
-        ></app-comment-item>
+<app-comment-item
+      [comment]="comment"
+      [answerId]="answer().answerId"
+
+      (updated)="updated.emit($event)"
+      (deleted)="deleted.emit()"
+    ></app-comment-item>
       }
     </div>
   </div>

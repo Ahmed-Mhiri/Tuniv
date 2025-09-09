@@ -1,6 +1,6 @@
 // answer-form.ts
 
-import { ChangeDetectionStrategy, Component, output, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, output, inject, signal, input } from '@angular/core'; // 👈 1. Import 'input'
 import { FormBuilder, ReactiveFormsModule, AbstractControl, ValidationErrors } from '@angular/forms';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { NzFormModule } from 'ng-zorro-antd/form';
@@ -29,14 +29,16 @@ export interface AnswerSubmitEvent {
   styleUrl: './answer-form.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class AnswerFormComponent {
+export class AnswerForm {
   private readonly fb = inject(FormBuilder);
   private readonly message = inject(NzMessageService);
   readonly answerSubmit = output<AnswerSubmitEvent>();
   
   readonly fileList = signal<NzUploadFile[]>([]);
   readonly filesToUpload = signal<File[]>([]);
-  readonly isSubmitting = signal(false);
+  
+  // 👇 2. Change from 'signal(false)' to 'input<boolean>(false)'
+  isSubmitting = input<boolean>(false);
 
   private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
     const body = control.get('body')?.value;
@@ -54,21 +56,18 @@ export class AnswerFormComponent {
   });
 
   beforeUpload = (file: NzUploadFile): boolean => {
-  const isLt5M = (file.size ?? 0) / 1024 / 1024 < 5;
-  if (!isLt5M) {
-    this.message.error(`File '${file.name}' is too large. Must be smaller than 5MB!`);
-    return false;
-  }
+    const isLt5M = (file.size ?? 0) / 1024 / 1024 < 5;
+    if (!isLt5M) {
+      this.message.error(`File '${file.name}' is too large. Must be smaller than 5MB!`);
+      return false;
+    }
 
-  // ✅ THE FINAL FIX:
-  // The 'file' parameter is the actual File object.
-  // Add it directly to both the display list and the upload list.
-  this.fileList.update(list => [...list, file]);
-  this.filesToUpload.update(list => [...list, file as unknown as File]);
-  
-  this.answerForm.updateValueAndValidity();
-  return false;
-};
+    this.fileList.update(list => [...list, file]);
+    this.filesToUpload.update(list => [...list, file as unknown as File]);
+    
+    this.answerForm.updateValueAndValidity();
+    return false;
+  };
 
   removeFile(fileToRemove: NzUploadFile): void {
     const newFileList = this.fileList().filter(f => f.uid !== fileToRemove.uid);
@@ -76,30 +75,29 @@ export class AnswerFormComponent {
 
     const newFilesToUpload = newFileList
       .map(f => f.originFileObj as File)
-      .filter(f => !!f); // This filter correctly removes any null/undefined values
+      .filter(f => !!f);
     this.filesToUpload.set(newFilesToUpload);
 
     this.answerForm.updateValueAndValidity();
   }
 
   submit(): void {
-  if (this.answerForm.invalid) {
-    this.answerForm.markAllAsTouched();
-    return;
+    if (this.answerForm.invalid) {
+      this.answerForm.markAllAsTouched();
+      return;
+    }
+
+    console.log('--- DEBUG: Submitting from AnswerFormComponent ---');
+    console.log('Files to submit:', this.filesToUpload());
+    console.log('-------------------------------------------');
+
+    this.answerSubmit.emit({
+      body: this.answerForm.value.body!,
+      files: this.filesToUpload(),
+    });
+    
+    this.answerForm.reset();
+    this.fileList.set([]);
+    this.filesToUpload.set([]);
   }
-
-  // ✅ ADD THIS LOG
-  console.log('--- DEBUG: Submitting from AnswerFormComponent ---');
-  console.log('Files to submit:', this.filesToUpload());
-  console.log('-------------------------------------------');
-
-  this.answerSubmit.emit({
-    body: this.answerForm.value.body!,
-    files: this.filesToUpload(),
-  });
-  
-  this.answerForm.reset();
-  this.fileList.set([]);
-  this.filesToUpload.set([]);
-}
 }

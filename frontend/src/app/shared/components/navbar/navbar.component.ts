@@ -52,7 +52,6 @@ import { NotificationService } from '../../../features/notification/services/not
     NzDrawerModule,
     NzDividerModule,
     SearchBarComponent,
-    NzBadgeComponent,
     NotificationDropdown
   ],
   templateUrl: './navbar.component.html',

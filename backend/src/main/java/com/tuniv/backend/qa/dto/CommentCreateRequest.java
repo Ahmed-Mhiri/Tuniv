@@ -1,8 +1,11 @@
 package com.tuniv.backend.qa.dto;
+import jakarta.validation.constraints.NotNull;
+
 
 public record CommentCreateRequest(
-    // No validation annotations here
     String body,
-    
-    Integer parentCommentId
+    Integer parentCommentId,
+
+    // ✅ FIX: Add the answerId to link the comment to its parent answer.
+    @NotNull Integer answerId
 ) {}

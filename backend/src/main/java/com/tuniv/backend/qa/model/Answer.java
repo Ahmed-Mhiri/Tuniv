@@ -41,9 +41,6 @@ public class Answer extends Post { // ✅ EXTENDS Post
     @JsonManagedReference("answer-comments")
     private Set<Comment> comments = new HashSet<>();
 
-    @OneToMany(mappedBy = "answer", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("answer-votes")
-    private Set<AnswerVote> votes = new HashSet<>();
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)

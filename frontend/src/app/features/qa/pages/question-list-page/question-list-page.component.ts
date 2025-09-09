@@ -3,7 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { switchMap } from 'rxjs';
 
-import { Question } from '../../../../shared/models/qa.model';
+import { Question, QuestionSummaryDto } from '../../../../shared/models/qa.model';
 import { QuestionService } from '../../services/question.service';
 import { AuthService } from '../../../../core/services/auth.service';
 
@@ -18,6 +18,7 @@ import { NzModalModule, NzModalRef, NzModalService } from 'ng-zorro-antd/modal';
 
 // Components
 import { QuestionListItemComponent } from '../../components/question-list-item/question-list-item';
+import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 
 
 @Component({
@@ -26,7 +27,7 @@ import { QuestionListItemComponent } from '../../components/question-list-item/q
   imports: [
     CommonModule, RouterLink, QuestionListItemComponent,
     NzPageHeaderModule, NzButtonModule, NzIconModule,
-    NzEmptyModule, NzSpinModule, NzGridModule, NzModalModule
+    NzEmptyModule, SpinnerComponent, NzGridModule, NzModalModule
   ],
   templateUrl: './question-list-page.component.html',
   styleUrl: './question-list-page.component.scss',
@@ -41,7 +42,7 @@ export class QuestionListPageComponent implements OnInit {
   private readonly modal = inject(NzModalService);
 
   // --- State ---
-  readonly questions = signal<Question[]>([]);
+readonly questions = signal<QuestionSummaryDto[]>([]);
   readonly moduleName = signal<string>('Module');
   readonly moduleId = signal<number | null>(null);
   readonly isLoading = signal(true);
@@ -51,18 +52,20 @@ export class QuestionListPageComponent implements OnInit {
   private activeModal: NzModalRef | null = null;
 
   ngOnInit(): void {
-    this.route.paramMap.pipe(
-      switchMap(params => {
-        const id = Number(params.get('moduleId'));
-        this.moduleId.set(id);
-        this.isLoading.set(true);
-        return this.qaService.getQuestionsByModule(id);
-      })
-    ).subscribe(questionPage => {
-      this.questions.set(questionPage.content);
-      this.isLoading.set(false);
-    });
-  }
+  this.route.paramMap.pipe(
+    switchMap(params => {
+      const id = Number(params.get('moduleId'));
+      this.moduleId.set(id);
+      this.isLoading.set(true);
+      // This service call now correctly returns the new DTO type
+      return this.qaService.getQuestionsByModule(id);
+    })
+  ).subscribe(questionPage => {
+    // The type from the page content now matches the signal's type
+    this.questions.set(questionPage.content);
+    this.isLoading.set(false);
+  });
+}
 
   /**
    * --- MODIFIED ---

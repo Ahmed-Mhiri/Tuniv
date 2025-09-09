@@ -5,19 +5,19 @@
       <span class="stat-label">votes</span>
     </div>
     <div class="stat-item answer-stat">
-      <span class="stat-count">{{ question().answers.length }}</span>
+      <span class="stat-count">{{ question().answerCount }}</span>
       <span class="stat-label">answers</span>
     </div>
   </div>
 
   <div class="content-col">
     <h3 class="question-title">
-      <a [routerLink]="['/questions', question().questionId]">{{ question().title }}</a>
+      <a [routerLink]="['/questions', question().id]">{{ question().title }}</a>
     </h3>
     <div class="meta-info">
       <span>
         asked {{ question().createdAt | timeAgo }} by
-        <a class="author-link" [routerLink]="['/users', question().author.userId]">{{ question().author.username }}</a>
+        <a class="author-link" [routerLink]="['/users', question().authorId]">{{ question().authorUsername }}</a>
       </span>
     </div>
   </div>

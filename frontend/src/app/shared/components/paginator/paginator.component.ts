@@ -33,9 +33,9 @@ export class PaginatorComponent {
     // Check if it's a full Page<T> object from the API
     if ('content' in pageData) {
       return {
-        // ✅ CORRECTED: Read from the new flattened structure
-        pageNumber: pageData.pageNumber,
-        pageSize: pageData.pageSize,
+        // ✅ FIX: Read from 'number' and 'size' to match the backend Page model.
+        pageNumber: pageData.number,
+        pageSize: pageData.size,
         totalElements: pageData.totalElements,
       };
     }

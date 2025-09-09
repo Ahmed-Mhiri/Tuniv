@@ -3,9 +3,8 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Va
 import { RouterLink } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { AuthService } from '../../../../core/services/auth.service';
-import { Comment, CommentCreateRequest } from '../../../../shared/models/qa.model';
+import { Comment, CommentCreateRequest, Question } from '../../../../shared/models/qa.model';
 import { CommentService } from '../../services/comment.service';
-import { VoteService } from '../../services/vote.service';
 import { TimeAgoPipe } from '../../../../shared/pipes/time-ago.pipe';
 import { VoteComponent } from '../../../../shared/components/vote/vote.component';
 
@@ -35,25 +34,27 @@ import { PostEditFormComponent, PostEditSaveEvent } from '../post-edit-form.comp
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CommentItemComponent {
-  // --- Dependencies ---
+  // --- Injections ---
   private readonly fb = inject(FormBuilder);
-  private readonly voteService = inject(VoteService);
   private readonly commentService = inject(CommentService);
   private readonly message = inject(NzMessageService);
   public readonly authService = inject(AuthService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly modal = inject(NzModalService);
 
+  // ✅ REMOVED VoteService
+  
   // --- Inputs & Outputs ---
   comment = input.required<Comment>();
   answerId = input.required<number>();
-  updateRequired = output<void>();
+  
+  updated = output<Question>();
+  deleted = output<void>();
 
-  // --- Component State ---
+  // --- State ---
   isReplyFormVisible = signal(false);
   isCollapsed = signal(false);
-  isEditing = signal(false); // ✨ New state for editing
-  
+  isEditing = signal(false);
   readonly replyFileList = signal<NzUploadFile[]>([]);
   readonly replyFilesToUpload = signal<File[]>([]);
 
@@ -62,18 +63,13 @@ export class CommentItemComponent {
     this.authService.currentUser()?.userId === this.comment().author.userId
   );
 
-  // --- Form for Replies ---
+  // --- Forms & Validation ---
   private atLeastOneFieldValidator = (control: AbstractControl): ValidationErrors | null => {
     const body = control.get('body')?.value;
     const hasFiles = this.replyFileList().length > 0;
     return !body?.trim() && !hasFiles ? { atLeastOneRequired: true } : null;
   };
-  
-  replyForm = this.fb.group({
-    body: [''],
-  }, {
-    validators: this.atLeastOneFieldValidator
-  });
+  replyForm = this.fb.group({ body: [''] }, { validators: this.atLeastOneFieldValidator });
   
   // --- Event Handlers ---
 
@@ -81,18 +77,14 @@ export class CommentItemComponent {
     this.isCollapsed.set(!this.isCollapsed());
   }
 
-  handleVote(voteValue: number): void {
-    const valueToSubmit = voteValue >= 0 ? 1 : -1;
-    this.voteService.voteOnComment(this.comment().commentId, valueToSubmit).subscribe({
-      next: () => {
-        this.message.success('Vote registered');
-        this.updateRequired.emit();
-      },
+  handleVote(voteValue: 1 | -1): void {
+    // ✅ UPDATED: Call CommentService's voteOnComment method with the required answerId
+    this.commentService.voteOnComment(this.answerId(), this.comment().commentId, voteValue).subscribe({
+      next: (updatedQuestion) => this.updated.emit(updatedQuestion),
       error: (err) => this.message.error(err.error?.message || 'Failed to vote.'),
     });
   }
 
-  // ✨ --- NEW: DELETE LOGIC --- ✨
   deleteComment(): void {
     this.modal.confirm({
       nzTitle: 'Delete this comment?',
@@ -100,27 +92,24 @@ export class CommentItemComponent {
       nzOkText: 'Delete',
       nzOkDanger: true,
       nzOnOk: () =>
-        this.commentService.deleteComment(this.comment().commentId).subscribe({
-          next: () => {
-            this.message.success('Comment deleted');
-            this.updateRequired.emit();
-          },
+        // ✅ UPDATED: Call CommentService with the required answerId
+        this.commentService.deleteComment(this.answerId(), this.comment().commentId).subscribe({
+          next: () => this.deleted.emit(),
           error: (err) => this.message.error(err.error?.message || 'Failed to delete comment.'),
         }),
     });
   }
 
-  // ✨ --- NEW: UPDATE LOGIC --- ✨
   handleSave(event: PostEditSaveEvent): void {
     const request = {
       body: event.body,
       attachmentIdsToDelete: event.attachmentIdsToDelete,
     };
-    this.commentService.updateComment(this.comment().commentId, request, event.newFiles).subscribe({
-      next: () => {
-        this.message.success('Comment updated');
+    // ✅ UPDATED: Call CommentService with the required answerId
+    this.commentService.updateComment(this.answerId(), this.comment().commentId, request, event.newFiles).subscribe({
+      next: (updatedQuestion) => {
         this.isEditing.set(false);
-        this.updateRequired.emit();
+        this.updated.emit(updatedQuestion);
       },
       error: (err) => this.message.error(err.error?.message || 'Failed to update comment.'),
     });
@@ -137,25 +126,27 @@ export class CommentItemComponent {
     const request: CommentCreateRequest = {
       body: this.replyForm.value.body!,
       parentCommentId: this.comment().commentId,
+      answerId: this.answerId(),
     };
-    this.commentService.createComment(this.answerId().toString(), request, this.replyFilesToUpload()).subscribe({
-      next: () => {
+    // ✅ UPDATED: Call CommentService with the required answerId
+    this.commentService.createComment(this.answerId(), request, this.replyFilesToUpload()).subscribe({
+      next: (updatedQuestion) => {
         this.replyForm.reset();
         this.replyFileList.set([]);
         this.replyFilesToUpload.set([]);
         this.isReplyFormVisible.set(false);
-        this.message.success('Reply posted');
-        this.updateRequired.emit();
+        this.updated.emit(updatedQuestion);
       },
       error: (err) => this.message.error(err.error?.message || 'Failed to post reply.'),
     });
   }
 
-  // --- File Handling for Replies ---
+  // --- File Handling for Replies (Unchanged) ---
   beforeUpload = (file: NzUploadFile): Observable<boolean> => {
     this.replyFilesToUpload.update(list => [...list, file as unknown as File]);
     this.replyFileList.update(list => [...list, file]);
-    this.cdr.detectChanges(); // Manually trigger change detection for file list UI
+    this.replyForm.updateValueAndValidity();
+    this.cdr.detectChanges();
     return of(false);
   };
 
@@ -168,6 +159,7 @@ export class CommentItemComponent {
   removeReplyFile(fileToRemove: NzUploadFile): void {
     this.replyFileList.update(list => list.filter(f => f.uid !== fileToRemove.uid));
     this.replyFilesToUpload.update(list => (list as unknown as NzUploadFile[]).filter(f => f.uid !== fileToRemove.uid) as unknown as File[]);
+    this.replyForm.updateValueAndValidity();
     this.cdr.detectChanges();
   }
 }

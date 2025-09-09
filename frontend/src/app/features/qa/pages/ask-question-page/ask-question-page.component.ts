@@ -196,14 +196,19 @@ export class AskQuestionPageComponent implements OnInit {
       });
       return;
     }
+
     this.isSubmitting.set(true);
     const formValue = this.questionForm.getRawValue();
+
+    // ✅ FIX 1: Add the missing 'moduleId' to the request object.
     const questionData: QuestionCreateRequest = {
       title: formValue.title!,
-      body: formValue.body!
+      body: formValue.body!,
+      moduleId: formValue.moduleId!
     };
+
+    // ✅ FIX 2: Call the service with the new 2-argument signature.
     this.questionService.createQuestion(
-      formValue.moduleId!,
       questionData,
       this.filesToUpload()
     ).subscribe({

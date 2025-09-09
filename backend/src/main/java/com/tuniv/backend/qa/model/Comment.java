@@ -29,9 +29,6 @@ public class Comment extends Post { // ✅ EXTENDS Post
     @JsonBackReference("answer-comments")
     private Answer answer;
 
-    @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("comment-votes")
-    private Set<CommentVote> votes = new HashSet<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_comment_id")

@@ -204,3 +204,32 @@
     grid-template-columns: minmax(0, 1fr) 340px;
   }
 }
+.create-post-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background-color: var(--color-surface);
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    border-color: var(--color-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .create-post-input {
+    flex-grow: 1;
+    background-color: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    transition: border-color 0.2s ease-in-out;
+  }
+}

@@ -37,6 +37,14 @@ import lombok.Setter;
 @Setter
 public abstract class Post {
 
+    public enum PostType {
+        QUESTION,
+        ANSWER,
+        COMMENT,
+        MESSAGE
+    }
+
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer id;

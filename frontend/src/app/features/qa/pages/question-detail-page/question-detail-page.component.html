@@ -2,7 +2,7 @@
   <div class="content-col">
     @if (isLoading()) {
       <div class="status-container">
-        <app-spinner></app-spinner>
+        <app-spinner [isLoading]="isLoading()" [overlay]="false" tip="Loading question..."></app-spinner>
       </div>
     } @else if (question(); as q) {
       
@@ -17,7 +17,6 @@
             (cancel)="isEditing.set(false)"
           ></app-post-edit-form>
         </div>
-
       } @else {
         <div class="question-container">
           <div class="question-header">
@@ -49,7 +48,7 @@
                 (vote)="handleQuestionVote($event)"
               ></app-vote>
             </div>
-            <div class="content-container prose dark:prose-invert max-w-none" [innerHTML]="q.body"></div>
+            <div class="content-container prose dark:prose-invert max-w-none" [innerHTML]="q.body | safeHtml"></div>
           </div>
         </div>
 
@@ -75,7 +74,10 @@
 
       <div class="answers-container">
         @if (authService.isUserLoggedIn()) {
-          <app-answer-form (answerSubmit)="handleAnswerSubmit($event)"></app-answer-form>
+          <app-answer-form 
+            [isSubmitting]="isSubmittingAnswer()" 
+            (answerSubmit)="handleAnswerSubmit($event)">
+          </app-answer-form>
           <nz-divider></nz-divider>
         }
 
@@ -98,13 +100,15 @@
         }
         
         <div class="answers-section">
-          <h2 nz-typography class="answers-title">{{ q.answers.length }} Answers</h2>
+          <h2 nz-typography class="answers-title">{{ q.answers?.length || 0 }} Answers</h2>
           @for (answer of q.answers; track answer.answerId) {
             <app-answer-item
-              [answer]="answer"
-              [isQuestionAuthor]="isCurrentUserQuestionAuthor()"
-              (updateRequired)="refreshData()"
-            ></app-answer-item>
+    [questionId]="q.questionId" [answer]="answer"
+    [isQuestionAuthor]="isCurrentUserQuestionAuthor()"
+    (updated)="handleChildUpdate($event)"
+    (deleted)="handleChildDeletion()"
+  ></app-answer-item>
+
           } @empty {
             <div class="py-8">
               <nz-empty nzNotFoundContent="No answers yet. Be the first to help!"></nz-empty>
@@ -112,7 +116,7 @@
           }
         </div>
       </div>
-    } @else {
+    } @else if (!isLoading()) {
       <div class="status-container">
           <nz-empty nzNotFoundContent="Question not found or you do not have permission to view it."></nz-empty>
       </div>
@@ -120,9 +124,13 @@
   </div>
 
   <div class="sidebar-col">
-    <div class="sidebar-widget">
-      <h4>About this Module</h4>
-      <p>Module-related information, rules, or related questions could go here.</p>
-    </div>
+    @if (question(); as q) {
+      <a class="sidebar-widget-link" [routerLink]="['/modules', q.module.moduleId, 'questions']">
+        <div class="sidebar-widget">
+          <h4>{{ q.module.name }}</h4>
+          <p>View all questions in this module.</p>
+        </div>
+      </a>
+    }
   </div>
 </div>

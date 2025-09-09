@@ -9,9 +9,9 @@ import { AuthService } from '../../../../core/services/auth.service';
 import { UserService } from '../../../user/services/user.service'; // ✅ IMPORT UserService
 
 // --- Models ---
-import { Question } from '../../../../shared/models/qa.model';
+import { Question, QuestionSummaryDto } from '../../../../shared/models/qa.model';
 import { University } from '../../../../shared/models/university.model';
-import { LeaderboardUser, UserCommunity } from '../../../../shared/models/user.model'; // ✅ IMPORT new models
+import { LeaderboardUser, UserCommunity, UserProfile } from '../../../../shared/models/user.model'; // ✅ IMPORT new models
 
 // --- Components ---
 import { QuestionListItemComponent } from '../../../qa/components/question-list-item/question-list-item';
@@ -44,19 +44,21 @@ export class HomePageComponent implements OnInit {
   // --- Services ---
   private readonly feedService = inject(FeedService);
   private readonly universityService = inject(UniversityService);
-  private readonly userService = inject(UserService); // ✅ INJECT UserService
+  private readonly userService = inject(UserService);
   public readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly modal = inject(NzModalService);
 
-
   // --- State Signals ---
-  readonly feedItems = signal<Question[]>([]);
+  readonly feedItems = signal<QuestionSummaryDto[]>([]);
   readonly topUniversities = signal<University[]>([]);
   readonly isLoading = signal(true);
-  readonly myCommunities = signal<UserCommunity[]>([]);   // ✅ NEW Signal
-  readonly leaderboard = signal<LeaderboardUser[]>([]);     // ✅ NEW Signal
+  readonly myCommunities = signal<UserCommunity[]>([]);
+  readonly leaderboard = signal<LeaderboardUser[]>([]);
   
+  // ✨ --- ADDED: Signal to hold the current user's profile ---
+  readonly currentUser = signal<UserProfile | null>(null);
+
   // --- Pagination State ---
   private currentPage = 0;
   readonly isLoadingMore = signal(false);
@@ -64,33 +66,40 @@ export class HomePageComponent implements OnInit {
   private activeFeedType = signal<'PERSONALIZED' | 'POPULAR'>('POPULAR');
   private activeModal: NzModalRef | null = null;
 
-
   ngOnInit(): void {
-    // Load content based on login status
     if (this.authService.isUserLoggedIn()) {
       this.activeFeedType.set('PERSONALIZED');
-      this.loadInitialFeed();
-      this.loadMyCommunities(); // ✅ Load user's communities
+      this.loadPersonalizedFeed();
+      this.loadMyCommunities();
+      
+      // ✨ --- ADDED: Load current user data if logged in ---
+      this.loadCurrentUser(); 
     } else {
       this.activeFeedType.set('POPULAR');
       this.loadPopularFeed();
     }
-    // Load content for all users
     this.loadTopUniversities();
-    this.loadLeaderboard(); // ✅ Load leaderboard
+    this.loadLeaderboard();
   }
 
-  loadInitialFeed(): void {
+  // ✨ --- ADDED: Method to fetch and set the current user ---
+  loadCurrentUser(): void {
+    this.userService.getCurrentUserProfile().subscribe(userProfile => {
+      this.currentUser.set(userProfile);
+    });
+  }
+
+  loadPersonalizedFeed(): void {
     this.isLoading.set(true);
     this.hasMoreItems.set(true);
     this.currentPage = 0;
-    this.feedService.getFeed(this.currentPage).subscribe(page => {
+    this.feedService.getPersonalizedFeed(this.currentPage).subscribe(page => {
       this.feedItems.set(page.content);
       this.hasMoreItems.set(!page.last);
       this.isLoading.set(false);
     });
   }
-  
+
   loadPopularFeed(): void {
     this.isLoading.set(true);
     this.hasMoreItems.set(true);
@@ -101,15 +110,15 @@ export class HomePageComponent implements OnInit {
       this.isLoading.set(false);
     });
   }
-  
+
   loadMore(): void {
     if (this.isLoadingMore() || !this.hasMoreItems()) return;
 
     this.isLoadingMore.set(true);
     this.currentPage++;
 
-    const loadMore$ = this.activeFeedType() === 'PERSONALIZED' 
-      ? this.feedService.getFeed(this.currentPage)
+    const loadMore$ = this.activeFeedType() === 'PERSONALIZED'
+      ? this.feedService.getPersonalizedFeed(this.currentPage)
       : this.feedService.getPopularFeed(this.currentPage);
 
     loadMore$.subscribe(page => {
@@ -125,14 +134,12 @@ export class HomePageComponent implements OnInit {
     });
   }
 
-  // ✅ NEW Method to load user's communities
   loadMyCommunities(): void {
     this.userService.getUserCommunities().subscribe(communities => {
       this.myCommunities.set(communities);
     });
   }
 
-  // ✅ NEW Method to load the leaderboard
   loadLeaderboard(): void {
     this.userService.getLeaderboard().subscribe(users => {
       this.leaderboard.set(users);

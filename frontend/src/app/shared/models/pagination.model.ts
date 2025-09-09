@@ -1,9 +1,3 @@
-// src/app/shared/models/pagination.model.ts
-
-/**
- * Interface for making paginated API REQUESTS.
- * Tells the backend which page and size to return.
- */
 export interface Pageable {
   page: number;
   size: number;
@@ -12,19 +6,28 @@ export interface Pageable {
 
 /**
  * A generic interface for a paginated API RESPONSE from the backend.
- * Contains the actual data (`content`) and all page metadata.
+ * ✅ CORRECTED: This now perfectly matches the default Spring Boot Page JSON structure.
  * @template T The type of the items in the content array.
  */
 export interface Page<T> {
   content: T[];
   
-  // ✅ CORRECTED: Properties are now at the top level
-  pageNumber: number;
-  pageSize: number;
-  
-  totalElements: number;
-  totalPages: number;
+  // Page metadata from Spring Boot
   last: boolean;
+  totalPages: number;
+  totalElements: number;
+  size: number;         // Corresponds to pageSize
+  number: number;       // Corresponds to pageNumber (zero-based index)
+  
+  // Additional useful properties from Spring Boot
+  sort: {
+    sorted: boolean;
+    unsorted: boolean;
+    empty: boolean;
+  };
+  first: boolean;
+  numberOfElements: number;
+  empty: boolean;
 }
 
 /**

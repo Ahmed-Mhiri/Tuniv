@@ -10,13 +10,13 @@
 
   <div class="content-container" nz-row nzGutter="16">
     <div nz-col nzSpan="24">
-      @if (isLoading()) {
-        <div class="spinner-container">
-          <nz-spin nzSimple nzSize="large"></nz-spin>
+      @if (isLoading() && questions().length === 0) {
+        <div class="status-container">
+           <app-spinner [isLoading]="isLoading()" [overlay]="false" tip="Loading questions..."></app-spinner>
         </div>
       } @else {
         <div class="question-list">
-          @for (question of questions(); track question.questionId) {
+          @for (question of questions(); track question.id) {
             <app-question-list-item [question]="question"></app-question-list-item>
           } @empty {
             <nz-empty nzNotFoundContent="No questions in this module yet. Be the first to ask!"></nz-empty>

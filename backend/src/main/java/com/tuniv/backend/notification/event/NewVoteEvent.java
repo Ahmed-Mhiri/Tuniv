@@ -3,7 +3,7 @@ package com.tuniv.backend.notification.event;
 
 import org.springframework.context.ApplicationEvent;
 
-import com.tuniv.backend.notification.model.PostType;
+import com.tuniv.backend.qa.model.Post.PostType;
 
 import lombok.Getter;
 

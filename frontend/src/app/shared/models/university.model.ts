@@ -18,3 +18,8 @@ export interface University {
   isMember: boolean;
   memberCount: number; // <-- ADD THIS PROPERTY
 }
+
+export interface ModuleSummary {
+  moduleId: number;
+  name: string;
+}

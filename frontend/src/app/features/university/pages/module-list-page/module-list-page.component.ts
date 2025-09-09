@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BehaviorSubject, combineLatest, switchMap } from 'rxjs';
-import { UniversityService } from '../../services/university.service';
 import { Module } from '../../../../shared/models/university.model';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 
@@ -13,7 +12,7 @@ import { NzIconModule } from 'ng-zorro-antd/icon';
 import { NzButtonModule } from 'ng-zorro-antd/button';
 import { ModuleService } from '../../services/module.service';
 import { Pageable, PageInfo } from '../../../../shared/models/pagination.model';
-import { NzPaginationComponent } from 'ng-zorro-antd/pagination';
+import { PaginatorComponent } from '../../../../shared/components/paginator/paginator.component';
 
 @Component({
   selector: 'app-module-list-page',
@@ -25,7 +24,7 @@ import { NzPaginationComponent } from 'ng-zorro-antd/pagination';
     NzTypographyModule,
     NzIconModule,
     NzButtonModule,
-    NzPaginationComponent
+    PaginatorComponent,
   ],
   templateUrl: './module-list-page.component.html',
   styleUrl: './module-list-page.component.scss',
@@ -69,8 +68,10 @@ export class ModuleListPageComponent implements OnInit {
           this.modules.set(page.content);
           // Update pageInfo signal with the response metadata
           this.pageInfo.set({
-            pageNumber: page.pageNumber,
-            pageSize: page.pageSize,
+            // ✅ FIX: Changed property names to match the backend Page model
+            pageNumber: page.number,
+
+            pageSize: page.size,
             totalElements: page.totalElements,
           });
           this.isLoading.set(false);
@@ -89,6 +90,13 @@ export class ModuleListPageComponent implements OnInit {
     this.pageable$.next({
       page: zeroBasedIndex,
       size: this.pageInfo().pageSize,
+    });
+  }
+  onPageSizeChange(newSize: number): void {
+    // When page size changes, it's best to go back to the first page
+    this.pageable$.next({
+      page: 0, 
+      size: newSize,
     });
   }
 }

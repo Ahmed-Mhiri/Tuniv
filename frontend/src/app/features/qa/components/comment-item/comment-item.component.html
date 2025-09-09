@@ -81,10 +81,12 @@
         <div class="nested-comments">
           @for (child of comment().children; track child.commentId) {
             <app-comment-item
-              [comment]="child"
-              [answerId]="answerId()"
-              (updateRequired)="updateRequired.emit()"
-            ></app-comment-item>
+      [comment]="child"
+      [answerId]="answerId()"
+
+      (updated)="updated.emit($event)"
+      (deleted)="deleted.emit()"
+    ></app-comment-item>
           }
         </div>
       </div>

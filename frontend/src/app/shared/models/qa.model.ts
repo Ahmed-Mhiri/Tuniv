@@ -1,6 +1,5 @@
-// src/app/shared/models/qa.model.ts
+import { ModuleSummary } from "./university.model";
 
-// Represents the author of any post.
 export interface Author {
   userId: number;
   username: string;
@@ -9,7 +8,7 @@ export interface Author {
 
 // Represents an uploaded file attachment.
 export interface Attachment {
-  attachmentId: number; // ✨ ADD THIS ID
+  attachmentId: number;
   fileName: string;
   fileUrl: string;
   fileType: string;
@@ -19,12 +18,12 @@ export interface Attachment {
 export interface Comment {
   commentId: number;
   body: string;
-  createdAt: string; // Dates are transferred as strings
+  createdAt: string;
   author: Author;
   score: number;
-  currentUserVote: number; // -1, 0, or 1
+  currentUserVote: number;
   attachments: Attachment[];
-  children: Comment[]; // For nested replies
+  children: Comment[];
 }
 
 // Represents a single answer to a question.
@@ -37,11 +36,10 @@ export interface Answer {
   score: number;
   currentUserVote: number;
   attachments: Attachment[];
-  comments: Comment[]; // Top-level comments for this answer
+  comments: Comment[];
 }
 
 // Represents the entire question page data structure.
-// This interface can also be used for the QuestionResponseDto.
 export interface Question {
   questionId: number;
   title: string;
@@ -52,36 +50,32 @@ export interface Question {
   currentUserVote: number;
   attachments: Attachment[];
   answers: Answer[];
+  module: ModuleSummary; // ✅ ADD THIS PROPERTY
 }
 
 // --- Request Models ---
 
-// For creating a new question.
 export interface QuestionCreateRequest {
   title: string;
   body: string;
+  // ✅ FIX: Added moduleId to link the new question to a module.
+  moduleId: number;
 }
 
-// For creating a new answer.
 export interface AnswerCreateRequest {
   body: string;
 }
 
-// For creating a new comment or a reply.
 export interface CommentCreateRequest {
   body: string;
   parentCommentId?: number | null;
+  // ✅ FIX: Added answerId to link the new comment to an answer.
+  answerId: number;
 }
 
-// For casting a vote.
 export interface VoteRequest {
   value: 1 | -1;
 }
-
-// --- Response Models (Often the same as the main models) ---
-
-// The response for a created question is the full question object.
-export type QuestionResponseDto = Question;
 
 export interface QuestionUpdateRequest {
   title: string;
@@ -97,4 +91,19 @@ export interface AnswerUpdateRequest {
 export interface CommentUpdateRequest {
   body: string;
   attachmentIdsToDelete?: number[];
+}
+
+// --- Response & DTO Models ---
+
+export type QuestionResponseDto = Question;
+
+export interface QuestionSummaryDto {
+  id: number;
+  title: string;
+  authorId: number;
+  authorUsername: string;
+  createdAt: string;
+  score: number;
+  answerCount: number;
+  currentUserVote: number;
 }

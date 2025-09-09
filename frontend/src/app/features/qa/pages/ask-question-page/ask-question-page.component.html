@@ -3,7 +3,7 @@
     <h1 nz-typography>Ask a Question</h1>
 
     @if (isLoading()) {
-      <app-spinner></app-spinner>
+      <app-spinner [isLoading]="isLoading()" [overlay]="false" tip="Checking permissions..."></app-spinner>
     } @else {
       @if (userMustJoin() && universityToJoin(); as uni) {
         <nz-alert
@@ -69,7 +69,7 @@
           <nz-form-item>
             <nz-form-label nzRequired>Body</nz-form-label>
             <nz-form-control nzHasFeedback [nzErrorTip]="bodyErrorTpl">
-              <textarea nz-input formControlName="body" placeholder="Include all the information someone would need to answer your question" [nzAutosize]="{ minRows: 10, maxRows: 20 }"></textarea>
+               <app-rich-text-editor formControlName="body"></app-rich-text-editor>
               <ng-template #bodyErrorTpl let-control>
                 @if (control.hasError('required')) { Body is required. }
                 @if (control.hasError('minlength')) { Body must be at least 20 characters. }

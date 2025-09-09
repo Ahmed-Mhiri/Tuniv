@@ -1,8 +1,6 @@
-package com.tuniv.backend.qa.model;
+package com.tuniv.backend.chat.model;
 
-
-import java.time.Instant;
-
+import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.Column;
@@ -20,13 +18,14 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+
 @Entity
-@Table(name = "votes")
+@Table(name = "reactions")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "vote_type", discriminatorType = DiscriminatorType.STRING)
+@DiscriminatorColumn(name = "reaction_type", discriminatorType = DiscriminatorType.STRING)
 @Getter
 @Setter
-public abstract class Vote {
+public abstract class Reaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -36,17 +35,10 @@ public abstract class Vote {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /**
-     * This is the polymorphic association to the Post base class.
-     * It allows a vote to be associated with a Question, Answer, or Comment.
-     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "post_id", nullable = false)
     private Post post;
 
     @Column(nullable = false)
-    private short value;
-
-    @Column(nullable = false, updatable = false)
-    private Instant createdAt = Instant.now();
+    private String emoji;
 }
