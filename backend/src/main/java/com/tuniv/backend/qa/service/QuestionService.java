@@ -54,38 +54,34 @@ public class QuestionService {
     private final UserRepository userRepository;
     private final AttachmentService attachmentService;
     private final PostAuthorizationService postAuthorizationService;
-    private final VoteRepository voteRepository; // ✨ INJECT THE NEW REPOSITORY (replaces CustomVoteRepository)
+    private final VoteRepository voteRepository;
 
-
-
+    /**
+     * ✅ REFACTORED AND HIGHLY OPTIMIZED
+     * This method now fetches the entire Question data tree in a single query using an Entity Graph,
+     * followed by a second query to fetch all user-specific votes.
+     */
     @Transactional(readOnly = true)
     @Cacheable(value = "questions", key = "#questionId")
     public QuestionResponseDto getQuestionById(Integer questionId, UserDetailsImpl currentUser) {
-        Question question = questionRepository.findWithAuthorAndModuleById(questionId)
+        // STEP 1: Fetch the question and its entire tree in ONE database call. 🚀
+        Question question = questionRepository.findFullTreeById(questionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Question not found with id: " + questionId));
 
-        List<Answer> answers = answerRepository.findAllByQuestionIdsWithDetails(Collections.singletonList(questionId));
-        List<Integer> answerIds = answers.stream().map(Answer::getId).toList();
-
-        List<Comment> topLevelComments = answerIds.isEmpty() ? Collections.emptyList() :
-                commentRepository.findTopLevelByAnswerIdsWithDetails(answerIds);
-        Map<Integer, List<Comment>> commentsByAnswerId = topLevelComments.stream()
-                .collect(Collectors.groupingBy(comment -> comment.getAnswer().getId()));
-
+        // STEP 2: Collect all Post IDs from the fully-loaded question object.
         Map<Integer, Integer> currentUserVotes = new HashMap<>();
         if (currentUser != null) {
-            // ✅ OPTIMIZATION: Combine all post IDs and fetch votes in one go.
-            List<Integer> commentIds = topLevelComments.stream()
-                    .flatMap(comment -> flattenComments(comment).stream())
-                    .map(Comment::getId)
-                    .toList();
-            
-            // Combine all IDs into a single list
-            List<Integer> allPostIds = Stream.concat(
-                Stream.of(questionId),
-                Stream.concat(answerIds.stream(), commentIds.stream())
-            ).toList();
+            List<Integer> allPostIds = new ArrayList<>();
+            allPostIds.add(question.getId());
+            question.getAnswers().forEach(answer -> {
+                allPostIds.add(answer.getId());
+                // Flatten the comment tree to get all comment IDs
+                answer.getComments().stream()
+                    .flatMap(this::flattenCommentsStream)
+                    .forEach(comment -> allPostIds.add(comment.getId()));
+            });
 
+            // STEP 3: Fetch all votes for the current user in ONE database call.
             if (!allPostIds.isEmpty()) {
                 List<VoteInfo> votes = voteRepository.findAllVotesForUserByPostIds(currentUser.getId(), allPostIds);
                 currentUserVotes = votes.stream()
@@ -93,19 +89,19 @@ public class QuestionService {
             }
         }
 
-        return QAMapper.buildQuestionResponseDto(question, answers, commentsByAnswerId, currentUser, currentUserVotes);
+        // STEP 4: Map the single, fully-populated entity to a DTO.
+        // NOTE: Ensure your QAMapper is updated to handle this simpler call signature.
+        return QAMapper.buildQuestionResponseDto(question, currentUser, currentUserVotes);
     }
-
 
     @Transactional(readOnly = true)
     public Page<QuestionSummaryDto> getQuestionsByModule(Integer moduleId, Pageable pageable, UserDetailsImpl currentUser) {
         Page<QuestionSummaryDto> summaryPage = questionRepository.findQuestionSummariesByModuleId(moduleId, pageable);
         if (currentUser != null && !summaryPage.isEmpty()) {
             List<Integer> questionIds = summaryPage.stream().map(QuestionSummaryDto::id).toList();
-            // ✅ UPDATED: Use the new repository for a single, efficient query
             List<VoteInfo> userVotes = voteRepository.findAllVotesForUserByPostIds(currentUser.getId(), questionIds);
             Map<Integer, Integer> userVoteMap = userVotes.stream()
-                .collect(Collectors.toMap(VoteInfo::postId, VoteInfo::value));
+                    .collect(Collectors.toMap(VoteInfo::postId, VoteInfo::value));
 
             List<QuestionSummaryDto> updatedSummaries = summaryPage.getContent().stream()
                     .map(summary -> summary.withCurrentUserVote(userVoteMap.getOrDefault(summary.id(), 0))).toList();
@@ -130,17 +126,16 @@ public class QuestionService {
         Question savedQuestion = questionRepository.save(question);
         attachmentService.saveAttachments(files, savedQuestion);
         
-        // ✅ OPTIMIZATION: Manually build the DTO to avoid slow, unnecessary database calls.
+        // This is already well-optimized to avoid re-fetching.
         return QAMapper.buildQuestionResponseDto(
-            savedQuestion, 
-            Collections.emptyList(), // New question has no answers
-            Collections.emptyMap(),  // New question has no comments
-            currentUser, 
-            Collections.emptyMap()   // New question has no votes yet
+                savedQuestion, 
+                Collections.emptyList(),
+                Collections.emptyMap(), 
+                currentUser, 
+                Collections.emptyMap() 
         );
     }
 
-    
     @Transactional
     @CacheEvict(value = "questions", key = "#questionId")
     public QuestionResponseDto addAnswer(Integer questionId, AnswerCreateRequest request, UserDetailsImpl currentUser, List<MultipartFile> files) {
@@ -155,6 +150,7 @@ public class QuestionService {
         Answer savedAnswer = answerRepository.save(answer);
         attachmentService.saveAttachments(files, savedAnswer);
 
+        // This method now calls our highly optimized getQuestionById, making it faster.
         return this.getQuestionById(questionId, currentUser);
     }
 
@@ -178,6 +174,7 @@ public class QuestionService {
         attachmentService.saveAttachments(newFiles, question);
         questionRepository.save(question);
         
+        // This method also calls our highly optimized getQuestionById.
         return getQuestionById(questionId, currentUser);
     }
 
@@ -187,15 +184,6 @@ public class QuestionService {
         Question question = questionRepository.findById(questionId).orElseThrow(() -> new ResourceNotFoundException("Question not found"));
         postAuthorizationService.checkOwnership(question, currentUser);
         questionRepository.delete(question);
-    }
-
-    private List<Comment> flattenComments(Comment comment) {
-        List<Comment> list = new ArrayList<>();
-        list.add(comment);
-        if (comment.getChildren() != null && !comment.getChildren().isEmpty()) {
-            comment.getChildren().forEach(child -> list.addAll(flattenComments(child)));
-        }
-        return list;
     }
     
     @Transactional(readOnly = true)
@@ -208,5 +196,20 @@ public class QuestionService {
     public Integer findQuestionIdByCommentId(Integer commentId) {
         return commentRepository.findQuestionIdById(commentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Could not find question for comment id: " + commentId));
+    }
+
+    /**
+     * A stream-based helper to recursively flatten a comment and its children.
+     * This is used to collect all post IDs for the vote lookup.
+     */
+    private Stream<Comment> flattenCommentsStream(Comment comment) {
+        if (comment.getChildren() == null || comment.getChildren().isEmpty()) {
+            return Stream.of(comment);
+        }
+        // Creates a stream of the parent comment, followed by the flattened stream of all its children.
+        return Stream.concat(
+            Stream.of(comment),
+            comment.getChildren().stream().flatMap(this::flattenCommentsStream)
+        );
     }
 }

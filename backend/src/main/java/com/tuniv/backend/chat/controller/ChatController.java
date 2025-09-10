@@ -1,6 +1,7 @@
 package com.tuniv.backend.chat.controller;
 
 import java.security.Principal;
+import java.util.Collections;
 import java.util.List;
 
 import org.springframework.http.MediaType;
@@ -56,10 +57,11 @@ public ResponseEntity<ChatMessageDto> sendMessageWithAttachment(
     UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     Message finalMessage = chatService.sendMessage(conversationId, chatMessageDto, currentUser.getUsername(), files);
 
-    // ✅ FIX: Provide all required arguments: Message, Username, and clientTempId
+    // ✅ FIX: Provide all required arguments, including the (empty) list of reactions.
     ChatMessageDto responseDto = ChatMapper.toChatMessageDto(
-        finalMessage, 
-        currentUser.getUsername(), // The missing String argument
+        finalMessage,
+        Collections.emptyList(), // A new message has no reactions
+        currentUser.getUsername(),
         chatMessageDto.getClientTempId()
     );
     

@@ -8,7 +8,6 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.tuniv.backend.qa.model.Answer;
 import com.tuniv.backend.qa.model.Comment;
-import com.tuniv.backend.qa.model.CommentVote;
 import com.tuniv.backend.qa.model.Question;
 import com.tuniv.backend.university.model.UniversityMembership;
 
@@ -72,9 +71,6 @@ public class User {
     @JsonManagedReference("user-comments")
     private Set<Comment> comments = new HashSet<>();
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    @JsonManagedReference("user-comment-votes")
-    private Set<CommentVote> commentVotes = new HashSet<>();
 
     // --- AUTHENTICATION FIELDS ---
     @Column(name = "reset_password_token")

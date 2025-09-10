@@ -1,6 +1,6 @@
 package com.tuniv.backend.chat.repository;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -14,6 +14,10 @@ import com.tuniv.backend.chat.model.Message;
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Integer> {
 
+    /**
+     * ✅ RENAMED: Added underscore for nested property traversal (Conversation -> conversationId).
+     * The @Query ensures author and attachments are fetched efficiently to prevent N+1 problems.
+     */
     @Query("""
     SELECT m FROM Message m
     LEFT JOIN FETCH m.author
@@ -21,14 +25,20 @@ public interface MessageRepository extends JpaRepository<Message, Integer> {
     WHERE m.conversation.conversationId = :conversationId
     ORDER BY m.sentAt ASC
     """)
-    List<Message> findByConversationConversationIdOrderBySentAtAsc(@Param("conversationId") Integer conversationId);
+    List<Message> findByConversation_ConversationIdOrderBySentAtAsc(@Param("conversationId") Integer conversationId);
 
-    Optional<Message> findTopByConversationConversationIdOrderBySentAtDesc(Integer conversationId);
+    /**
+     * ✅ RENAMED: Added underscore for nested property traversal.
+     */
+    Optional<Message> findTopByConversation_ConversationIdOrderBySentAtDesc(Integer conversationId);
 
-    // ✅ RENAMED: Changed from 'SenderUserId' to 'AuthorUserId' to match the refactored Message entity.
-    long countByConversationConversationIdAndAuthorUserIdNotAndSentAtAfter(
+    /**
+     * ✅ RENAMED & UPDATED: Added underscores for nested properties and changed parameter type
+     * from LocalDateTime to Instant to match the entity fields.
+     */
+    long countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
             Integer conversationId,
             Integer userId,
-            LocalDateTime timestamp
+            Instant timestamp
     );
 }

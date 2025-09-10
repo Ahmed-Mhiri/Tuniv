@@ -54,7 +54,7 @@ public class VoteService {
         }
         
         // ✅ NEW LOGIC: Find existing vote by user and post
-        Optional<Vote> existingVote = voteRepository.findByUser_IdAndPost_Id(voter.getUserId(), questionId);
+        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), questionId);
         // ✅ NEW LOGIC: Create vote object with the simple constructor
         QuestionVote newVote = new QuestionVote(voter, question, (short) value);
 
@@ -72,7 +72,7 @@ public class VoteService {
         }
 
         // ✅ NEW LOGIC: Find existing vote by user and post
-        Optional<Vote> existingVote = voteRepository.findByUser_IdAndPost_Id(voter.getUserId(), answerId);
+        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), answerId);
         // ✅ NEW LOGIC: Create vote object with the simple constructor
         AnswerVote newVote = new AnswerVote(voter, answer, (short) value);
 
@@ -90,7 +90,7 @@ public class VoteService {
         }
 
         // ✅ NEW LOGIC: Find existing vote by user and post
-        Optional<Vote> existingVote = voteRepository.findByUser_IdAndPost_Id(voter.getUserId(), commentId);
+        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), commentId);
         // ✅ NEW LOGIC: Create vote object with the simple constructor
         CommentVote newVote = new CommentVote(voter, comment, (short) value);
 

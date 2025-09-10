@@ -14,26 +14,22 @@ import com.tuniv.backend.qa.model.Vote;
 public interface VoteRepository extends JpaRepository<Vote, Integer> {
 
     /**
-     * Finds an existing vote by a specific user on a specific post.
-     * This is used by the VoteService.
+     * ✅ RENAMED: Changed from User_Id to User_UserId to match the User entity.
      */
-    Optional<Vote> findByUser_IdAndPost_Id(Integer userId, Integer postId);
+    Optional<Vote> findByUser_UserIdAndPost_Id(Integer userId, Integer postId);
 
     /**
-     * ✅ ADD THIS METHOD
-     * Fetches all votes cast by a specific user, ordered by most recent first.
-     * This is required by the ActivityService.
+     * ✅ RENAMED: Changed from User_Id to User_UserId to match the User entity.
      */
-    List<Vote> findByUser_IdOrderByCreatedAtDesc(Integer userId);
+    List<Vote> findByUser_UserIdOrderByCreatedAtDesc(Integer userId);
 
     /**
-     * Fetches all votes for a given user across multiple posts
-     * in a single, highly efficient database query.
+     * ✅ UPDATED: Changed from v.user.id to v.user.userId in the WHERE clause.
      */
     @Query("""
-        SELECT new com.yourpackage.dto.VoteInfo(v.post.id, v.value)
+        SELECT new com.tuniv.backend.qa.dto.VoteInfo(v.post.id, v.value)
         FROM Vote v
-        WHERE v.user.id = :userId AND v.post.id IN :postIds
+        WHERE v.user.userId = :userId AND v.post.id IN :postIds
     """)
     List<VoteInfo> findAllVotesForUserByPostIds(
         @Param("userId") Integer userId,

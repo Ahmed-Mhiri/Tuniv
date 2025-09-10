@@ -3,6 +3,8 @@ package com.tuniv.backend.qa.controller;
 import java.util.List;
 import java.util.Map;
 
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
@@ -48,22 +50,18 @@ public class QuestionController {
     private final AnswerService answerService;
     private final VoteService voteService;
     private final RateLimitingService rateLimitingService;
+    private final CacheManager cacheManager; // ✅ Injected for manual cache eviction
 
     // =================================================================
     // == Question Endpoints
     // =================================================================
 
-    /**
-     * ✅ NEW ENDPOINT
-     * Gets a paginated list of questions. Must be filtered by moduleId.
-     * Example: GET /api/v1/questions?moduleId=1&page=0&size=10
-     */
     @GetMapping
     public ResponseEntity<Page<QuestionSummaryDto>> getQuestions(
             @RequestParam Integer moduleId,
             @PageableDefault(sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        
+
         Page<QuestionSummaryDto> questionPage = questionService.getQuestionsByModule(moduleId, pageable, currentUser);
         return ResponseEntity.ok(questionPage);
     }
@@ -73,16 +71,16 @@ public class QuestionController {
             @RequestPart("question") @Valid QuestionCreateRequest request,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
             @RequestPart(value = "files", required = false) List<MultipartFile> files) {
-        
+
         QuestionResponseDto newQuestionDto = questionService.createQuestion(request, currentUser, files);
         return new ResponseEntity<>(newQuestionDto, HttpStatus.CREATED);
     }
-    
+
     @GetMapping("/{questionId}")
     public ResponseEntity<QuestionResponseDto> getQuestionById(
             @PathVariable Integer questionId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        
+
         QuestionResponseDto question = questionService.getQuestionById(questionId, currentUser);
         return ResponseEntity.ok(question);
     }
@@ -93,7 +91,7 @@ public class QuestionController {
             @RequestPart("question") @Valid QuestionUpdateRequest request,
             @RequestPart(value = "files", required = false) List<MultipartFile> newFiles,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-            
+
         QuestionResponseDto updatedQuestion = questionService.updateQuestion(questionId, request, newFiles, currentUser);
         return ResponseEntity.ok(updatedQuestion);
     }
@@ -102,7 +100,7 @@ public class QuestionController {
     public ResponseEntity<Void> deleteQuestion(
             @PathVariable Integer questionId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-            
+
         questionService.deleteQuestion(questionId, currentUser);
         return ResponseEntity.noContent().build();
     }
@@ -121,10 +119,17 @@ public class QuestionController {
         }
 
         voteService.voteOnQuestion(questionId, currentUser, (short) voteRequest.value());
+
+        // ✅ THE FIX: Evict the stale question from the cache before fetching.
+        Cache questionsCache = cacheManager.getCache("questions");
+        if (questionsCache != null) {
+            questionsCache.evict(questionId);
+        }
+
         QuestionResponseDto updatedQuestion = questionService.getQuestionById(questionId, currentUser);
         return ResponseEntity.ok(updatedQuestion);
     }
-    
+
     // =================================================================
     // == Answer Sub-Resource Endpoints (/questions/{qId}/answers/...)
     // =================================================================
@@ -135,7 +140,7 @@ public class QuestionController {
             @RequestPart("answer") @Valid AnswerCreateRequest request,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
             @RequestPart(value = "files", required = false) List<MultipartFile> files) {
-        
+
         QuestionResponseDto updatedQuestion = questionService.addAnswer(questionId, request, currentUser, files);
         return new ResponseEntity<>(updatedQuestion, HttpStatus.CREATED);
     }
@@ -147,7 +152,7 @@ public class QuestionController {
             @RequestPart("answer") @Valid AnswerUpdateRequest request,
             @RequestPart(value = "files", required = false) List<MultipartFile> newFiles,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-            
+
         answerService.updateAnswer(answerId, request, newFiles, currentUser);
         QuestionResponseDto updatedQuestion = questionService.getQuestionById(questionId, currentUser);
         return ResponseEntity.ok(updatedQuestion);
@@ -158,7 +163,7 @@ public class QuestionController {
             @PathVariable Integer questionId,
             @PathVariable Integer answerId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-            
+
         answerService.deleteAnswer(answerId, currentUser);
         return ResponseEntity.noContent().build();
     }
@@ -168,7 +173,7 @@ public class QuestionController {
             @PathVariable Integer questionId,
             @PathVariable Integer answerId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-            
+
         answerService.markAsSolution(answerId, currentUser);
         QuestionResponseDto updatedQuestion = questionService.getQuestionById(questionId, currentUser);
         return ResponseEntity.ok(updatedQuestion);
@@ -189,6 +194,13 @@ public class QuestionController {
         }
 
         voteService.voteOnAnswer(answerId, currentUser, (short) voteRequest.value());
+
+        // ✅ THE FIX: Evict the stale question from the cache before fetching.
+        Cache questionsCache = cacheManager.getCache("questions");
+        if (questionsCache != null) {
+            questionsCache.evict(questionId);
+        }
+
         QuestionResponseDto updatedQuestion = questionService.getQuestionById(questionId, currentUser);
         return ResponseEntity.ok(updatedQuestion);
     }

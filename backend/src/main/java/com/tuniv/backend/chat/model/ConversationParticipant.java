@@ -1,7 +1,7 @@
 package com.tuniv.backend.chat.model;
 
 import java.io.Serializable;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Objects;
 
 import com.tuniv.backend.user.model.User;
@@ -38,7 +38,7 @@ public class ConversationParticipant {
     private Conversation conversation;
 
     @Column(name = "last_read_timestamp")
-    private LocalDateTime lastReadTimestamp;
+    private Instant  lastReadTimestamp;
 
     /**
      * ✅ FIX: Default constructor required by JPA.

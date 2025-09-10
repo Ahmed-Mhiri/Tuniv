@@ -26,24 +26,25 @@ public final class QAMapper {
     private QAMapper() {}
 
     /**
-     * This is the main high-performance entry point for building the full question response.
+     * ✅ NEW PRIMARY METHOD
+     * Builds the full question response from a single, fully-populated Question entity.
+     * This is the new high-performance entry point, designed to work with the Entity Graph fetch.
+     *
+     * @param question         The fully-loaded Question entity, including its answers, comments, and replies.
+     * @param currentUser      The details of the user making the request, for vote calculation.
+     * @param currentUserVotes A map of post IDs to the current user's vote value (1, -1, or 0).
+     * @return A complete QuestionResponseDto.
      */
     public static QuestionResponseDto buildQuestionResponseDto(
             Question question,
-            List<Answer> answers,
-            Map<Integer, List<Comment>> commentsByAnswerId,
             UserDetailsImpl currentUser,
             Map<Integer, Integer> currentUserVotes
     ) {
         if (question == null) return null;
 
-        List<AnswerResponseDto> answerDtos = answers.stream()
-                .map(answer -> toAnswerResponseDto(
-                        answer,
-                        commentsByAnswerId.getOrDefault(answer.getId(), Collections.emptyList()),
-                        currentUser,
-                        currentUserVotes
-                ))
+        // Map the answers directly from the question entity. The 'comments' are already fetched.
+        List<AnswerResponseDto> answerDtos = question.getAnswers().stream()
+                .map(answer -> toAnswerResponseDto(answer, currentUser, currentUserVotes))
                 .sorted(Comparator.comparing(AnswerResponseDto::isSolution).reversed()
                         .thenComparing(AnswerResponseDto::score, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
@@ -54,7 +55,7 @@ public final class QAMapper {
                 question.getBody(),
                 question.getCreatedAt(),
                 toAuthorDto(question.getAuthor()),
-                toModuleDto(question.getModule()), // ✅ Module information is now included
+                toModuleDto(question.getModule()),
                 answerDtos,
                 question.getScore(),
                 currentUserVotes.getOrDefault(question.getId(), 0),
@@ -62,15 +63,18 @@ public final class QAMapper {
         );
     }
 
+    /**
+     * Maps an Answer entity to its DTO representation.
+     * It now directly uses the 'comments' collection from the Answer entity.
+     */
     public static AnswerResponseDto toAnswerResponseDto(
             Answer answer,
-            List<Comment> comments,
             UserDetailsImpl currentUser,
             Map<Integer, Integer> currentUserVotes
     ) {
         if (answer == null) return null;
 
-        List<CommentResponseDto> commentDtos = comments.stream()
+        List<CommentResponseDto> commentDtos = answer.getComments().stream()
                 .map(comment -> toCommentResponseDto(comment, currentUser, currentUserVotes))
                 .sorted(Comparator.comparing(CommentResponseDto::score).reversed())
                 .collect(Collectors.toList());
@@ -88,6 +92,10 @@ public final class QAMapper {
         );
     }
 
+    /**
+     * Recursively maps a Comment entity and its children to their DTO representation.
+     * This method remains unchanged as its recursive nature is perfect for the entity graph.
+     */
     public static CommentResponseDto toCommentResponseDto(
             Comment comment,
             UserDetailsImpl currentUser,
@@ -125,16 +133,64 @@ public final class QAMapper {
         );
     }
     
-    /**
-    * ✅ NEW HELPER METHOD
-    * Converts a Module entity into a ModuleDto.
-    */
     public static ModuleDto toModuleDto(Module module) {
         if (module == null) return null;
         return new ModuleDto(module.getModuleId(), module.getName());
     }
-}
 
+    /**
+     * @deprecated This method is kept for backward compatibility (e.g., in createQuestion)
+     * but the new, simpler buildQuestionResponseDto(Question, ...) is preferred for performance.
+     */
+    @Deprecated
+    public static QuestionResponseDto buildQuestionResponseDto(
+            Question question,
+            List<Answer> answers,
+            Map<Integer, List<Comment>> commentsByAnswerId,
+            UserDetailsImpl currentUser,
+            Map<Integer, Integer> currentUserVotes
+    ) {
+        if (question == null) return null;
+
+        List<AnswerResponseDto> answerDtos = answers.stream()
+                .map(answer -> {
+                    // This is the key difference: comments are looked up from the map.
+                    List<Comment> commentsForAnswer = commentsByAnswerId.getOrDefault(answer.getId(), Collections.emptyList());
+                    List<CommentResponseDto> commentDtos = commentsForAnswer.stream()
+                            .map(comment -> toCommentResponseDto(comment, currentUser, currentUserVotes))
+                            .sorted(Comparator.comparing(CommentResponseDto::score).reversed())
+                            .collect(Collectors.toList());
+
+                    return new AnswerResponseDto(
+                            answer.getId(),
+                            answer.getBody(),
+                            answer.getIsSolution(),
+                            answer.getCreatedAt(),
+                            toAuthorDto(answer.getAuthor()),
+                            answer.getScore(),
+                            currentUserVotes.getOrDefault(answer.getId(), 0),
+                            commentDtos,
+                            answer.getAttachments().stream().map(QAMapper::toAttachmentDto).collect(Collectors.toList())
+                    );
+                })
+                .sorted(Comparator.comparing(AnswerResponseDto::isSolution).reversed()
+                        .thenComparing(AnswerResponseDto::score, Comparator.reverseOrder()))
+                .collect(Collectors.toList());
+
+        return new QuestionResponseDto(
+                question.getId(),
+                question.getTitle(),
+                question.getBody(),
+                question.getCreatedAt(),
+                toAuthorDto(question.getAuthor()),
+                toModuleDto(question.getModule()),
+                answerDtos,
+                question.getScore(),
+                currentUserVotes.getOrDefault(question.getId(), 0),
+                question.getAttachments().stream().map(QAMapper::toAttachmentDto).collect(Collectors.toList())
+        );
+    }
+}
 
 
 

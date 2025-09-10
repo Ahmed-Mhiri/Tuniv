@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable; // <-- IMPORT ADDED
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository; // <-- IMPORT ADDED
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,7 +17,10 @@ import com.tuniv.backend.qa.model.Question;
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, Integer> {
 
-    List<Question> findByAuthor_IdOrderByCreatedAtDesc(Integer userId);
+     @EntityGraph(value = "question-with-full-tree", type = EntityGraph.EntityGraphType.FETCH)
+    Optional<Question> findFullTreeById(Integer questionId);
+
+    List<Question> findByAuthor_UserIdOrderByCreatedAtDesc(Integer userId);
 
     @Query("SELECT q FROM Question q LEFT JOIN FETCH q.attachments WHERE q.id = :questionId")
     Optional<Question> findByIdWithDetails(@Param("questionId") Integer questionId);

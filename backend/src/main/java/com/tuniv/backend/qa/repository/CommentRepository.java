@@ -15,7 +15,7 @@ public interface CommentRepository extends JpaRepository<Comment, Integer> {
 
     List<Comment> findByAnswerIdOrderByCreatedAtAsc(Integer answerId);
     List<Comment> findByAnswerIdAndParentCommentIsNullOrderByCreatedAtAsc(Integer answerId);
-    List<Comment> findByAuthor_IdOrderByCreatedAtDesc(Integer userId);
+    List<Comment> findByAuthor_UserIdOrderByCreatedAtDesc(Integer userId);
 
     @Query("SELECT c FROM Comment c " +
            "JOIN FETCH c.author " +

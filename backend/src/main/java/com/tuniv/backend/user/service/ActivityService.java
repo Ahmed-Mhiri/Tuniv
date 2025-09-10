@@ -33,12 +33,12 @@ public class ActivityService {
     @Transactional(readOnly = true)
     public List<UserActivityItemDto> getActivityForUser(Integer userId) {
         // --- 1. Fetch all posts, accepted answers, and votes for the user ---
-        var questions = questionRepository.findByAuthor_IdOrderByCreatedAtDesc(userId);
-        var answers = answerRepository.findByAuthor_IdOrderByCreatedAtDesc(userId);
-        var comments = commentRepository.findByAuthor_IdOrderByCreatedAtDesc(userId);
-        var acceptedAnswers = answerRepository.findByQuestion_Author_IdAndIsSolutionTrueOrderByUpdatedAtDesc(userId);
+        var questions = questionRepository.findByAuthor_UserIdOrderByCreatedAtDesc(userId);
+        var answers = answerRepository.findByAuthor_UserIdOrderByCreatedAtDesc(userId);
+        var comments = commentRepository.findByAuthor_UserIdOrderByCreatedAtDesc(userId);
+        var acceptedAnswers = answerRepository.findByQuestion_Author_UserIdAndIsSolutionTrueOrderByUpdatedAtDesc(userId);
         // ✅ FETCH ALL VOTES IN A SINGLE CALL
-        var votes = voteRepository.findByUser_IdOrderByCreatedAtDesc(userId);
+        var votes = voteRepository.findByUser_UserIdOrderByCreatedAtDesc(userId);
 
         // --- 2. Convert each list into a stream of standardized DTOs ---
         Stream<UserActivityItemDto> questionActivities = questions.stream()

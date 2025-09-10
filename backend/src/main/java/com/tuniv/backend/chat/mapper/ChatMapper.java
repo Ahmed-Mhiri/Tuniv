@@ -7,13 +7,16 @@ import java.util.stream.Collectors;
 import com.tuniv.backend.chat.dto.ChatMessageDto;
 import com.tuniv.backend.chat.dto.ReactionDto;
 import com.tuniv.backend.chat.model.Message;
-import com.tuniv.backend.chat.model.MessageReaction;
+import com.tuniv.backend.chat.model.Reaction;
 import com.tuniv.backend.qa.mapper.QAMapper;
 
 public class ChatMapper {
 
-    // ✅ PRIMARY aapper: Handles everything except the clientTempId
-    public static ChatMessageDto toChatMessageDto(Message message, String currentUsername) {
+    /**
+     * ✅ UPDATED: The mapper now accepts a List<Reaction> as an argument,
+     * since the Message entity no longer holds this collection.
+     */
+    public static ChatMessageDto toChatMessageDto(Message message, List<Reaction> reactions, String currentUsername) {
         if (message == null) {
             return null;
         }
@@ -28,41 +31,41 @@ public class ChatMapper {
         if (message.isDeleted()) {
             dto.setContent("This message was deleted.");
             dto.setAttachments(Collections.emptyList());
+            dto.setReactions(Collections.emptyList()); // Also clear reactions
         } else {
             dto.setContent(message.getBody());
             dto.setAttachments(
                 message.getAttachments() != null ?
                 message.getAttachments().stream()
-                       .map(QAMapper::toAttachmentDto) // Assuming QAMapper exists and is correct
+                       .map(QAMapper::toAttachmentDto)
                        .collect(Collectors.toList()) :
                 Collections.emptyList()
             );
-        }
 
-        // Handle reactions
-        if (message.getReactions() != null) {
-            dto.setReactions(
-                message.getReactions().stream()
-                    .collect(Collectors.groupingBy(MessageReaction::getEmoji))
-                    .entrySet().stream()
-                    .map(entry -> {
-                        List<MessageReaction> reactions = entry.getValue();
-                        List<String> usernames = reactions.stream()
-                                .map(r -> r.getUser().getUsername())
-                                .collect(Collectors.toList());
-                        boolean currentUserReacted = currentUsername != null && usernames.contains(currentUsername);
-                        return new ReactionDto(entry.getKey(), reactions.size(), usernames, currentUserReacted);
-                    })
-                    .collect(Collectors.toList())
-            );
+            // Handle reactions from the passed-in list
+            if (reactions != null) {
+                dto.setReactions(
+                    reactions.stream()
+                        .collect(Collectors.groupingBy(Reaction::getEmoji)) // Group by emoji from Reaction
+                        .entrySet().stream()
+                        .map(entry -> {
+                            List<Reaction> reactionGroup = entry.getValue();
+                            List<String> usernames = reactionGroup.stream()
+                                    .map(r -> r.getUser().getUsername())
+                                    .collect(Collectors.toList());
+                            boolean currentUserReacted = currentUsername != null && usernames.contains(currentUsername);
+                            return new ReactionDto(entry.getKey(), reactionGroup.size(), usernames, currentUserReacted);
+                        })
+                        .collect(Collectors.toList())
+                );
+            }
         }
-
         return dto;
     }
 
-    // ✅ HELPER overload: For convenience when clientTempId is also needed
-    public static ChatMessageDto toChatMessageDto(Message message, String currentUsername, Long clientTempId) {
-        ChatMessageDto dto = toChatMessageDto(message, currentUsername);
+    // ✅ UPDATED: Helper overload to accept the reactions list
+    public static ChatMessageDto toChatMessageDto(Message message, List<Reaction> reactions, String currentUsername, Long clientTempId) {
+        ChatMessageDto dto = toChatMessageDto(message, reactions, currentUsername);
         if (dto != null) {
             dto.setClientTempId(clientTempId);
         }

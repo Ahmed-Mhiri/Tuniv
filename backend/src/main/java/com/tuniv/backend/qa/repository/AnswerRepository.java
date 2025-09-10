@@ -13,8 +13,8 @@ import com.tuniv.backend.qa.model.Answer;
 @Repository
 public interface AnswerRepository extends JpaRepository<Answer, Integer> {
 
-    List<Answer> findByAuthor_IdOrderByCreatedAtDesc(Integer userId);
-    List<Answer> findByQuestion_Author_IdAndIsSolutionTrueOrderByUpdatedAtDesc(Integer userId);
+    List<Answer> findByAuthor_UserIdOrderByCreatedAtDesc(Integer userId);
+    List<Answer> findByQuestion_Author_UserIdAndIsSolutionTrueOrderByUpdatedAtDesc(Integer userId);
 
     @Query("SELECT a FROM Answer a " +
            "JOIN FETCH a.author " +

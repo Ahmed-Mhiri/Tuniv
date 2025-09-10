@@ -69,7 +69,12 @@
           <nz-form-item>
             <nz-form-label nzRequired>Body</nz-form-label>
             <nz-form-control nzHasFeedback [nzErrorTip]="bodyErrorTpl">
-               <app-rich-text-editor formControlName="body"></app-rich-text-editor>
+              <textarea
+                nz-input
+                formControlName="body"
+                placeholder="Include all the information someone would need to answer your question..."
+                [nzAutosize]="{ minRows: 6, maxRows: 15 }"
+              ></textarea>
               <ng-template #bodyErrorTpl let-control>
                 @if (control.hasError('required')) { Body is required. }
                 @if (control.hasError('minlength')) { Body must be at least 20 characters. }

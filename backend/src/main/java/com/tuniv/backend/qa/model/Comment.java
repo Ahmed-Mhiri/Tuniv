@@ -20,7 +20,7 @@ import lombok.Setter;
 @DiscriminatorValue("COMMENT") // ✅ This value is stored in the 'post_type' column
 @Getter
 @Setter
-public class Comment extends Post { // ✅ EXTENDS Post
+public class Comment extends VotablePost  { // ✅ EXTENDS Post
 
     // ❌ ID, author, createdAt, and attachments are REMOVED as they are now in Post.
 

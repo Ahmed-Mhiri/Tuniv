@@ -24,7 +24,7 @@ import lombok.Setter;
 @DiscriminatorValue("ANSWER") // ✅ This value is stored in the 'post_type' column
 @Getter
 @Setter
-public class Answer extends Post { // ✅ EXTENDS Post
+public class Answer extends VotablePost  { // ✅ EXTENDS Post
 
     // ❌ ID, author, createdAt, and attachments are REMOVED as they are now in Post.
 
