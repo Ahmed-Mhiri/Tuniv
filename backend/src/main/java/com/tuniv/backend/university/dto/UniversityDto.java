@@ -6,7 +6,7 @@ public record UniversityDto(
     Integer universityId,
     String name,
     List<ModuleDto> modules,
-    boolean isMember, // <-- ADD THIS
-    int memberCount
-
+    boolean isMember,
+    Integer memberCount,
+    Integer questionCount
 ) {}

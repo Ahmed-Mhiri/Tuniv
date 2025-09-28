@@ -6,9 +6,7 @@ import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import com.tuniv.backend.qa.model.Answer;
-import com.tuniv.backend.qa.model.Comment;
-import com.tuniv.backend.qa.model.Question;
+import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.university.model.UniversityMembership;
 
 import jakarta.persistence.CascadeType;
@@ -59,18 +57,8 @@ public class User {
     @JsonManagedReference("user-memberships")
     private Set<UniversityMembership> memberships = new HashSet<>();
 
-    @OneToMany(mappedBy = "author")
-    @JsonManagedReference("user-questions")
-    private Set<Question> questions = new HashSet<>();
-
-    @OneToMany(mappedBy = "author")
-    @JsonManagedReference("user-answers")
-    private Set<Answer> answers = new HashSet<>();
-    
-    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL)
-    @JsonManagedReference("user-comments")
-    private Set<Comment> comments = new HashSet<>();
-
+    @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Post> posts = new HashSet<>();
 
     // --- AUTHENTICATION FIELDS ---
     @Column(name = "reset_password_token")
@@ -78,6 +66,9 @@ public class User {
 
     @Column(name = "reset_password_token_expiry")
     private OffsetDateTime resetPasswordTokenExpiry; // Use OffsetDateTime
+
+    @Column(name = "is_platform_admin", nullable = false)
+    private boolean isPlatformAdmin = false;
 
     @Column(name = "is_2fa_enabled", nullable = false)
     private boolean is2faEnabled = false;

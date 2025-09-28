@@ -3,9 +3,8 @@
     <input
       type="text"
       nz-input
-      placeholder="Search for questions..."
-      [formControl]="searchControl"
-      (focus)="showResults = true"
+      [placeholder]="placeholder()" [formControl]="searchControl"
+      (focus)="showResults.set(true)"
     />
   </nz-input-group>
 
@@ -14,23 +13,23 @@
   </ng-template>
 
   <ng-template #loadingIcon>
-    @if (isLoading) {
+    @if (isLoading()) {
       <nz-spin nzSimple [nzSize]="'small'"></nz-spin>
     }
   </ng-template>
 
-  @if (showResults && searchControl.value) {
+  @if (showResults() && searchControl.value) {
     <div class="results-dropdown">
-      @if (!isLoading && searchResults.length > 0) {
+      @if (!isLoading() && searchResults().length > 0) {
         <ul class="results-list">
-          @for (result of searchResults; track result.questionId) {
+          @for (result of searchResults(); track result.questionId) {
             <li class="result-item" (mousedown)="selectQuestion(result.questionId)">
               <span class="result-title">{{ result.title }}</span>
               <span class="result-author">by {{ result.author.username }}</span>
             </li>
           }
         </ul>
-      } @else if (!isLoading && searchResults.length === 0 && searchControl.value.length > 1) {
+      } @else if (!isLoading() && searchResults().length === 0 && searchControl.value.length > 1) {
         <div class="no-results">
           No results found for "{{ searchControl.value }}"
         </div>

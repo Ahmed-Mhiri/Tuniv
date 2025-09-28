@@ -13,6 +13,9 @@ import com.tuniv.backend.qa.model.Answer;
 @Repository
 public interface AnswerRepository extends JpaRepository<Answer, Integer> {
 
+       long countByAuthor_UserId(Integer userId);
+
+
     List<Answer> findByAuthor_UserIdOrderByCreatedAtDesc(Integer userId);
     List<Answer> findByQuestion_Author_UserIdAndIsSolutionTrueOrderByUpdatedAtDesc(Integer userId);
 

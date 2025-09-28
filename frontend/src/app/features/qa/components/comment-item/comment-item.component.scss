@@ -1,169 +1,483 @@
-@import '../attachments'; // <-- ADD THIS
-// ... rest of your existing styles
+@import '../attachments';
+
 :host {
   display: block;
-  padding-top: 1rem;
-}
-.hidden-uploader {
-  display: none;
 }
 
-.comment-thread-item {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.indentation-col {
-  flex-shrink: 0;
+.comment-wrapper {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.thread-line {
-  width: 2px;
-  background-color: var(--color-border);
-  flex-grow: 1;
-  margin-top: 0.5rem;
-  transition: background-color 0.2s;
-  cursor: pointer;
-
-  &:hover {
-    background-color: var(--color-primary);
+  margin-top: 0.75rem;
+  
+  // Mobile-first: reduced spacing on mobile
+  padding-left: 12px;
+  
+  @media (min-width: 768px) {
+    padding-left: 24px;
+    margin-top: 1rem;
   }
 }
 
-.content-col {
-  flex-grow: 1;
-  min-width: 0;
+// Improved indentation guide with better visual hierarchy
+.indentation-guide {
+  position: absolute;
+  top: 28px; // Start below the avatar
+  bottom: 0;
+  left: 11px;
+  width: 2px;
+  background: linear-gradient(
+    to bottom,
+    var(--color-border) 0%,
+    var(--color-border) 50%,
+    transparent 100%
+  );
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  // Add subtle interaction hint
+  &::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -8px;
+    right: -8px;
+    bottom: 0;
+    z-index: -1;
+  }
+
+  &:hover {
+    background: linear-gradient(
+      to bottom,
+      var(--color-primary) 0%,
+      var(--color-primary) 50%,
+      transparent 100%
+    );
+    
+    .collapse-button {
+      transform: translate(-50%, -50%) scale(1.1);
+      background-color: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+  }
+
+  @media (min-width: 768px) {
+    left: 15px;
+    top: 32px;
+  }
 }
 
-/* --- Expanded View Styles --- */
-.comment-header,
-.collapsed-view {
+// Enhanced collapse button with better mobile touch targets
+.collapse-button {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  
+  // Larger touch target for mobile
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  
+  // Modern design with subtle shadow
+  background-color: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 4px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  cursor: pointer;
+  
+  // Active state for mobile
+  &:active {
+    transform: translate(-50%, -50%) scale(0.95);
+  }
+  
+  @media (min-width: 768px) {
+    width: 18px;
+    height: 18px;
+    font-size: 12px;
+  }
+}
+
+.comment-content {
+  min-width: 0;
+  // Add subtle animation for expand/collapse
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.comment-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
   font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  min-height: 32px; // Ensure consistent height
+  
+  // Better touch target on mobile when collapsed
+  padding: 0.25rem 0;
+  margin: -0.25rem 0;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+  
+  @media (min-width: 768px) {
+    gap: 0.5rem;
+    font-size: 0.8rem;
+  }
 }
 
 .author-link {
   font-weight: 600;
   color: var(--color-text-primary);
   text-decoration: none;
-  &:hover { 
-    text-decoration: underline; 
+  transition: color 0.15s ease;
+  
+  &:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
   }
 }
 
 .meta-info {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  
+  @media (min-width: 768px) {
+    font-size: 0.8rem;
+  }
+}
+
+// Improved collapsed state
+.is-collapsed {
+  .expanded-content {
+    display: none;
+  }
+  
+  .indentation-guide {
+    // Keep guide visible but fade it
+    opacity: 0.3;
+    background: var(--color-border);
+    
+    &:hover {
+      opacity: 1;
+    }
+  }
+  
+  .comment-header {
+    cursor: pointer;
+    padding: 0.5rem;
+    margin: -0.5rem;
+    
+    &:hover {
+      background-color: var(--color-surface-subtle);
+    }
+    
+    &:active {
+      background-color: var(--color-surface-active);
+    }
+  }
+}
+
+// Enhanced expand indicator
+.toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background-color: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
   color: var(--color-text-secondary);
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.15s ease;
+  
+  &:hover {
+    background-color: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+  }
+}
+
+.expanded-content {
+  padding-top: 0.5rem;
+  animation: expandContent 0.2s ease;
+}
+
+@keyframes expandContent {
+  from {
+    opacity: 0;
+    max-height: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 100vh;
+  }
 }
 
 .comment-body {
-  padding: 0.25rem 0;
-  p {
-    margin: 0.5rem 0;
-    color: var(--color-text-primary);
-    white-space: pre-wrap;
-    word-break: break-word;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  padding: 0.5rem 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  color: var(--color-text-primary);
+  
+  @media (min-width: 768px) {
+    font-size: 0.95rem;
+    line-height: 1.65;
   }
 }
 
+// Enhanced action bar for mobile
 .action-bar {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
-}
-
-.action-button {
-  color: var(--color-text-secondary);
-  font-weight: 600;
-  font-size: 0.875rem;
-  padding: 0.25rem 0.5rem;
-  &:hover {
-    background-color: var(--color-surface-subtle);
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border-light);
+  
+  @media (min-width: 768px) {
+    gap: 0.5rem;
+    margin-top: 0.75rem;
   }
 }
 
-.reply-form-wrapper {
-  margin-top: 1rem;
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  font-size: 0.8125rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  
+  // Better mobile touch targets
+  min-height: 32px;
+  
+  &:hover {
+    background-color: var(--color-surface-subtle);
+    color: var(--color-text-primary);
+  }
+  
+  &:active {
+    background-color: var(--color-surface-active);
+    transform: scale(0.98);
+  }
+  
+  @media (min-width: 768px) {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    min-height: auto;
+  }
 }
 
-.reply-form-actions {
+// Reply form with better mobile layout
+.reply-form-wrapper {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: var(--color-surface-subtle);
+  border-radius: 8px;
+  border: 1px solid var(--color-border-light);
+  
+  @media (min-width: 768px) {
+    margin-top: 1rem;
+    padding: 1rem;
+  }
+}
+
+.comment-form-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 0.5rem;
-  margin-top: 0.5rem;
+  margin-top: 0.75rem;
+  
+  @media (max-width: 480px) {
+    flex-direction: column;
+    align-items: stretch;
+    
+    .submit-actions {
+      justify-content: flex-end;
+    }
+  }
 }
 
 .submit-actions {
   display: flex;
   gap: 0.5rem;
-}
-
-.nested-comments {
-  // Indentation is handled by the component structure
-}
-
-/* --- Collapsed View Styles --- */
-.is-collapsed .thread-line {
-  display: none;
-}
-
-.collapsed-view {
-  cursor: pointer;
-  padding-top: 0.5rem; // Align text with avatar
   
-  &:hover .author-link {
-    text-decoration: underline;
+  button {
+    min-width: 60px;
   }
 }
 
-.toggle-button {
-  font-weight: bold;
-  color: var(--color-text-secondary);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0 0.25rem;
-  line-height: 1;
-  margin-right: 0.25rem;
-
-  &:hover {
-    color: var(--color-primary);
-  }
-}
-
-/* --- File Preview Styles --- */
+// File preview with better mobile layout
 .file-list-preview {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
   border-top: 1px dashed var(--color-border);
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.375rem;
+  
+  @media (min-width: 768px) {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 }
 
 .file-item {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.25rem 0.75rem;
-  background-color: var(--color-surface-subtle);
+  padding: 0.375rem 0.75rem;
+  background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 0.875rem;
   color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+  
+  &:hover {
+    border-color: var(--color-primary);
+    background-color: var(--color-surface-hover);
+  }
 
   button {
-    color: var(--color-text-secondary);
+    margin-left: auto;
+    color: var(--color-text-tertiary);
+    transition: color 0.15s ease;
+    
     &:hover {
-      color: var(--color-text-primary);
+      color: var(--color-danger);
       background-color: transparent;
     }
   }
+}
+
+// Nested comments with progressive indentation
+.nested-comments {
+  margin-top: 0.5rem;
+  
+  // Reduce indentation on deeper levels for mobile
+  .comment-wrapper {
+    @media (max-width: 480px) {
+      padding-left: 8px;
+      
+      .indentation-guide {
+        left: 7px;
+      }
+    }
+    
+    // Progressive opacity for deep nesting
+    .comment-wrapper {
+      .comment-wrapper {
+        .comment-body {
+          font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+          .comment-body {
+            font-size: 0.875rem;
+          }
+        }
+      }
+    }
+  }
+}
+
+// Attachments section improvements
+.attachments-section {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background-color: var(--color-surface-subtle);
+  border-radius: 8px;
+  border: 1px solid var(--color-border-light);
+}
+
+.attachments-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+  
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 1rem;
+  }
+}
+
+.attachment-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  
+  &:hover {
+    border-color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  
+  .img-preview {
+    width: 100%;
+    height: auto;
+    max-height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+  }
+  
+  .file-icon {
+    font-size: 24px;
+    color: var(--color-text-secondary);
+    margin-bottom: 0.25rem;
+  }
+  
+  .file-name {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    width: 100%;
+  }
+}
+
+// Edit form wrapper
+.edit-form-wrapper {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: var(--color-surface-edit);
+  border-radius: 8px;
+  border: 2px dashed var(--color-primary);
 }

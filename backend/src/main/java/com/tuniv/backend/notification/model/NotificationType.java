@@ -17,5 +17,14 @@ public enum NotificationType {
     NEW_CHAT_MESSAGE,
     
     // Welcome/System
-    WELCOME_TO_UNIVERSITY
+    WELCOME_TO_UNIVERSITY,
+
+    // ✅ NEW: Follow notifications
+    NEW_FOLLOWER,
+    
+    // ✅ NEW: Content from followed entities
+    NEW_QUESTION_FROM_FOLLOWED_USER,
+    NEW_QUESTION_IN_FOLLOWED_COMMUNITY,
+    NEW_QUESTION_IN_FOLLOWED_MODULE,
+    NEW_QUESTION_WITH_FOLLOWED_TAG
 }

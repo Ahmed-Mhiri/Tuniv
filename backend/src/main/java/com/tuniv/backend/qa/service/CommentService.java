@@ -69,6 +69,10 @@ public class CommentService {
         Answer answer = answerRepository.findWithQuestionById(answerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Answer not found with id: " + answerId));
 
+        // ✅ INCREMENT COMMENT COUNT
+        // This change is automatically saved by JPA's dirty checking at the end of the transaction.
+        answer.setCommentCount(answer.getCommentCount() + 1);
+
         Comment comment = new Comment();
         comment.setBody(request.body());
         comment.setAnswer(answer);
@@ -115,7 +119,12 @@ public class CommentService {
 
         postAuthorizationService.checkOwnership(comment, currentUser);
 
-        Integer questionId = comment.getAnswer().getQuestion().getId();
+        // ✅ DECREMENT COMMENT COUNT
+        // This change is automatically saved by JPA's dirty checking.
+        Answer answer = comment.getAnswer();
+        answer.setCommentCount(answer.getCommentCount() - 1);
+
+        Integer questionId = answer.getQuestion().getId();
         Cache questionsCache = cacheManager.getCache("questions");
         if (questionsCache != null) {
             questionsCache.evict(questionId);
@@ -124,7 +133,6 @@ public class CommentService {
         attachmentService.deleteAttachments(comment.getAttachments());
         commentRepository.delete(comment);
     }
-
     @Transactional(readOnly = true)
     public List<CommentResponseDto> getCommentsByAnswer(Integer answerId, UserDetailsImpl currentUser) {
         if (!answerRepository.existsById(answerId)) {

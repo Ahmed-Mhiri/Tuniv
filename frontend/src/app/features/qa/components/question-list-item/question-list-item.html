@@ -1,23 +1,67 @@
-<div class="question-item-container" [ngClass]="answerStatus()">
-  <div class="stats-col">
+<div class="question-item-container" [class]="answerStatus()">
+  <div class="vote-col">
+    @if (interactive()) {
+      <button
+        class="vote-btn upvote"
+        [class.active]="questionState().userVoteStatus === 'UPVOTE'"
+        (click)="vote('UPVOTE')"
+        aria-label="Upvote question"
+      >
+        <span nz-icon nzType="arrow-up"></span>
+      </button>
+    }
+
     <div class="stat-item">
-      <span class="stat-count">{{ question().score }}</span>
+      <span class="stat-count">{{ questionState().score }}</span>
       <span class="stat-label">votes</span>
     </div>
+
+    @if (interactive()) {
+      <button
+        class="vote-btn downvote"
+        [class.active]="questionState().userVoteStatus === 'DOWNVOTE'"
+        (click)="vote('DOWNVOTE')"
+        aria-label="Downvote question"
+      >
+        <span nz-icon nzType="arrow-down"></span>
+      </button>
+    }
+  </div>
+
+  <div class="stats-col">
     <div class="stat-item answer-stat">
-      <span class="stat-count">{{ question().answerCount }}</span>
+      <span class="stat-count">{{ questionState().answerCount }}</span>
       <span class="stat-label">answers</span>
     </div>
   </div>
 
   <div class="content-col">
     <h3 class="question-title">
-      <a [routerLink]="['/questions', question().id]">{{ question().title }}</a>
+      <a [routerLink]="['/qa/questions', questionState().id]">{{ questionState().title }}</a>
     </h3>
+
+    <div class="tag-list">
+      @for (tag of questionState().tags; track tag) {
+        <a class="tag" [routerLink]="['/qa/tags', tag]">{{ tag }}</a>
+      }
+    </div>
+
     <div class="meta-info">
-      <span>
-        asked {{ question().createdAt | timeAgo }} by
-        <a class="author-link" [routerLink]="['/users', question().authorId]">{{ question().authorUsername }}</a>
+      @if (showUniversity() && questionState().universityName) {
+        <a
+          class="university-link"
+          [routerLink]="['/universities', questionState().universityId]"
+        >
+          <span nz-icon nzType="bank"></span>
+          {{ questionState().universityName }}
+        </a>
+        <span class="meta-divider">•</span>
+      }
+      <span class="author-info">
+        asked {{ questionState().createdAt | timeAgo }} by
+        <a class="author-link" [routerLink]="['/users', questionState().authorId]">
+          {{ questionState().authorUsername }}
+        </a>
       </span>
     </div>
   </div>

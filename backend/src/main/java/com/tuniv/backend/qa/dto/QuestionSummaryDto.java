@@ -1,11 +1,11 @@
 package com.tuniv.backend.qa.dto;
 
 import java.time.Instant;
+import java.util.List;
 
-/**
- * A lightweight Data Transfer Object representing a question summary for list views.
- * Using a Java Record makes it concise and immutable.
- */
+import com.tuniv.backend.qa.model.VoteStatus;
+
+
 public record QuestionSummaryDto(
     Integer id,
     String title,
@@ -13,17 +13,33 @@ public record QuestionSummaryDto(
     String authorUsername,
     Instant createdAt,
     int score,
-    long answerCount,   // We get the COUNT of answers, not the full answer objects
-    int currentUserVote // This will be populated in a second step
+    int answerCount,
+    VoteStatus userVoteStatus,
+    boolean hasAcceptedAnswer,
+    List<String> tags,
+    Integer universityId,
+    String universityName
 ) {
     /**
-     * A helper method to create a new DTO with the user's vote populated.
-     * Since records are immutable, this creates a copy with the updated value.
+     * ✅ ADD THIS CONSTRUCTOR
+     * This constructor will be called by the JPQL query.
+     * It accepts the raw String from the CASE statement and converts it to the VoteStatus enum.
      */
-    public QuestionSummaryDto withCurrentUserVote(int vote) {
+    public QuestionSummaryDto(
+            Integer id, String title, Integer authorId, String authorUsername, Instant createdAt,
+            int score, int answerCount, String userVoteStatusString, boolean hasAcceptedAnswer,
+            Integer universityId, String universityName
+    ) {
+        this(id, title, authorId, authorUsername, createdAt, score, answerCount,
+             VoteStatus.fromString(userVoteStatusString), // Convert String to Enum
+             hasAcceptedAnswer, List.of(), universityId, universityName);
+    }
+
+    public QuestionSummaryDto withTags(List<String> newTags) {
         return new QuestionSummaryDto(
-            this.id, this.title, this.authorId, this.authorUsername,
-            this.createdAt, this.score, this.answerCount, vote
+            this.id, this.title, this.authorId, this.authorUsername, 
+            this.createdAt, this.score, this.answerCount, this.userVoteStatus,
+            this.hasAcceptedAnswer, newTags, this.universityId, this.universityName
         );
     }
 }

@@ -1,90 +1,322 @@
-<nz-header>
-  <div class="navbar-content">
-    <div class="navbar-left">
-      <a routerLink="/" class="logo">
-        <span class="themed-logo"></span>
-      </a>
-      <div class="main-nav-links">
-        <a class="nav-link" routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a>
-        <a class="nav-link" routerLink="/universities" routerLinkActive="active">Universities</a>
-      </div>
-    </div>
-
-    <div class="navbar-center">
-      <app-search-bar />
-    </div>
-
-    <div class="navbar-right">
-      @if (isBrowser()) {
-        <nz-switch
-          [ngModel]="isDarkMode()"
-          (ngModelChange)="toggleTheme($event)"
-          [nzCheckedChildren]="iconMoon"
-          [nzUnCheckedChildren]="iconSun"
-        ></nz-switch>
-        <ng-template #iconSun><span nz-icon nzType="sun"></span></ng-template>
-        <ng-template #iconMoon><span nz-icon nzType="moon"></span></ng-template>
-        @if (isUserLoggedIn()) {
-          <button (click)="toggleChatWidget()" nz-button nzType="text" nzShape="circle" class="action-icon" nz-tooltip nzTooltipTitle="Chat">
-            <span nz-icon nzType="message" nzTheme="outline"></span>
-          </button>
-          
-          <app-notification-dropdown></app-notification-dropdown>
-
-
-          <a nz-dropdown [nzDropdownMenu]="userMenu" nzPlacement="bottomRight" class="user-profile">
-            <nz-avatar nzIcon="user" [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"></nz-avatar>
+<!-- navbar.component.html -->
+<nz-header [class.scrolled]="isScrolled()">
+  <div class="navbar-container">
+    <div class="navbar-content">
+      <!-- Left Section -->
+      <div class="navbar-left">
+        <a routerLink="/" class="logo" aria-label="Home">
+          <span class="themed-logo"></span>
+        </a>
+        
+        <!-- Desktop Navigation -->
+        <nav class="main-nav" role="navigation" aria-label="Main navigation">
+          <a 
+            class="nav-link" 
+            routerLink="/" 
+            routerLinkActive="active" 
+            [routerLinkActiveOptions]="{ exact: true }"
+            (click)="handleNavClick($event)"
+          >
+            Home
           </a>
-          <nz-dropdown-menu #userMenu="nzDropdownMenu">
-            <ul nz-menu>
-              <div class="dropdown-header">
-                Signed in as <strong>{{ currentUser()?.username }}</strong>
-              </div>
-              <li nz-menu-divider></li>
-              <li nz-menu-item [routerLink]="['/users', currentUser()?.userId]"><span nz-icon nzType="user"></span> My Profile</li>
-              <li nz-menu-item routerLink="/settings"><span nz-icon nzType="setting"></span> Settings</li>
-              <li nz-menu-divider></li>
-              <li nz-menu-item (click)="logout()"><span nz-icon nzType="logout"></span> Logout</li>
-            </ul>
-          </nz-dropdown-menu>
-        } @else {
-          <a routerLink="/login"><button nz-button nzType="default" class="btn-secondary">Login</button></a>
-          <a routerLink="/register"><button nz-button nzType="primary" class="btn-primary">Register</button></a>
+          <a 
+            class="nav-link" 
+            routerLink="/universities" 
+            routerLinkActive="active"
+            (click)="handleNavClick($event)"
+          >
+            Universities
+          </a>
+        </nav>
+      </div>
+
+      <!-- Center Section - Search -->
+      <div class="navbar-center">
+        <app-search-bar [placeholder]="searchPlaceholder()" />
+      </div>
+
+      <!-- Right Section -->
+      <div class="navbar-right">
+        @if (isBrowser()) {
+          <!-- Theme Toggle -->
+          <button 
+            class="theme-toggle"
+            [attr.aria-label]="isDarkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
+            (click)="toggleTheme(!isDarkMode())"
+            nz-tooltip
+            [nzTooltipTitle]="isDarkMode() ? 'Light mode' : 'Dark mode'"
+          >
+            <span 
+              nz-icon 
+              [nzType]="isDarkMode() ? 'sun' : 'moon'" 
+              nzTheme="outline"
+              class="theme-icon"
+            ></span>
+          </button>
+
+          @if (isUserLoggedIn()) {
+            <!-- Chat Button -->
+            <button 
+              (click)="toggleChatWidget()" 
+              nz-button 
+              nzType="text" 
+              nzShape="circle" 
+              class="action-icon chat-icon"
+              [class.has-unread]="hasUnreadMessages()"
+              nz-tooltip 
+              nzTooltipTitle="Chat"
+              aria-label="Open chat"
+            >
+              <span nz-icon nzType="message" nzTheme="outline"></span>
+              @if (hasUnreadMessages()) {
+                <span class="notification-dot"></span>
+              }
+            </button>
+            
+            <!-- Notifications -->
+            <div class="notification-wrapper">
+              <app-notification-dropdown></app-notification-dropdown>
+            </div>
+
+            <!-- User Menu -->
+            <div class="user-menu-wrapper">
+              <a 
+                nz-dropdown 
+                [nzDropdownMenu]="userMenu" 
+                nzPlacement="bottomRight" 
+                class="user-profile"
+                [attr.aria-label]="'User menu for ' + currentUser()?.username"
+              >
+                <nz-avatar 
+                  [nzIcon]="!currentUser()?.profilePhotoUrl ? 'user' : ''"
+                  [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
+                  [nzSize]="32"
+                  class="user-avatar"
+                ></nz-avatar>
+                <span class="user-name">{{ currentUser()?.username }}</span>
+                <span nz-icon nzType="down" class="dropdown-arrow"></span>
+              </a>
+              
+              <nz-dropdown-menu #userMenu="nzDropdownMenu">
+                <ul nz-menu class="user-dropdown-menu">
+                  <li class="dropdown-header">
+                    <div class="user-info">
+                      <nz-avatar 
+                        [nzIcon]="!currentUser()?.profilePhotoUrl ? 'user' : ''"
+                        [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
+                        [nzSize]="40"
+                      ></nz-avatar>
+                      <div class="user-details">
+                        <strong>{{ currentUser()?.username }}</strong>
+                        <span class="user-email">{{ currentUser()?.email }}</span>
+                      </div>
+                    </div>
+                  </li>
+                  <li nz-menu-divider></li>
+                  <li nz-menu-item [routerLink]="['/users', currentUser()?.userId]">
+                    <span nz-icon nzType="user"></span> 
+                    <span>My Profile</span>
+                  </li>
+                  <li nz-menu-item routerLink="/dashboard">
+                    <span nz-icon nzType="dashboard"></span> 
+                    <span>Dashboard</span>
+                  </li>
+                  <li nz-menu-item routerLink="/settings">
+                    <span nz-icon nzType="setting"></span> 
+                    <span>Settings</span>
+                  </li>
+                  <li nz-menu-divider></li>
+                  <li nz-menu-item routerLink="/help">
+                    <span nz-icon nzType="question-circle"></span> 
+                    <span>Help & Support</span>
+                  </li>
+                  <li nz-menu-divider></li>
+                  <li nz-menu-item (click)="logout()" class="logout-item">
+                    <span nz-icon nzType="logout"></span> 
+                    <span>Logout</span>
+                  </li>
+                </ul>
+              </nz-dropdown-menu>
+            </div>
+          } @else {
+            <!-- Auth Buttons -->
+            <div class="auth-buttons">
+              <a routerLink="/login" class="btn-link">
+                <button nz-button nzType="default" class="btn-secondary">
+                  Login
+                </button>
+              </a>
+              <a routerLink="/register" class="btn-link">
+                <button nz-button nzType="primary" class="btn-primary">
+                  Get Started
+                </button>
+              </a>
+            </div>
+          }
         }
-      }
-      <button nz-button nzType="text" (click)="openMobileDrawer()" class="mobile-menu-trigger" aria-label="Open menu">
-        <span nz-icon nzType="menu"></span>
-      </button>
+        
+        <!-- Mobile Menu Trigger -->
+        <button 
+          nz-button 
+          nzType="text" 
+          (click)="openMobileDrawer()" 
+          class="mobile-menu-trigger" 
+          aria-label="Open navigation menu"
+          [attr.aria-expanded]="isMobileDrawerVisible()"
+        >
+          <span nz-icon [nzType]="isMobileDrawerVisible() ? 'close' : 'menu'"></span>
+        </button>
+      </div>
     </div>
   </div>
 </nz-header>
 
+<!-- Mobile Drawer -->
 <nz-drawer
   [nzClosable]="true"
   [nzVisible]="isMobileDrawerVisible()"
   (nzOnClose)="closeMobileDrawer()"
   [nzWidth]="'85vw'"
-  nzPlacement="right"
-  nzTitle="Menu"
+  [nzPlacement]="'right'"
+  [nzBodyStyle]="{ padding: 0 }"
+  class="mobile-drawer"
 >
   <ng-container *nzDrawerContent>
-    <div class="mobile-search-wrapper">
-      <app-search-bar />
-    </div>
-    <ul nz-menu nzMode="inline" [nzTheme]="menuTheme()">
-      <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/">Home</li>
-      <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/universities">Universities</li>
-      <li nz-menu-divider></li>
+    <!-- Mobile Header -->
+    <div class="mobile-drawer-header">
       @if (isUserLoggedIn()) {
-        <li nz-menu-item (click)="closeMobileDrawer()" [routerLink]="['/users', currentUser()?.userId]">My Profile</li>
-        <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/settings">Settings</li>
-        <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/qa/ask">Ask Question</li>
-        <li nz-menu-divider></li>
-        <li nz-menu-item (click)="logout(); closeMobileDrawer()">Logout</li>
+        <div class="mobile-user-info">
+          <nz-avatar 
+            [nzIcon]="!currentUser()?.profilePhotoUrl ? 'user' : ''"
+            [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
+            [nzSize]="48"
+          ></nz-avatar>
+          <div class="mobile-user-details">
+            <strong>{{ currentUser()?.username }}</strong>
+            <span>{{ currentUser()?.email }}</span>
+          </div>
+        </div>
       } @else {
-        <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/login">Login</li>
-        <li nz-menu-item (click)="closeMobileDrawer()" routerLink="/register">Register</li>
+        <div class="mobile-brand">
+          <span class="themed-logo"></span>
+        </div>
       }
-    </ul>
+      <button 
+        nz-button 
+        nzType="text" 
+        (click)="closeMobileDrawer()" 
+        class="drawer-close"
+        aria-label="Close menu"
+      >
+        <span nz-icon nzType="close"></span>
+      </button>
+    </div>
+
+    <!-- Mobile Search -->
+    <div class="mobile-search-wrapper">
+      <app-search-bar [placeholder]="'Search...'" />
+    </div>
+
+    <!-- Mobile Navigation -->
+    <nav class="mobile-nav" role="navigation" aria-label="Mobile navigation">
+      <div class="nav-section">
+        <h3 class="nav-section-title">Navigation</h3>
+        <ul nz-menu nzMode="inline" [nzTheme]="menuTheme()">
+          <li nz-menu-item (click)="navigateAndClose('/')">
+            <span nz-icon nzType="home"></span>
+            <span>Home</span>
+          </li>
+          <li nz-menu-item (click)="navigateAndClose('/universities')">
+            <span nz-icon nzType="bank"></span>
+            <span>Universities</span>
+          </li>
+        </ul>
+      </div>
+
+      @if (isUserLoggedIn()) {
+        <div class="nav-section">
+          <h3 class="nav-section-title">Account</h3>
+          <ul nz-menu nzMode="inline" [nzTheme]="menuTheme()">
+            <li nz-menu-item (click)="navigateAndClose(['/users', currentUser()?.userId])">
+              <span nz-icon nzType="user"></span>
+              <span>My Profile</span>
+            </li>
+            <li nz-menu-item (click)="navigateAndClose('/dashboard')">
+              <span nz-icon nzType="dashboard"></span>
+              <span>Dashboard</span>
+            </li>
+            <li nz-menu-item (click)="navigateAndClose('/settings')">
+              <span nz-icon nzType="setting"></span>
+              <span>Settings</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="nav-section">
+          <h3 class="nav-section-title">Actions</h3>
+          <ul nz-menu nzMode="inline" [nzTheme]="menuTheme()">
+            <li nz-menu-item (click)="navigateAndClose('/qa/ask')">
+              <span nz-icon nzType="question-circle"></span>
+              <span>Ask Question</span>
+            </li>
+            <li nz-menu-item (click)="toggleChatWidget(); closeMobileDrawer()">
+              <span nz-icon nzType="message"></span>
+              <span>Open Chat</span>
+              @if (hasUnreadMessages()) {
+                <span class="menu-badge">{{ unreadMessageCount() }}</span>
+              }
+            </li>
+          </ul>
+        </div>
+      }
+
+      <!-- Theme Toggle in Mobile -->
+      <div class="nav-section">
+        <h3 class="nav-section-title">Preferences</h3>
+        <div class="mobile-theme-toggle">
+          <span>Dark Mode</span>
+          <nz-switch
+            [ngModel]="isDarkMode()"
+            (ngModelChange)="toggleTheme($event)"
+          ></nz-switch>
+        </div>
+      </div>
+
+      <!-- Mobile Auth/Logout -->
+      <div class="nav-section mobile-actions">
+        @if (isUserLoggedIn()) {
+          <button 
+            nz-button 
+            nzType="default" 
+            nzBlock 
+            nzDanger
+            (click)="logout(); closeMobileDrawer()"
+            class="mobile-logout"
+          >
+            <span nz-icon nzType="logout"></span>
+            <span>Logout</span>
+          </button>
+        } @else {
+          <button 
+            nz-button 
+            nzType="default" 
+            nzBlock
+            (click)="navigateAndClose('/login')"
+            class="mobile-login"
+          >
+            Login
+          </button>
+          <button 
+            nz-button 
+            nzType="primary" 
+            nzBlock
+            (click)="navigateAndClose('/register')"
+            class="mobile-register"
+          >
+            Get Started
+          </button>
+        }
+      </div>
+    </nav>
   </ng-container>
 </nz-drawer>

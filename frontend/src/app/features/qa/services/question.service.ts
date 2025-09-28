@@ -57,6 +57,15 @@ export class QuestionService {
     return this.http.post<Question>(`${this.apiUrl}/${questionId}/vote`, payload);
   }
 
+  removeVoteOnQuestion(questionId: number): Observable<Question> {
+    // This corresponds to a DELETE endpoint on your backend API
+    return this.http.delete<Question>(`${this.apiUrl}/${questionId}/vote`);
+  }
+
+
+  
+
+
   // =================================================================
   // == List/Query Methods
   // =================================================================

@@ -115,19 +115,23 @@ export class AuthService {
   }
 
   private decodeTokenToAuthResponse(token: string): AuthResponse {
-    const decoded: DecodedToken = jwtDecode(token);
-    return {
-      token: token,
-      userId: decoded.id, // <-- Renamed from 'id'
-      username: decoded.sub,
-      email: decoded.email,
-      // The other fields will be undefined here
-      bio: '',
-      major: '',
-      reputationScore: 0,
-    };
-
-  }
+  const decoded: DecodedToken = jwtDecode(token);
+  return {
+    token: token,
+    userId: decoded.id,
+    username: decoded.sub,
+    email: decoded.email,
+    
+    // Provide default/empty values for profile data.
+    // This data is incomplete and MUST be fetched from an API.
+    bio: '',
+    major: '',
+    reputationScore: 0,
+    questionsCount: 0,    // ✅ ADD with default value
+    answersCount: 0,      // ✅ ADD with default value
+    followersCount: 0,    // ✅ ADD with default value
+  };
+}
 
   hasRole(role: string): boolean {
     const token = this.getToken();

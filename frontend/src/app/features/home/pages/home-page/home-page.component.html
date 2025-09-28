@@ -1,148 +1,628 @@
-<div class="page-container">
-  <main class="main-content">
-    @if (!authService.isUserLoggedIn()) {
-      <div class="hero-section">
-        <h1 class="hero-title">The Answer to Your University Questions</h1>
-        <p class="hero-subtitle">
-          Stop searching, start learning. Tuniv is the Q&A hub for Tunisian students. Join your university's community, get expert answers, and build a powerful knowledge base.
-        </p>
-        <div class="hero-actions">
-          <a routerLink="/auth/register" nz-button nzType="primary" nzSize="large" class="btn-accent">Create a Free Account</a>
-          <a routerLink="/universities" nz-button nzType="default" nzSize="large">Explore Universities</a>
-        </div>
-      </div>
-    } @else {
-  <a class="create-post-card" (click)="handleAskQuestionClick(authModalFooter)">
-<nz-avatar nzIcon="user" [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"></nz-avatar>
-    <div class="create-post-input" role="textbox">Ask a question or share something new...</div>
-  </a>
-}
+<!-- home-page.component.html -->
+<div class="home-container">
+  <!-- Enhanced Mobile Tab Navigation with Blur Effect -->
+  <div class="mobile-tabs glass-effect">
+    <div class="tabs-container">
+      @if (authService.isUserLoggedIn()) {
+        <button 
+          class="tab-button"
+          [class.active]="activeFeedType() === 'PERSONALIZED'"
+          (click)="switchFeedType('PERSONALIZED')"
+        >
+          <span class="tab-icon-wrapper">
+            <span nz-icon nzType="home"></span>
+          </span>
+          <span class="tab-label">For You</span>
+        </button>
+      }
+      <button 
+        class="tab-button"
+        [class.active]="activeFeedType() === 'POPULAR'"
+        (click)="switchFeedType('POPULAR')"
+      >
+        <span class="tab-icon-wrapper">
+          <span nz-icon nzType="fire"></span>
+        </span>
+        <span class="tab-label">Trending</span>
+      </button>
+      <button 
+        class="tab-button"
+        [class.active]="activeView() === 'COMMUNITIES'"
+        (click)="switchView('COMMUNITIES')"
+      >
+        <span class="tab-icon-wrapper">
+          <span nz-icon nzType="team"></span>
+        </span>
+        <span class="tab-label">Communities</span>
+      </button>
+      <button 
+        class="tab-button"
+        [class.active]="activeView() === 'LEADERBOARD'"
+        (click)="switchView('LEADERBOARD')"
+      >
+        <span class="tab-icon-wrapper">
+          <span nz-icon nzType="trophy"></span>
+        </span>
+        <span class="tab-label">Top Users</span>
+      </button>
+    </div>
+  </div>
 
-    @if (isLoading()) {
-      <div class="spinner-container">
-        <nz-spin nzSimple nzSize="large"></nz-spin>
-      </div>
-    } @else {
-      <div class="feed-list">
-        @for (item of feedItems(); track item.id) {
-          <app-question-list-item [question]="item"></app-question-list-item>
-        } @empty {
-          <nz-card class="empty-feed-card">
-            <nz-empty nzNotFoundImage="https://gw.alipayobjects.com/zos/antfincdn/ZHrcdLPrvN/empty.svg"
-                      [nzNotFoundContent]="emptyFeedContent">
-              <ng-template #emptyFeedContent>
-                @if (authService.isUserLoggedIn()) {
-                  <p>Your home feed is empty.</p>
-                  <p class="empty-subtext">Join universities to see questions from your communities here.</p>
+  <!-- Main Content Area -->
+  <div class="content-wrapper">
+    <main class="main-content">
+      <!-- Enhanced Hero Section -->
+      @if (!authService.isUserLoggedIn() && !hasViewedHero()) {
+        <div class="hero-section">
+          <div class="hero-background">
+            <div class="gradient-orb orb-1"></div>
+            <div class="gradient-orb orb-2"></div>
+            <div class="gradient-orb orb-3"></div>
+          </div>
+          
+          <button class="hero-close" (click)="dismissHero()" aria-label="Close">
+            <span nz-icon nzType="close"></span>
+          </button>
+          
+          <div class="hero-content">
+            <div class="hero-badge">
+              <span nz-icon nzType="star" nzTheme="fill"></span>
+              <span>Tunisia's #1 Academic Platform</span>
+            </div>
+            
+            <h1 class="hero-title">
+              Where Knowledge <span class="text-gradient">Meets Community</span>
+            </h1>
+            
+            <p class="hero-subtitle">
+              Connect with thousands of students, share knowledge, and ace your studies together
+            </p>
+            
+            <div class="hero-stats">
+              <div class="stat-pill">
+                <span class="stat-number">10K+</span>
+                <span class="stat-label">Students</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-number">50K+</span>
+                <span class="stat-label">Questions</span>
+              </div>
+              <div class="stat-pill">
+                <span class="stat-number">95%</span>
+                <span class="stat-label">Success Rate</span>
+              </div>
+            </div>
+            
+            <div class="hero-cta">
+              <button 
+                routerLink="/auth/register" 
+                class="primary-cta"
+              >
+                <span class="cta-content">
+                  <span nz-icon nzType="rocket"></span>
+                  Start Learning Free
+                </span>
+                <span class="cta-shine"></span>
+              </button>
+              
+              <button 
+                routerLink="/universities" 
+                class="secondary-cta"
+              >
+                Browse Universities
+                <span nz-icon nzType="arrow-right"></span>
+              </button>
+            </div>
+            
+            <div class="trust-indicators">
+              <div class="trust-item">
+                <span nz-icon nzType="safety-certificate" nzTheme="fill"></span>
+                Verified Content
+              </div>
+              <div class="trust-item">
+                <span nz-icon nzType="team"></span>
+                Active Community
+              </div>
+              <div class="trust-item">
+                <span nz-icon nzType="thunderbolt" nzTheme="fill"></span>
+                Instant Help
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Enhanced Create Post Card -->
+      @if (authService.isUserLoggedIn()) {
+        <div class="create-post-wrapper">
+          <div class="create-post-card glass-card" (click)="handleAskQuestionClick(authModalFooter)">
+            <div class="avatar-glow">
+              <nz-avatar 
+                [nzIcon]="!currentUser()?.profilePhotoUrl ? 'user' : ''"
+                [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
+                [nzSize]="44"
+                class="user-avatar"
+              ></nz-avatar>
+            </div>
+            
+            <div class="create-post-content">
+              <div class="create-post-input">
+                <span class="placeholder-text">What's on your mind?</span>
+                <span class="cursor-blink"></span>
+              </div>
+              
+              <div class="quick-actions">
+                <div class="action-pill" data-tooltip="Ask Question">
+                  <span nz-icon nzType="question-circle"></span>
+                  <span>Ask</span>
+                </div>
+                <div class="action-pill" data-tooltip="Write Answer">
+                  <span nz-icon nzType="edit"></span>
+                  <span>Answer</span>
+                </div>
+                <div class="action-pill" data-tooltip="Share Knowledge">
+                  <span nz-icon nzType="bulb"></span>
+                  <span>Share</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Feed Section with Cards -->
+      @if (activeView() === 'FEED' || !isMobile()) {
+        <div class="feed-section">
+          <!-- Enhanced Feed Header -->
+          <div class="feed-header glass-card">
+            <div class="feed-title-wrapper">
+              <div class="feed-icon-bg">
+                @if (activeFeedType() === 'PERSONALIZED') {
+                  <span nz-icon nzType="home"></span>
                 } @else {
-                  <p>There are no popular posts right now.</p>
-                  <p class="empty-subtext">Be the first to ask a question and get the conversation started!</p>
-                }
-              </ng-template>
-              <div nz-empty-footer>
-                @if (authService.isUserLoggedIn()) {
-                  <a routerLink="/universities" nz-button nzType="primary">Explore Universities</a>
-                } @else {
-                  <a (click)="handleAskQuestionClick(authModalFooter)" nz-button nzType="primary">Ask a Question</a>
+                  <span nz-icon nzType="fire"></span>
                 }
               </div>
-            </nz-empty>
-          </nz-card>
-        }
-      </div>
+              <div>
+                <h2 class="feed-title">
+                  @if (activeFeedType() === 'PERSONALIZED') {
+                    Your Personalized Feed
+                  } @else {
+                    Trending Now
+                  }
+                </h2>
+                <p class="feed-subtitle">
+                  @if (activeFeedType() === 'PERSONALIZED') {
+                    Questions from your communities
+                  } @else {
+                    Most popular discussions today
+                  }
+                </p>
+              </div>
+            </div>
+            
+            <div class="feed-controls">
+              <button class="filter-button" nz-dropdown [nzDropdownMenu]="filterMenu">
+                <span nz-icon nzType="filter"></span>
+                <span>Filter</span>
+                <span nz-icon nzType="down"></span>
+              </button>
+              
+              <div class="view-toggle">
+                <button class="view-option active">
+                  <span nz-icon nzType="appstore"></span>
+                </button>
+                <button class="view-option">
+                  <span nz-icon nzType="bars"></span>
+                </button>
+              </div>
+            </div>
+            
+            <nz-dropdown-menu #filterMenu="nzDropdownMenu">
+              <ul nz-menu class="custom-dropdown">
+                <li nz-menu-item (click)="setTimeFilter('today')">
+                  <span nz-icon nzType="clock-circle"></span>
+                  Today
+                </li>
+                <li nz-menu-item (click)="setTimeFilter('week')">
+                  <span nz-icon nzType="calendar"></span>
+                  This Week
+                </li>
+                <li nz-menu-item (click)="setTimeFilter('month')">
+                  <span nz-icon nzType="calendar"></span>
+                  This Month
+                </li>
+                <li nz-menu-item (click)="setTimeFilter('all')">
+                  <span nz-icon nzType="global"></span>
+                  All Time
+                </li>
+              </ul>
+            </nz-dropdown-menu>
+          </div>
 
-      @if (hasMoreItems()) {
-        <div class="load-more-container">
-          <button nz-button (click)="loadMore()" [nzLoading]="isLoadingMore()">
-            Load More Posts
+          <!-- Enhanced Loading State -->
+          @if (isLoading()) {
+            <div class="loading-container">
+              @for (i of [1,2,3]; track i) {
+                <div class="skeleton-card glass-card">
+                  <div class="skeleton-shimmer"></div>
+                  <div class="skeleton-header">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-meta">
+                      <div class="skeleton-line short"></div>
+                      <div class="skeleton-line shorter"></div>
+                    </div>
+                  </div>
+                  <div class="skeleton-content">
+                    <div class="skeleton-line"></div>
+                    <div class="skeleton-line medium"></div>
+                    <div class="skeleton-line short"></div>
+                  </div>
+                  <div class="skeleton-footer">
+                    <div class="skeleton-line tiny"></div>
+                    <div class="skeleton-line tiny"></div>
+                    <div class="skeleton-line tiny"></div>
+                  </div>
+                </div>
+              }
+            </div>
+          } @else {
+            <!-- Feed Items with Animation -->
+            <div class="feed-list">
+              @for (item of feedItems(); track item.id; let i = $index) {
+                <div 
+                  class="feed-item-wrapper"
+                  [@slideIn]="'in'"
+                  [style.animation-delay.ms]="i * 100"
+                >
+                  <div class="feed-card glass-card hover-lift">
+                    <app-question-list-item 
+                      [question]="item"
+                      [showUniversity]="true"
+                      [interactive]="true"
+                    ></app-question-list-item>
+                  </div>
+                </div>
+              } @empty {
+                <!-- Enhanced Empty State -->
+                <div class="empty-state-card">
+                  <div class="empty-illustration">
+                    <div class="empty-icon-wrapper">
+                      <span nz-icon nzType="inbox" class="empty-icon"></span>
+                      <div class="empty-decoration">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <h3 class="empty-title">
+                    @if (authService.isUserLoggedIn()) {
+                      Your feed is waiting for content
+                    } @else {
+                      No questions yet
+                    }
+                  </h3>
+                  
+                  <p class="empty-description">
+                    @if (authService.isUserLoggedIn()) {
+                      Follow universities and topics to see relevant questions here
+                    } @else {
+                      Be the pioneer! Ask the first question
+                    }
+                  </p>
+                  
+                  <div class="empty-actions">
+                    @if (authService.isUserLoggedIn()) {
+                      <button routerLink="/universities" class="action-button primary">
+                        <span nz-icon nzType="compass"></span>
+                        Explore Communities
+                      </button>
+                      <button (click)="handleAskQuestionClick(authModalFooter)" class="action-button secondary">
+                        <span nz-icon nzType="plus"></span>
+                        Ask Question
+                      </button>
+                    } @else {
+                      <button routerLink="/auth/register" class="action-button primary">
+                        <span nz-icon nzType="user-add"></span>
+                        Join Now
+                      </button>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Enhanced Load More -->
+            @if (hasMoreItems() && feedItems().length > 0) {
+              <div class="load-more-wrapper" #loadMoreTrigger>
+                @if (isLoadingMore()) {
+                  <div class="loading-more">
+                    <div class="spinner-dots">
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </div>
+                    <span>Loading more questions...</span>
+                  </div>
+                } @else {
+                  <button class="load-more-button">
+                    <span class="button-content">
+                      <span nz-icon nzType="plus-circle"></span>
+                      Load More
+                    </span>
+                  </button>
+                }
+              </div>
+            }
+          }
+        </div>
+      }
+
+      <!-- Enhanced Mobile Views -->
+      @if (activeView() === 'COMMUNITIES' && isMobile()) {
+        <div class="mobile-view-container">
+          <div class="view-header">
+            <h2 class="view-title">
+              <span class="icon-wrapper">
+                <span nz-icon nzType="team"></span>
+              </span>
+              Communities
+            </h2>
+          </div>
+          
+          @if (authService.isUserLoggedIn() && myCommunities().length > 0) {
+            <section class="content-section">
+              <h3 class="section-label">Your Communities</h3>
+              <div class="community-grid">
+                @for (community of myCommunities(); track community.id) {
+                  <a [routerLink]="['/universities', community.id, 'modules']" 
+                     class="community-tile">
+                    <div class="tile-icon">
+                      <span nz-icon nzType="bank"></span>
+                    </div>
+                    <div class="tile-content">
+                      <h4 class="tile-title">{{ community.name }}</h4>
+                      <p class="tile-stats">
+                        <span nz-icon nzType="team"></span>
+                        {{ community.memberCount | number }}
+                      </p>
+                    </div>
+                  </a>
+                }
+              </div>
+            </section>
+          }
+          
+          <section class="content-section">
+            <h3 class="section-label">Popular Communities</h3>
+            <div class="ranked-list">
+              @for (uni of topUniversities(); track uni.universityId; let i = $index) {
+                <a [routerLink]="['/universities', uni.universityId, 'modules']"
+                   class="ranked-item">
+                  <div class="rank-badge" [class.gold]="i === 0" 
+                       [class.silver]="i === 1" [class.bronze]="i === 2">
+                    @if (i < 3) {
+                      <span nz-icon nzType="trophy" nzTheme="fill"></span>
+                    } @else {
+                      {{ i + 1 }}
+                    }
+                  </div>
+                  <div class="item-content">
+                    <h4 class="item-title">{{ uni.name }}</h4>
+                    <p class="item-meta">
+                      <span nz-icon nzType="team"></span>
+                      {{ uni.memberCount | number }} members
+                    </p>
+                  </div>
+                  <span nz-icon nzType="right" class="item-arrow"></span>
+                </a>
+              }
+            </div>
+          </section>
+        </div>
+      }
+
+      @if (activeView() === 'LEADERBOARD' && isMobile()) {
+        <div class="mobile-view-container">
+          <div class="view-header">
+            <h2 class="view-title">
+              <span class="icon-wrapper trophy">
+                <span nz-icon nzType="trophy"></span>
+              </span>
+              Top Contributors
+            </h2>
+          </div>
+          
+          <div class="leaderboard-list">
+            @for (user of leaderboard(); track user.userId; let i = $index) {
+              <a [routerLink]="['/users', user.userId]"
+                 class="leaderboard-card" [class.podium]="i < 3">
+                <div class="rank-indicator" [class.gold]="i === 0" 
+                     [class.silver]="i === 1" [class.bronze]="i === 2">
+                  @if (i < 3) {
+                    <span nz-icon nzType="crown" nzTheme="fill"></span>
+                  } @else {
+                    <span>#{{ i + 1 }}</span>
+                  }
+                </div>
+                
+                <div class="user-avatar-wrapper">
+                  <nz-avatar 
+                    [nzSize]="i < 3 ? 56 : 48"
+                    [nzIcon]="!user.profilePhotoUrl ? 'user' : ''"
+                    [nzSrc]="user.profilePhotoUrl ?? undefined"
+                  ></nz-avatar>
+                  @if (i < 3) {
+                    <div class="avatar-ring"></div>
+                  }
+                </div>
+                
+                <div class="user-details">
+                  <h4 class="user-name">{{ user.username }}</h4>
+                  <div class="user-stats">
+                    <span class="rep-score">
+                      <span nz-icon nzType="star" nzTheme="fill"></span>
+                      {{ user.reputationScore | number }}
+                    </span>
+                    <span class="contributions">
+                      {{ user.answersCount }} answers
+                    </span>
+                  </div>
+                </div>
+                
+                <span nz-icon nzType="right" class="card-arrow"></span>
+              </a>
+            }
+          </div>
+        </div>
+      }
+    </main>
+
+    <!-- Enhanced Desktop Sidebar -->
+    <aside class="sidebar">
+      <!-- User Profile Card -->
+      @if (authService.isUserLoggedIn()) {
+        <div class="profile-card glass-card">
+          <div class="profile-header">
+            <div class="profile-avatar">
+              <nz-avatar 
+                [nzSize]="64"
+                [nzIcon]="!currentUser()?.profilePhotoUrl ? 'user' : ''"
+                [nzSrc]="currentUser()?.profilePhotoUrl ?? undefined"
+              ></nz-avatar>
+              <div class="avatar-badge">
+                <span nz-icon nzType="check-circle" nzTheme="fill"></span>
+              </div>
+            </div>
+            
+            <div class="profile-info">
+              <h3 class="profile-name">{{ currentUser()?.username }}</h3>
+              <div class="profile-level">
+                <span nz-icon nzType="thunderbolt" nzTheme="fill"></span>
+                Level {{ Math.floor((currentUser()?.reputationScore || 0) / 100) }}
+              </div>
+            </div>
+          </div>
+          
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon">
+                <span nz-icon nzType="question-circle"></span>
+              </div>
+              <div class="stat-content">
+                <div class="stat-number">{{ currentUser()?.questionsCount || 0 }}</div>
+                <div class="stat-label">Questions</div>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon">
+                <span nz-icon nzType="solution"></span>
+              </div>
+              <div class="stat-content">
+                <div class="stat-number">{{ currentUser()?.answersCount || 0 }}</div>
+                <div class="stat-label">Answers</div>
+              </div>
+            </div>
+            
+            <div class="stat-card">
+              <div class="stat-icon">
+                <span nz-icon nzType="team"></span>
+              </div>
+              <div class="stat-content">
+                <div class="stat-number">{{ currentUser()?.followersCount || 0 }}</div>
+                <div class="stat-label">Followers</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="profile-progress">
+            <div class="progress-label">
+              <span>Next level</span>
+              <span>{{ ((currentUser()?.reputationScore || 0) % 100) }}/100</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" 
+                   [style.width.%]="((currentUser()?.reputationScore || 0) % 100)">
+              </div>
+            </div>
+          </div>
+          
+          <button [routerLink]="['/users', currentUser()?.userId]" 
+                  class="profile-button">
+            View Full Profile
+            <span nz-icon nzType="arrow-right"></span>
           </button>
         </div>
       }
-    }
-  </main>
 
-  <aside class="sidebar">
-    @if (authService.isUserLoggedIn()) {
-      @if(myCommunities().length > 0) {
-        <nz-card class="sidebar-card" [nzTitle]="myCommunitiesTitle" [nzBordered]="false">
-          <ng-template #myCommunitiesTitle>
-            <div class="card-title-wrapper">
-              <span nz-icon nzType="book" nzTheme="fill"></span>
-              My Communities
-            </div>
-          </ng-template>
-          <nz-list [nzDataSource]="myCommunities()" [nzRenderItem]="communityItem" [nzSplit]="false">
-            <ng-template #communityItem let-community>
-              <nz-list-item>
-                <a [routerLink]="['/universities', community.id, 'modules']" class="community-link">
-                  <span nz-icon nzType="bank" class="community-icon"></span>
-                  <div class="community-info">
-                    <span class="community-name">{{ community.name }}</span>
-                  </div>
-                  <span nz-icon nzType="right" class="community-arrow"></span>
-                </a>
-              </nz-list-item>
-            </ng-template>
-          </nz-list>
-          <div class="sidebar-actions">
-              <a routerLink="/universities" nz-button nzType="default" nzBlock>Explore More</a>
+      <!-- Top Universities Widget -->
+      <div class="widget-card glass-card">
+        <div class="widget-header">
+          <div class="widget-title">
+            <span class="widget-icon">
+              <span nz-icon nzType="bank"></span>
+            </span>
+            <span>Top Universities</span>
           </div>
-        </nz-card>
-      }
-    }
-
-    <nz-card class="sidebar-card" [nzTitle]="leaderboardTitle" [nzBordered]="false">
-      <ng-template #leaderboardTitle>
-        <div class="card-title-wrapper">
-          <span nz-icon nzType="trophy" nzTheme="fill"></span>
-          Leaderboard
         </div>
-      </ng-template>
-      <nz-list [nzDataSource]="leaderboard()" [nzRenderItem]="leaderboardItem" [nzSplit]="false">
-        <ng-template #leaderboardItem let-user let-i="index">
-          <nz-list-item>
-            <a [routerLink]="['/users', user.userId]" class="community-link">
-              <span class="community-rank">{{ i + 1 }}</span>
-              <nz-avatar [nzSize]="32" nzIcon="user" [nzSrc]="user.profilePhotoUrl ?? undefined"></nz-avatar>
-              <div class="community-info">
-                <span class="community-name">{{ user.username }}</span>
-                <span class="community-meta">{{ user.reputationScore | number }} reputation</span>
+        
+        <div class="widget-list">
+          @for (uni of topUniversities().slice(0, 5); track uni.universityId; let i = $index) {
+            <a [routerLink]="['/universities', uni.universityId, 'modules']"
+               class="widget-item">
+              <div class="item-rank" [class.top-three]="i < 3">
+                {{ i + 1 }}
               </div>
-              <span nz-icon nzType="right" class="community-arrow"></span>
+              <div class="item-content">
+                <h4 class="item-name">{{ uni.name }}</h4>
+                <p class="item-meta">{{ uni.memberCount | number }} members</p>
+              </div>
+              <div class="item-trend up">
+                <span nz-icon nzType="rise"></span>
+              </div>
             </a>
-          </nz-list-item>
-        </ng-template>
-      </nz-list>
-    </nz-card>
-
-    <nz-card class="sidebar-card" [nzTitle]="topUniversitiesTitle" [nzBordered]="false">
-      <ng-template #topUniversitiesTitle>
-        <div class="card-title-wrapper">
-          <span nz-icon nzType="fire" nzTheme="fill"></span>
-          Top Communities
+          }
         </div>
-      </ng-template>
-      <nz-list [nzDataSource]="topUniversities()" [nzRenderItem]="uniItem" [nzSplit]="false">
-        <ng-template #uniItem let-uni let-i="index">
-          <nz-list-item>
-            <a [routerLink]="['/universities', uni.universityId, 'modules']" class="community-link">
-              <span class="community-rank">{{ i + 1 }}</span>
-              <span nz-icon nzType="bank" class="community-icon"></span>
-              <div class="community-info">
-                <span class="community-name">{{ uni.name }}</span>
-                <span class="community-meta">{{ uni.memberCount | number }} members</span>
-              </div>
-              <span nz-icon nzType="right" class="community-arrow"></span>
-            </a>
-          </nz-list-item>
-        </ng-template>
-      </nz-list>
-    </nz-card>
-  </aside>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="quick-links glass-card">
+        <a href="/help" class="quick-link">
+          <span nz-icon nzType="question-circle"></span>
+          <span>Help Center</span>
+        </a>
+        <a href="/guidelines" class="quick-link">
+          <span nz-icon nzType="safety"></span>
+          <span>Guidelines</span>
+        </a>
+        <a href="/about" class="quick-link">
+          <span nz-icon nzType="info-circle"></span>
+          <span>About Us</span>
+        </a>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Enhanced Floating Action Button -->
+  <button 
+    class="fab-button"
+    (click)="handleAskQuestionClick(authModalFooter)"
+  >
+    <div class="fab-content">
+      <span nz-icon nzType="plus" class="fab-icon"></span>
+    </div>
+    <div class="fab-ripple"></div>
+  </button>
 </div>
 
+<!-- Auth Modal Template -->
 <ng-template #authModalFooter>
-  <button nz-button (click)="handleCancel()">Cancel</button>
-  <button nz-button (click)="handleRegister()">Register</button>
-  <button nz-button nzType="primary" (click)="handleLogin()">Log In</button>
+  <div class="modal-footer">
+    <button nz-button (click)="handleCancel()">Cancel</button>
+    <button nz-button (click)="handleRegister()" class="register-btn">Create Account</button>
+    <button nz-button nzType="primary" (click)="handleLogin()">Sign In</button>
+  </div>
 </ng-template>

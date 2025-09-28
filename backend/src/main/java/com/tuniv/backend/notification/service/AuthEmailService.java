@@ -84,4 +84,33 @@ public class AuthEmailService {
             System.err.println("Failed to send verification email: " + e.getMessage());
         }
     }
+
+
+    @Async
+public void sendUniversityVerificationEmail(String to, String token) {
+    try {
+        String verificationUrl = frontendUrl + "/verify-university?token=" + token; // A new frontend route
+        String subject = "Verify Your Student Status";
+
+        Context context = new Context();
+        context.setVariable("verificationUrl", verificationUrl);
+        context.setVariable("subject", subject);
+
+        // You can create a new Thymeleaf template for this email
+        String htmlContent = templateEngine.process("university-verification-template", context);
+
+        MimeMessage mimeMessage = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "UTF-8");
+        
+        helper.setTo(to);
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+
+        mailSender.send(mimeMessage);
+        System.out.println("University verification email sent to " + to);
+
+    } catch (MessagingException e) {
+        System.err.println("Failed to send university verification email: " + e.getMessage());
+    }
+}
 }

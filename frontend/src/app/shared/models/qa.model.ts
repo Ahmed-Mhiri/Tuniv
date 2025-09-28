@@ -102,8 +102,16 @@ export interface QuestionSummaryDto {
   title: string;
   authorId: number;
   authorUsername: string;
-  createdAt: string;
+  createdAt: string; // ISO date string
   score: number;
   answerCount: number;
-  currentUserVote: number;
+  
+  // ✅ RECOMMENDED CHANGE
+  userVoteStatus: 'UPVOTE' | 'DOWNVOTE' | null;
+
+  // ✅ REQUIRED ADDITIONS
+  hasAcceptedAnswer: boolean;
+  tags: string[];
+  universityId?: number;     // Optional, as not all questions might have one
+  universityName?: string;   // Optional
 }

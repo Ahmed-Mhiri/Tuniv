@@ -1,30 +1,27 @@
-<div class="comment-thread-item" [class.is-collapsed]="isCollapsed()">
-  <div class="indentation-col">
-    <a [routerLink]="['/users', comment().author.userId]">
-      <nz-avatar [nzSize]="32" [nzSrc]="comment().author.profilePhotoUrl ?? undefined" [nzText]="comment().author.username.charAt(0).toUpperCase()"></nz-avatar>
-    </a>
-    <div class="thread-line" (click)="toggleCollapse()"></div>
+<div class="comment-wrapper" [class.is-collapsed]="isCollapsed()">
+  
+  <div class="indentation-guide" (click)="toggleCollapse()">
+    <span class="collapse-button">–</span>
   </div>
 
-  <div class="content-col">
-    @if (isCollapsed()) {
-      <div class="collapsed-view" (click)="toggleCollapse()">
+  <div class="comment-content">
+    
+    <div class="comment-header" (click)="isCollapsed() && toggleCollapse()">
+      @if(isCollapsed()) {
         <span class="toggle-button">[+]</span>
-        <a class="author-link" [routerLink]="['/users', comment().author.userId]">{{ comment().author.username }}</a>
-        <span class="meta-info">{{ comment().score }} points</span>
-        <span class="meta-info">· {{ comment().createdAt | timeAgo }}</span>
-      </div>
-    }
+      }
+      <a [routerLink]="['/users', comment().author.userId]" (click)="$event.stopPropagation()">
+        <nz-avatar [nzSize]="24" [nzSrc]="comment().author.profilePhotoUrl ?? undefined" [nzText]="comment().author.username.charAt(0).toUpperCase()"></nz-avatar>
+      </a>
+      <a class="author-link" [routerLink]="['/users', comment().author.userId]" (click)="$event.stopPropagation()">
+        {{ comment().author.username }}
+      </a>
+      <span class="meta-info">· {{ comment().score }} points</span>
+      <span class="meta-info">· {{ comment().createdAt | timeAgo }}</span>
+    </div>
 
     @if (!isCollapsed()) {
-      <div class="expanded-view">
-        <div class="comment-header">
-          <button class="toggle-button" (click)="toggleCollapse()">[–]</button>
-          <a class="author-link" [routerLink]="['/users', comment().author.userId]">{{ comment().author.username }}</a>
-          <span class="meta-info">· {{ comment().score }} points</span>
-          <span class="meta-info">· {{ comment().createdAt | timeAgo }}</span>
-        </div>
-        
+      <div class="expanded-content">
         @if (isEditing()) {
           <div class="edit-form-wrapper">
             <app-post-edit-form
@@ -55,13 +52,13 @@
             </div>
           }
         }
+        
         @if (authService.isUserLoggedIn()) {
           <div class="action-bar">
             <app-vote [score]="comment().score" [userVote]="comment().currentUserVote" (vote)="handleVote($event)" [isVertical]="false"></app-vote>
             <button nz-button nzType="text" class="action-button" (click)="isReplyFormVisible.set(!isReplyFormVisible())">
               <span nz-icon nzType="message"></span> Reply
             </button>
-
             @if (isCurrentUserAuthor()) {
               <button nz-button nzType="text" class="action-button" (click)="isEditing.set(true)">
                 <span nz-icon nzType="edit"></span> Edit
@@ -74,40 +71,39 @@
         }
 
         <div class="reply-form-wrapper" [hidden]="!isReplyFormVisible()">
-          <form [formGroup]="replyForm" (ngSubmit)="submitReply()">
-            <textarea nz-input formControlName="body" placeholder="Write a reply..." [nzAutosize]="{ minRows: 2, maxRows: 5 }"></textarea>
-            <div class="comment-form-actions">
-
-              <nz-upload
-                [nzFileList]="replyFileList()"
-                (nzChange)="handleReplyFileChange($event)"
-                [nzShowUploadList]="false"
-                [nzMultiple]="true"
-                [nzBeforeUpload]="beforeUpload">
-                <button nz-button nzType="text" nzShape="circle" type="button" nz-tooltip nzTooltipTitle="Attach files">
-                  <span nz-icon nzType="paper-clip"></span>
-                </button>
-              </nz-upload>
-
-              <div class="submit-actions">
-                <button nz-button nzType="text" type="button" (click)="isReplyFormVisible.set(false)">Cancel</button>
-                <button nz-button nzType="primary" [disabled]="replyForm.invalid">Reply</button>
-              </div>
-            </div>
-
-            @if (replyFileList().length > 0) {
-              <div class="file-list-preview">
-                @for (file of replyFileList(); track file.uid) {
-                  <div class="file-item">
-                    <span nz-icon nzType="file-text"></span>
-                    <span>{{ file.name }}</span>
-                    <button nz-button nzType="text" nzShape="circle" type="button" (click)="removeReplyFile(file)">
-                      <span nz-icon nzType="close"></span>
+            <form [formGroup]="replyForm" (ngSubmit)="submitReply()">
+                <textarea nz-input formControlName="body" placeholder="Write a reply..." [nzAutosize]="{ minRows: 2, maxRows: 5 }"></textarea>
+                <div class="comment-form-actions">
+                  <nz-upload
+                    [nzFileList]="replyFileList()"
+                    (nzChange)="handleReplyFileChange($event)"
+                    [nzShowUploadList]="false"
+                    [nzMultiple]="true"
+                    [nzBeforeUpload]="beforeUpload">
+                    <button nz-button nzType="text" nzShape="circle" type="button" nz-tooltip nzTooltipTitle="Attach files">
+                      <span nz-icon nzType="paper-clip"></span>
                     </button>
+                  </nz-upload>
+    
+                  <div class="submit-actions">
+                    <button nz-button nzType="text" type="button" (click)="isReplyFormVisible.set(false)">Cancel</button>
+                    <button nz-button nzType="primary" [disabled]="replyForm.invalid">Reply</button>
+                  </div>
+                </div>
+    
+                @if (replyFileList().length > 0) {
+                  <div class="file-list-preview">
+                    @for (file of replyFileList(); track file.uid) {
+                      <div class="file-item">
+                        <span nz-icon nzType="file-text"></span>
+                        <span>{{ file.name }}</span>
+                        <button nz-button nzType="text" nzShape="circle" type="button" (click)="removeReplyFile(file)">
+                          <span nz-icon nzType="close"></span>
+                        </button>
+                      </div>
+                    }
                   </div>
                 }
-              </div>
-            }
             </form>
         </div>
 

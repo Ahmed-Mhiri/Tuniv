@@ -7,15 +7,20 @@ export interface AuthRequest {
 
 export interface AuthResponse {
   token: string | null;
-  userId: number; // <-- Renamed from 'id' to match UserProfile
+  userId: number;
   username: string;
   email: string;
   profilePhotoUrl?: string | null;
-  bio: string;             // <-- ADD
-  major: string;           // <-- ADD
-  reputationScore: number; // <-- ADD
+  bio: string;
+  major: string;
+  reputationScore: number;
   is2faRequired?: boolean;
   is2faEnabled?: boolean;
+  
+  // ✅ ADD THESE PROPERTIES
+  questionsCount: number;
+  answersCount: number;
+  followersCount: number; // It's good to add this one too for the stats card
 }
 
 export interface DecodedToken {

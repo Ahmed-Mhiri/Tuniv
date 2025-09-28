@@ -1,6 +1,7 @@
 package com.tuniv.backend.university.model;
 
 import java.io.Serializable;
+import java.time.OffsetDateTime; // ✅ ADD THIS IMPORT
 import java.util.Objects;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
@@ -10,19 +11,18 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "university_memberships", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"user_id", "university_id"})
-})
+@Table(name = "university_memberships")
 @Getter
 @Setter
 public class UniversityMembership {
@@ -42,8 +42,36 @@ public class UniversityMembership {
     @JsonBackReference("university-members")
     private University university;
 
-    @Column(nullable = false)
-    private String role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private VerificationStatus status = VerificationStatus.PENDING;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private UserRoleEnum role;
+    
+    // ✅ ADD THESE FIELDS
+    @Column(name = "verification_token")
+    private String verificationToken;
+
+    @Column(name = "verification_token_expiry")
+    private OffsetDateTime verificationTokenExpiry;
+
+    // --- CONSTRUCTORS ---
+
+    public UniversityMembership() {}
+
+    public UniversityMembership(User user, University university, UserRoleEnum role) {
+        this.id = new UniversityMembershipId(user.getUserId(), university.getUniversityId());
+        this.user = user;
+        this.university = university;
+        this.role = role;
+        user.getMemberships().add(this);
+        university.getMemberships().add(this);
+    }
+
+    // --- EMBEDDED ID CLASS ---
 
     @Embeddable
     @Getter

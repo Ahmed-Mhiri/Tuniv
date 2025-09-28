@@ -1,9 +1,9 @@
-import { DestroyRef, inject, Injectable, signal } from '@angular/core';
+import { DestroyRef, inject, Injectable, signal, computed } from '@angular/core'; // ✅ Import computed
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { timer, tap } from 'rxjs';
 import { ChatService } from './chat.service';
 import { Conversation } from '../../../shared/models/conversation.model';
-import { ChatMessage } from '../../../shared/models/chat.model'; // ✅ IMPORTED
+import { ChatMessage } from '../../../shared/models/chat.model';
 
 @Injectable({
   providedIn: 'root'
@@ -18,6 +18,15 @@ export class ChatWidgetService {
   readonly activeConversation = signal<Conversation | null>(null);
   readonly conversations = signal<Conversation[]>([]);
   readonly isLoading = signal(true);
+
+  // ✅ --- [NEW] Computed Signal ---
+  /**
+   * Calculates the total number of unread messages across all conversations.
+   * This will automatically update whenever the `conversations` signal changes.
+   */
+  readonly unreadCount = computed(() => {
+    return this.conversations().reduce((total, convo) => total + convo.unreadCount, 0);
+  });
 
   constructor() {
     // Poll for new conversation data every 30 seconds to keep the list fresh.
@@ -116,7 +125,7 @@ export class ChatWidgetService {
   }
   
   /**
-   * ✅ [NEW] Updates a conversation summary when a new message arrives and moves it to the top.
+   * Updates a conversation summary when a new message arrives and moves it to the top.
    * @param newMessage The new chat message from the server.
    */
   updateConversationSummary(newMessage: ChatMessage): void {
@@ -134,7 +143,7 @@ export class ChatWidgetService {
       // Found the conversation, let's update it
       const updatedConvo = {
         ...currentConvos[convoIndex],
-        lastMessage: newMessage.content || 'Attachment', // Use a placeholder for file-only messages
+        lastMessage: newMessage.content || 'Attachment',
         lastMessageTimestamp: newMessage.sentAt,
       };
 

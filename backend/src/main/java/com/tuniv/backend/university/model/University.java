@@ -28,6 +28,17 @@ public class University {
 
     @Column(nullable = false, unique = true)
     private String name;
+    
+    @Column(name = "email_domain", nullable = false, unique = true)
+    private String emailDomain;
+
+    // ✅ NEW: Denormalized question count for performance
+    @Column(name = "question_count", nullable = false)
+    private int questionCount = 0;
+
+    // ✅ NEW: Denormalized member count for performance (optional but consistent)
+    @Column(name = "member_count", nullable = false)
+    private int memberCount = 0;
 
     @OneToMany(mappedBy = "university", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference("university-modules")
@@ -36,4 +47,24 @@ public class University {
     @OneToMany(mappedBy = "university", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference("university-memberships")
     private Set<UniversityMembership> memberships;
+
+    // ✅ Helper method to increment question count
+    public void incrementQuestionCount() {
+        this.questionCount++;
+    }
+
+    // ✅ Helper method to decrement question count
+    public void decrementQuestionCount() {
+        this.questionCount = Math.max(0, this.questionCount - 1);
+    }
+
+    // ✅ Helper method to increment member count
+    public void incrementMemberCount() {
+        this.memberCount++;
+    }
+
+    // ✅ Helper method to decrement member count
+    public void decrementMemberCount() {
+        this.memberCount = Math.max(0, this.memberCount - 1);
+    }
 }

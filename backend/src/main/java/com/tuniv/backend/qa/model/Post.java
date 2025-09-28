@@ -60,10 +60,6 @@ public abstract class Post {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    // ✅ OPTIMIZED: Added score for pre-calculation
-    @Column(name = "score", nullable = false)
-    private int score = 0;
-
     @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Attachment> attachments = new HashSet<>();
 

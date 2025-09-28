@@ -54,7 +54,7 @@ public class AuthService {
 
         if (user.is2faEnabled()) {
             if (loginRequest.code() == null || loginRequest.code().isEmpty()) {
-                return AuthMapper.toJwtResponse(null, userDetails, true);
+                return AuthMapper.toJwtResponse(null,  userDetails, 0L, 0L, 0L, true);
             }
 
             // --- TEMPORARY DEBUG LOGS FOR 2FA ---
@@ -74,7 +74,7 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         String jwt = jwtUtil.generateJwtToken(authentication);
 
-        return AuthMapper.toJwtResponse(jwt, userDetails, false);
+        return AuthMapper.toJwtResponse(jwt,  userDetails, 0L, 0L, 0L, false);
     }
 
 
@@ -190,7 +190,7 @@ public class AuthService {
         
         // Return the updated state in a JwtResponse object
         // The token can be null because the frontend only needs the updated flags.
-        return AuthMapper.toJwtResponse(null, userDetails, false);
+        return AuthMapper.toJwtResponse(null,  userDetails, 0L, 0L, 0L, false);
     }
     
 }

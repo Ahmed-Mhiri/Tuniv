@@ -26,12 +26,12 @@ public final class UniversityMapper {
             university.getName(),
             university.getModules() != null ?
                 university.getModules().stream()
-                    .map(UniversityMapper::toModuleDto)
+                    .map(module -> UniversityMapper.toModuleDto(module, isMember)) // ✅ Pass isMember to modules
                     .collect(Collectors.toList()) :
                 Collections.emptyList(),
             isMember,
-            // ✅ CORRECTED METHOD CALL
-            university.getMemberships() != null ? university.getMemberships().size() : 0
+            university.getMemberCount(),  // ✅ Use stored denormalized count
+            university.getQuestionCount() // ✅ Use stored denormalized count
         );
     }
 
@@ -45,7 +45,21 @@ public final class UniversityMapper {
         }
         return new ModuleDto(
             module.getModuleId(),
-            module.getName()
+            module.getName(),
+            module.getQuestionCount(), // ✅ Use stored denormalized count
+            false // Default value, will be set in service
+        );
+    }
+
+    public static ModuleDto toModuleDto(Module module, boolean isMember) {
+        if (module == null) {
+            return null;
+        }
+        return new ModuleDto(
+            module.getModuleId(),
+            module.getName(),
+            module.getQuestionCount(), // ✅ Use stored denormalized count
+            isMember // ✅ Added member status
         );
     }
     
@@ -57,13 +71,31 @@ public final class UniversityMapper {
         UniversityBasicDto universityDto = new UniversityBasicDto(
             module.getUniversity().getUniversityId(),
             module.getUniversity().getName(),
-            isMember
+            isMember,
+            module.getUniversity().getQuestionCount(), // ✅ Use stored denormalized count
+            module.getUniversity().getMemberCount()    // ✅ Use stored denormalized count
         );
 
         return new ModuleDetailDto(
             module.getModuleId(),
             module.getName(),
-            universityDto
+            universityDto,
+            module.getQuestionCount(), // ✅ Use stored denormalized count
+            isMember // ✅ Module member status
+        );
+    }
+
+    public static UniversityBasicDto toUniversityBasicDto(University university, boolean isMember) {
+        if (university == null) {
+            return null;
+        }
+        
+        return new UniversityBasicDto(
+            university.getUniversityId(),
+            university.getName(),
+            isMember,
+            university.getQuestionCount(), // ✅ Use stored denormalized count
+            university.getMemberCount()    // ✅ Use stored denormalized count
         );
     }
 }

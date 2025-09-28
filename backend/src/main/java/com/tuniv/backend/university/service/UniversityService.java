@@ -21,6 +21,7 @@ import com.tuniv.backend.university.mapper.UniversityMapper;
 import com.tuniv.backend.university.model.University; // <-- IMPORT ADDED
 import com.tuniv.backend.university.model.UniversityMembership;
 import com.tuniv.backend.university.model.UniversitySpecification;
+import com.tuniv.backend.university.model.UserRoleEnum;
 import com.tuniv.backend.university.repository.UniversityMembershipRepository;
 import com.tuniv.backend.university.repository.UniversityRepository;
 import com.tuniv.backend.user.model.User;
@@ -65,7 +66,7 @@ public class UniversityService {
         ));
     }
 
-    @Transactional
+     @Transactional
     @CacheEvict(value = "universities", allEntries = true)
     public void joinUniversity(Integer universityId, UserDetailsImpl currentUser) {
         User user = userRepository.findById(currentUser.getId())
@@ -86,15 +87,27 @@ public class UniversityService {
         membership.setId(membershipId);
         membership.setUser(user);
         membership.setUniversity(university);
-        membership.setRole("student");
-        membershipRepository.save(membership);      
+        membership.setRole(UserRoleEnum.STUDENT);
+        membershipRepository.save(membership);
+
+        // ✅ Update university member count
+        university.incrementMemberCount();
+        universityRepository.save(university);
+        
         eventPublisher.publishEvent(new UserJoinedUniversityEvent(this, user, university));
     }
 
     @Transactional
     @CacheEvict(value = "universities", allEntries = true)
     public void unjoinUniversity(Integer universityId, UserDetailsImpl currentUser) {
+        University university = universityRepository.findById(universityId)
+            .orElseThrow(() -> new ResourceNotFoundException("University not found with id: " + universityId));
+        
         membershipRepository.deleteByUserIdAndUniversityId(currentUser.getId(), universityId);
+        
+        // ✅ Update university member count
+        university.decrementMemberCount();
+        universityRepository.save(university);
     }
 
     @Transactional(readOnly = true)

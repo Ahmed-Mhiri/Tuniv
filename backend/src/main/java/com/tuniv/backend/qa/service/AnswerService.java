@@ -100,23 +100,27 @@ public class AnswerService {
     }
 
     @Transactional
-    // ❌ The invalid @CacheEvict annotation has been removed.
-    public void deleteAnswer(Integer answerId, UserDetailsImpl currentUser) {
-        // Fetch the answer with its question so we have the ID for cache eviction.
-        Answer answer = answerRepository.findWithQuestionById(answerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Answer not found with id: " + answerId));
+public void deleteAnswer(Integer answerId, UserDetailsImpl currentUser) {
+    // Fetch the answer with its question so we have the ID for cache eviction.
+    Answer answer = answerRepository.findWithQuestionById(answerId)
+            .orElseThrow(() -> new ResourceNotFoundException("Answer not found with id: " + answerId));
 
-        postAuthorizationService.checkOwnership(answer, currentUser);
+    postAuthorizationService.checkOwnership(answer, currentUser);
 
-        // ✅ THE FIX: Manually find the question ID and evict the cache entry.
-        Integer questionId = answer.getQuestion().getId();
-        Cache questionsCache = cacheManager.getCache("questions");
-        if (questionsCache != null) {
-            questionsCache.evict(questionId);
-        }
-        
-        // Now, proceed with the deletion.
-        attachmentService.deleteAttachments(answer.getAttachments());
-        answerRepository.delete(answer);
+    // ✅ DECREMENT ANSWER COUNT
+    Question question = answer.getQuestion();
+    question.setAnswerCount(question.getAnswerCount() - 1);
+    
+    // Evict from cache
+    Integer questionId = question.getId();
+    Cache questionsCache = cacheManager.getCache("questions");
+    if (questionsCache != null) {
+        questionsCache.evict(questionId);
     }
+    
+    // Now, proceed with the deletion.
+    attachmentService.deleteAttachments(answer.getAttachments());
+    answerRepository.delete(answer);
+}
+
 }

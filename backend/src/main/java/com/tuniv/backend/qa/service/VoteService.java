@@ -16,6 +16,7 @@ import com.tuniv.backend.qa.model.CommentVote;
 import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.qa.model.Question;
 import com.tuniv.backend.qa.model.QuestionVote;
+import com.tuniv.backend.qa.model.VotablePost;
 import com.tuniv.backend.qa.model.Vote;
 import com.tuniv.backend.qa.repository.AnswerRepository;
 import com.tuniv.backend.qa.repository.CommentRepository;
@@ -97,7 +98,7 @@ public class VoteService {
         processVote(voter, comment, comment.getAuthor(), existingVote, newVote, value, COMMENT_UPVOTE_REP, commentRepository);
     }
 
-    private <P extends Post> void processVote(
+    private <P extends VotablePost> void processVote(
             User voter, P post, User author, Optional<Vote> existingVoteOpt, Vote newVote, int value,
             int upvoteReputation, JpaRepository<P, Integer> postRepository
     ) {

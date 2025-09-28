@@ -32,6 +32,10 @@ public class Module {
     @Column(nullable = false)
     private String name;
 
+    // ✅ NEW: Denormalized question count for performance
+    @Column(name = "question_count", nullable = false)
+    private int questionCount = 0;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id", nullable = false)
     @JsonBackReference("university-modules")
@@ -40,4 +44,22 @@ public class Module {
     @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference("module-questions")
     private Set<Question> questions;
+
+    // ✅ Helper method to increment question count
+    public void incrementQuestionCount() {
+        this.questionCount++;
+        // Also update parent university count
+        if (this.university != null) {
+            this.university.incrementQuestionCount();
+        }
+    }
+
+    // ✅ Helper method to decrement question count
+    public void decrementQuestionCount() {
+        this.questionCount = Math.max(0, this.questionCount - 1);
+        // Also update parent university count
+        if (this.university != null) {
+            this.university.decrementQuestionCount();
+        }
+    }
 }

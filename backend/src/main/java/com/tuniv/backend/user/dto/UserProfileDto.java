@@ -6,6 +6,10 @@ public record UserProfileDto(
     String profilePhotoUrl,
     String bio,
     String major,
-    Integer reputationScore
-    // We could add a list of university memberships here in the future
+    Integer reputationScore,
+    long questionsCount,
+    long answersCount,
+    long followersCount,
+    VerificationInfo verification // ✅ ADD THIS FIELD
+
 ) {}

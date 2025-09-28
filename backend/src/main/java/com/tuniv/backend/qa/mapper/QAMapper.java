@@ -133,9 +133,32 @@ public final class QAMapper {
         );
     }
     
+    /**
+     * ✅ UPDATED: Now matches the new ModuleDto constructor with 4 parameters
+     * Note: For question responses, we don't have the current user context for isMember,
+     * so we default to false. The question count is taken from the module entity.
+     */
     public static ModuleDto toModuleDto(Module module) {
         if (module == null) return null;
-        return new ModuleDto(module.getModuleId(), module.getName());
+        return new ModuleDto(
+            module.getModuleId(), 
+            module.getName(),
+            module.getQuestionCount(), // ✅ Added question count
+            false // ✅ Default to false since we don't have user context here
+        );
+    }
+
+    /**
+     * ✅ NEW OVERLOAD: For cases where we have user context
+     */
+    public static ModuleDto toModuleDto(Module module, boolean isMember) {
+        if (module == null) return null;
+        return new ModuleDto(
+            module.getModuleId(), 
+            module.getName(),
+            module.getQuestionCount(), // ✅ Added question count
+            isMember // ✅ Use provided member status
+        );
     }
 
     /**
@@ -183,7 +206,7 @@ public final class QAMapper {
                 question.getBody(),
                 question.getCreatedAt(),
                 toAuthorDto(question.getAuthor()),
-                toModuleDto(question.getModule()),
+                toModuleDto(question.getModule()), // ✅ Now uses the updated method
                 answerDtos,
                 question.getScore(),
                 currentUserVotes.getOrDefault(question.getId(), 0),
@@ -191,8 +214,3 @@ public final class QAMapper {
         );
     }
 }
-
-
-
-
-

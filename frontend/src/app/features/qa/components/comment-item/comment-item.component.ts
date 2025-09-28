@@ -20,6 +20,7 @@ import { NzToolTipModule } from 'ng-zorro-antd/tooltip';
 import { NzSpaceModule } from 'ng-zorro-antd/space';
 import { NzModalService } from 'ng-zorro-antd/modal';
 import { PostEditFormComponent, PostEditSaveEvent } from '../post-edit-form.component/post-edit-form.component';
+import { SafeHtmlPipe } from '../../../../shared/pipes/safe-html.pipe';
 
 @Component({
   selector: 'app-comment-item',
@@ -27,7 +28,7 @@ import { PostEditFormComponent, PostEditSaveEvent } from '../post-edit-form.comp
   imports: [
     CommentItemComponent, ReactiveFormsModule, RouterLink, TimeAgoPipe, VoteComponent,
     NzAvatarModule, NzButtonModule, NzFormModule, NzInputModule, NzIconModule,
-    NzUploadModule, NzToolTipModule, NzSpaceModule,PostEditFormComponent
+    NzUploadModule, NzToolTipModule, NzSpaceModule,PostEditFormComponent,SafeHtmlPipe
   ],
   templateUrl: './comment-item.component.html',
   styleUrl: './comment-item.component.scss',
