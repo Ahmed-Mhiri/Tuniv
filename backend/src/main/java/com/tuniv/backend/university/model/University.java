@@ -32,9 +32,9 @@ public class University {
     @Column(name = "email_domain", nullable = false, unique = true)
     private String emailDomain;
 
-    // ✅ NEW: Denormalized question count for performance
-    @Column(name = "question_count", nullable = false)
-    private int questionCount = 0;
+    // ✅ UPDATED: Renamed from question_count to topic_count
+    @Column(name = "topic_count", nullable = false)
+    private int topicCount = 0;
 
     // ✅ NEW: Denormalized member count for performance (optional but consistent)
     @Column(name = "member_count", nullable = false)
@@ -48,14 +48,12 @@ public class University {
     @JsonManagedReference("university-memberships")
     private Set<UniversityMembership> memberships;
 
-    // ✅ Helper method to increment question count
-    public void incrementQuestionCount() {
-        this.questionCount++;
+    public void incrementTopicCount() {
+        this.topicCount++;
     }
 
-    // ✅ Helper method to decrement question count
-    public void decrementQuestionCount() {
-        this.questionCount = Math.max(0, this.questionCount - 1);
+    public void decrementTopicCount() {
+        this.topicCount = Math.max(0, this.topicCount - 1);
     }
 
     // ✅ Helper method to increment member count

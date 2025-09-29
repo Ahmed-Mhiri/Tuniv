@@ -4,6 +4,6 @@ public record ModuleDetailDto(
     Integer moduleId,
     String name,
     UniversityBasicDto university,
-    Integer questionCount,
+    Integer topicCount,  // ✅ UPDATED: questionCount → topicCount
     boolean isMember
 ) {}

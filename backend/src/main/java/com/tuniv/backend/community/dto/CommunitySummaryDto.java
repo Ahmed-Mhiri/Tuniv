@@ -4,6 +4,6 @@ public record CommunitySummaryDto(
     Integer communityId,
     String name,
     Integer memberCount,
-    Integer questionCount, // ✅ Added
+    Integer topicCount, // ✅ UPDATED: questionCount → topicCount
     String universityName
 ) {}

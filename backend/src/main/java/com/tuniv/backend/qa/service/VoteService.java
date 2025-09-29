@@ -9,18 +9,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.notification.event.NewVoteEvent;
-import com.tuniv.backend.qa.model.Answer;
-import com.tuniv.backend.qa.model.AnswerVote;
-import com.tuniv.backend.qa.model.Comment;
-import com.tuniv.backend.qa.model.CommentVote;
+
 import com.tuniv.backend.qa.model.Post;
-import com.tuniv.backend.qa.model.Question;
-import com.tuniv.backend.qa.model.QuestionVote;
+import com.tuniv.backend.qa.model.PostType;
+import com.tuniv.backend.qa.model.Reply;
+import com.tuniv.backend.qa.model.ReplyVote;
+import com.tuniv.backend.qa.model.Topic;
+import com.tuniv.backend.qa.model.TopicVote;
+
 import com.tuniv.backend.qa.model.VotablePost;
 import com.tuniv.backend.qa.model.Vote;
-import com.tuniv.backend.qa.repository.AnswerRepository;
-import com.tuniv.backend.qa.repository.CommentRepository;
-import com.tuniv.backend.qa.repository.QuestionRepository;
+import com.tuniv.backend.qa.repository.ReplyRepository;
+import com.tuniv.backend.qa.repository.TopicRepository;
 import com.tuniv.backend.qa.repository.VoteRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.user.model.User;
@@ -33,69 +33,45 @@ import lombok.RequiredArgsConstructor;
 public class VoteService {
 
     private final UserRepository userRepository;
-    private final QuestionRepository questionRepository;
-    private final AnswerRepository answerRepository;
-    private final CommentRepository commentRepository;
-    private final VoteRepository voteRepository; // ✨ INJECT THE CONSOLIDATED REPOSITORY
+    private final TopicRepository topicRepository;
+    private final ReplyRepository replyRepository;
+    private final VoteRepository voteRepository;
     private final ApplicationEventPublisher eventPublisher;
 
-    private static final int QUESTION_UPVOTE_REP = 5;
-    private static final int ANSWER_UPVOTE_REP = 10;
-    private static final int COMMENT_UPVOTE_REP = 2;
+    private static final int TOPIC_UPVOTE_REP = 5;
+    private static final int REPLY_UPVOTE_REP = 10;
     private static final int DOWNVOTE_REP = -2;
 
     @Transactional
-    public void voteOnQuestion(Integer questionId, UserDetailsImpl currentUser, int value) {
+    public void voteOnTopic(Integer topicId, UserDetailsImpl currentUser, int value) {
         User voter = findVoter(currentUser);
-        Question question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Question not found"));
+        Topic topic = topicRepository.findById(topicId)
+                .orElseThrow(() -> new ResourceNotFoundException("Topic not found"));
 
-        if (voter.getUserId().equals(question.getAuthor().getUserId())) {
+        if (voter.getUserId().equals(topic.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
         }
         
-        // ✅ NEW LOGIC: Find existing vote by user and post
-        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), questionId);
-        // ✅ NEW LOGIC: Create vote object with the simple constructor
-        QuestionVote newVote = new QuestionVote(voter, question, (short) value);
+        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), topicId);
+        TopicVote newVote = new TopicVote(voter, topic, (short) value);
 
-        processVote(voter, question, question.getAuthor(), existingVote, newVote, value, QUESTION_UPVOTE_REP, questionRepository);
+        processVote(voter, topic, topic.getAuthor(), existingVote, newVote, value, TOPIC_UPVOTE_REP, topicRepository);
     }
 
     @Transactional
-    public void voteOnAnswer(Integer answerId, UserDetailsImpl currentUser, int value) {
+    public void voteOnReply(Integer replyId, UserDetailsImpl currentUser, int value) {
         User voter = findVoter(currentUser);
-        Answer answer = answerRepository.findWithQuestionById(answerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Answer not found"));
+        Reply reply = replyRepository.findWithTopicById(replyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Reply not found"));
 
-        if (voter.getUserId().equals(answer.getAuthor().getUserId())) {
+        if (voter.getUserId().equals(reply.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
         }
 
-        // ✅ NEW LOGIC: Find existing vote by user and post
-        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), answerId);
-        // ✅ NEW LOGIC: Create vote object with the simple constructor
-        AnswerVote newVote = new AnswerVote(voter, answer, (short) value);
+        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), replyId);
+        ReplyVote newVote = new ReplyVote(voter, reply, (short) value);
 
-        processVote(voter, answer, answer.getAuthor(), existingVote, newVote, value, ANSWER_UPVOTE_REP, answerRepository);
-    }
-
-    @Transactional
-    public void voteOnComment(Integer commentId, UserDetailsImpl currentUser, int value) {
-        User voter = findVoter(currentUser);
-        Comment comment = commentRepository.findWithParentsById(commentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Comment not found"));
-
-        if (voter.getUserId().equals(comment.getAuthor().getUserId())) {
-            throw new IllegalArgumentException("You cannot vote on your own post.");
-        }
-
-        // ✅ NEW LOGIC: Find existing vote by user and post
-        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), commentId);
-        // ✅ NEW LOGIC: Create vote object with the simple constructor
-        CommentVote newVote = new CommentVote(voter, comment, (short) value);
-
-        processVote(voter, comment, comment.getAuthor(), existingVote, newVote, value, COMMENT_UPVOTE_REP, commentRepository);
+        processVote(voter, reply, reply.getAuthor(), existingVote, newVote, value, REPLY_UPVOTE_REP, replyRepository);
     }
 
     private <P extends VotablePost> void processVote(
@@ -123,14 +99,27 @@ public class VoteService {
             voteRepository.save(newVote);
             
             if (shortValue == 1) { // Only notify on upvotes
-                // ✅ NEW LOGIC: Use the Post object from the vote for context
                 Post votedPost = newVote.getPost();
-                if (votedPost instanceof Question) {
-                    eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(), Post.PostType.QUESTION, votedPost.getId(), ((Question) votedPost).getTitle(), votedPost.getId()));
-                } else if (votedPost instanceof Answer) {
-                    eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(), Post.PostType.ANSWER, votedPost.getId(), ((Answer) votedPost).getQuestion().getTitle(), ((Answer) votedPost).getQuestion().getId()));
-                } else if (votedPost instanceof Comment) {
-                     eventPublisher.publishEvent(new NewVoteEvent(this, voter.getUserId(), author.getUserId(), Post.PostType.COMMENT, votedPost.getId(), ((Comment) votedPost).getAnswer().getQuestion().getTitle(), ((Comment) votedPost).getAnswer().getQuestion().getId()));
+                if (votedPost instanceof Topic topic) {
+                    // ✅ Using convenience constructor for Topic vote
+                    eventPublisher.publishEvent(new NewVoteEvent(
+                        voter.getUserId(), // voterId
+                        author.getUserId(), // authorId
+                        PostType.TOPIC, // postType
+                        votedPost.getId(), // postId (topic ID)
+                        topic.getTitle(), // questionTitle
+                        votedPost.getId() // questionId (same as topic ID for topics)
+                    ));
+                } else if (votedPost instanceof Reply reply) {
+                    // ✅ Using convenience constructor for Reply vote
+                    eventPublisher.publishEvent(new NewVoteEvent(
+                        voter.getUserId(), // voterId
+                        author.getUserId(), // authorId
+                        PostType.REPLY, // postType
+                        votedPost.getId(), // postId (reply ID)
+                        reply.getTopic().getTitle(), // questionTitle (from parent topic)
+                        reply.getTopic().getId() // questionId (parent topic ID)
+                    ));
                 }
             }
         }

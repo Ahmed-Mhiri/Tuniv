@@ -15,10 +15,10 @@ import org.springframework.transaction.annotation.Transactional;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.follow.model.Follow;
 import com.tuniv.backend.follow.repository.FollowRepository;
-import com.tuniv.backend.qa.dto.QuestionSummaryDto;
-import com.tuniv.backend.qa.model.Question;
+import com.tuniv.backend.qa.dto.TopicSummaryDto;
 import com.tuniv.backend.qa.model.Tag;
-import com.tuniv.backend.qa.repository.QuestionRepository;
+import com.tuniv.backend.qa.model.Topic;
+import com.tuniv.backend.qa.repository.TopicRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -26,11 +26,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FeedService {
 
-    private final QuestionRepository questionRepository;
+    private final TopicRepository topicRepository;
     private final FollowRepository followRepository;
 
     @Transactional(readOnly = true)
-    public Page<QuestionSummaryDto> getPersonalizedFeed(UserDetailsImpl currentUser, Pageable pageable) {
+    public Page<TopicSummaryDto> getPersonalizedFeed(UserDetailsImpl currentUser, Pageable pageable) {
         // 1. Fetch all of the user's follow relationships
         List<Follow> follows = followRepository.findAllByUser_UserId(currentUser.getId());
 
@@ -53,8 +53,8 @@ public class FeedService {
             }
         }
         
-        // 3. Call a new, powerful repository method to get the feed
-        Page<QuestionSummaryDto> summaryPage = questionRepository.findPersonalizedFeed(
+        // 3. Call the new repository method to get the feed (now using TopicRepository)
+        Page<TopicSummaryDto> summaryPage = topicRepository.findPersonalizedFeed(
             followedUserIds, followedCommunityIds, followedTagIds, followedModuleIds,
             currentUser.getId(), pageable
         );
@@ -63,44 +63,52 @@ public class FeedService {
     }
     
     @Transactional(readOnly = true)
-    public Page<QuestionSummaryDto> getQuestionsByModule(Integer moduleId, Pageable pageable, UserDetailsImpl currentUser) {
+    public Page<TopicSummaryDto> getTopicsByModule(Integer moduleId, Pageable pageable, UserDetailsImpl currentUser) {
         Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
-        Page<QuestionSummaryDto> summaryPage = questionRepository.findQuestionSummariesByModuleId(moduleId, currentUserId, pageable);
+        Page<TopicSummaryDto> summaryPage = topicRepository.findTopicSummariesByModuleId(moduleId, currentUserId, pageable);
         return enrichSummariesWithTags(summaryPage, pageable);
     }
     
     @Transactional(readOnly = true)
-    public Page<QuestionSummaryDto> getQuestionsByTag(String tagName, Pageable pageable, UserDetailsImpl currentUser) {
+    public Page<TopicSummaryDto> getTopicsByCommunity(Integer communityId, Pageable pageable, UserDetailsImpl currentUser) {
         Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
-        Page<QuestionSummaryDto> summaryPage = questionRepository.findQuestionSummariesByTag(tagName.toLowerCase(), currentUserId, pageable);
+        Page<TopicSummaryDto> summaryPage = topicRepository.findTopicSummariesByCommunityId(communityId, currentUserId, pageable);
         return enrichSummariesWithTags(summaryPage, pageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<QuestionSummaryDto> getPopularFeed(Pageable pageable, UserDetailsImpl currentUser) {
+    public Page<TopicSummaryDto> getTopicsByTag(String tagName, Pageable pageable, UserDetailsImpl currentUser) {
         Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
-        Page<QuestionSummaryDto> summaryPage = questionRepository.findPopularQuestionSummaries(currentUserId, pageable);
+        Page<TopicSummaryDto> summaryPage = topicRepository.findTopicSummariesByTag(tagName.toLowerCase(), currentUserId, pageable);
         return enrichSummariesWithTags(summaryPage, pageable);
     }
 
-    private Page<QuestionSummaryDto> enrichSummariesWithTags(Page<QuestionSummaryDto> summaryPage, Pageable pageable) {
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getPopularFeed(Pageable pageable, UserDetailsImpl currentUser) {
+        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
+        Page<TopicSummaryDto> summaryPage = topicRepository.findPopularTopicSummaries(currentUserId, pageable);
+        return enrichSummariesWithTags(summaryPage, pageable);
+    }
+
+    private Page<TopicSummaryDto> enrichSummariesWithTags(Page<TopicSummaryDto> summaryPage, Pageable pageable) {
         if (summaryPage.isEmpty()) {
             return summaryPage;
         }
 
-        List<Integer> questionIds = summaryPage.getContent().stream()
-                .map(QuestionSummaryDto::id)
+        List<Integer> topicIds = summaryPage.getContent().stream()
+                .map(TopicSummaryDto::id)
                 .toList();
 
-        List<Question> questionsWithTags = questionRepository.findWithTagsByIdIn(questionIds);
+        // ✅ UPDATED: Use TopicRepository instead of QuestionRepository
+        List<Topic> topicsWithTags = topicRepository.findWithTagsByIdIn(topicIds);
 
-        Map<Integer, List<String>> tagsMap = questionsWithTags.stream()
+        Map<Integer, List<String>> tagsMap = topicsWithTags.stream()
                 .collect(Collectors.toMap(
-                    Question::getId,
-                    q -> q.getTags().stream().map(Tag::getName).toList()
+                    Topic::getId,
+                    t -> t.getTags().stream().map(Tag::getName).toList()
                 ));
 
-        List<QuestionSummaryDto> enrichedSummaries = summaryPage.getContent().stream()
+        List<TopicSummaryDto> enrichedSummaries = summaryPage.getContent().stream()
                 .map(summary -> summary.withTags(tagsMap.getOrDefault(summary.id(), Collections.emptyList())))
                 .toList();
 

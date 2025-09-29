@@ -8,5 +8,5 @@ public record UniversityDto(
     List<ModuleDto> modules,
     boolean isMember,
     Integer memberCount,
-    Integer questionCount
+    Integer topicCount  // ✅ UPDATED: questionCount → topicCount
 ) {}

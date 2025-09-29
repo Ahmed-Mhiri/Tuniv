@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.qa.dto.TopicSummaryDto;
+import com.tuniv.backend.qa.repository.TopicRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.university.dto.ModuleDetailDto;
 import com.tuniv.backend.university.dto.ModuleDto;
@@ -28,7 +30,7 @@ public class ModuleService {
     private final ModuleRepository moduleRepository;
     private final UniversityRepository universityRepository;
     private final UniversityMembershipRepository membershipRepository;
-
+    private final TopicRepository topicRepository; // ✅ ADDED: For topic counts
 
     @Transactional(readOnly = true)
     public ModuleDetailDto getModuleDetails(Integer moduleId, UserDetailsImpl currentUser) {
@@ -37,7 +39,6 @@ public class ModuleService {
         
         University parentUniversity = module.getUniversity();
 
-        // ✅ FIX: Call the new, correctly named method from the repository
         boolean isMember = membershipRepository.existsByUser_UserIdAndUniversity_UniversityId(
             currentUser.getId(), 
             parentUniversity.getUniversityId()
@@ -46,34 +47,41 @@ public class ModuleService {
         return UniversityMapper.toModuleDetailDto(module, isMember);
     }
 
-
     @Transactional(readOnly = true)
     public Page<ModuleDto> getModulesByUniversity(Integer universityId, Pageable pageable) {
         if (!universityRepository.existsById(universityId)) {
             throw new ResourceNotFoundException("University not found with id: " + universityId);
         }
-        // The repository call now returns a Page<Module>
-        Page<Module> modulePage = moduleRepository.findByUniversityUniversityId(universityId, pageable);
         
-        // Use the map function provided by the Page interface to convert Page<Module> to Page<ModuleDto>
+        Page<Module> modulePage = moduleRepository.findByUniversityUniversityId(universityId, pageable);
         return modulePage.map(UniversityMapper::toModuleDto);
     }
 
     @Transactional(readOnly = true)
     public Page<ModuleDto> getAllModules(Pageable pageable) {
-        // The findAll method from JpaRepository already supports Pageable
         return moduleRepository.findAll(pageable)
                                .map(UniversityMapper::toModuleDto);
     }
+
     @Transactional(readOnly = true)
-public List<ModuleDto> getAllModulesByUniversity(Integer universityId) {
-    if (!universityRepository.existsById(universityId)) {
-        throw new ResourceNotFoundException("University not found with id: " + universityId);
+    public List<ModuleDto> getAllModulesByUniversity(Integer universityId) {
+        if (!universityRepository.existsById(universityId)) {
+            throw new ResourceNotFoundException("University not found with id: " + universityId);
+        }
+        
+        return moduleRepository.findByUniversityUniversityId(universityId).stream()
+               .map(UniversityMapper::toModuleDto)
+               .collect(Collectors.toList());
     }
-    
-    // This calls the repository method that returns a simple List, not a Page
-    return moduleRepository.findByUniversityUniversityId(universityId).stream()
-           .map(UniversityMapper::toModuleDto)
-           .collect(Collectors.toList());
-}
+
+    // ✅ NEW: Get topics by module (replaces getQuestionsByModule)
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getTopicsByModule(Integer moduleId, Pageable pageable, UserDetailsImpl currentUser) {
+        if (!moduleRepository.existsById(moduleId)) {
+            throw new ResourceNotFoundException("Module not found with id: " + moduleId);
+        }
+        
+        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
+        return topicRepository.findTopicSummariesByModuleId(moduleId, currentUserId, pageable);
+    }
 }

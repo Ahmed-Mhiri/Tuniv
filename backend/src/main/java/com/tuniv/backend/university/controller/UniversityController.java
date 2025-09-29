@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.qa.dto.TopicSummaryDto;
 import com.tuniv.backend.university.dto.ModuleDto;
 import com.tuniv.backend.university.dto.UniversityDto;
 import com.tuniv.backend.university.service.ModuleService;
@@ -24,18 +25,18 @@ import com.tuniv.backend.university.service.UniversityService;
 import lombok.RequiredArgsConstructor;
 
 @RestController
-@RequestMapping("/api/v1/universities") // All endpoints start with /universities
+@RequestMapping("/api/v1/universities")
 @RequiredArgsConstructor
 public class UniversityController {
 
     private final UniversityService universityService;
-    private final ModuleService moduleService; // Keep this to serve the modules sub-resource
+    private final ModuleService moduleService; // Kept to serve the modules sub-resource
 
     // --- Primary University Endpoints ---
 
     /**
      * GET /api/v1/universities
-     * Get a paginated list of all universities, with optional search.
+     * Get a paginated list of all universities, with an optional search term.
      */
     @GetMapping
     public ResponseEntity<Page<UniversityDto>> getAllUniversities(
@@ -48,7 +49,7 @@ public class UniversityController {
 
     /**
      * GET /api/v1/universities/top
-     * Get a list of the most popular universities.
+     * Get a list of the most popular universities by member count.
      */
     @GetMapping("/top")
     public ResponseEntity<List<UniversityDto>> getTopUniversities(
@@ -58,7 +59,7 @@ public class UniversityController {
 
     /**
      * GET /api/v1/universities/joined
-     * Get a list of universities the current user has joined.
+     * Get a list of universities the current user is a member of.
      */
     @GetMapping("/joined")
     public ResponseEntity<List<UniversityDto>> getJoinedUniversities(
@@ -70,7 +71,7 @@ public class UniversityController {
 
     /**
      * POST /api/v1/universities/{universityId}/members
-     * Join a specific university.
+     * Allows the current user to join a specific university.
      */
     @PostMapping("/{universityId}/members")
     public ResponseEntity<?> joinUniversity(
@@ -82,7 +83,7 @@ public class UniversityController {
 
     /**
      * DELETE /api/v1/universities/{universityId}/members
-     * Unjoin from a specific university.
+     * Allows the current user to leave a specific university.
      */
     @DeleteMapping("/{universityId}/members")
     public ResponseEntity<?> unjoinUniversity(
@@ -107,11 +108,26 @@ public class UniversityController {
 
     /**
      * GET /api/v1/universities/{universityId}/modules/all
-     * Get a complete list of all modules for a specific university (for dropdowns).
+     * Get a complete, non-paginated list of all modules for a specific university.
      */
     @GetMapping("/{universityId}/modules/all")
     public ResponseEntity<List<ModuleDto>> getAllModulesByUniversity(
             @PathVariable Integer universityId) {
         return ResponseEntity.ok(moduleService.getAllModulesByUniversity(universityId));
+    }
+
+    // --- ✅ NEW: University Topics Endpoint (Sub-resource: topics) ---
+
+    /**
+     * GET /api/v1/universities/{universityId}/topics
+     * Get a paginated list of all topics associated with a university's modules.
+     */
+    @GetMapping("/{universityId}/topics")
+    public ResponseEntity<Page<TopicSummaryDto>> getTopicsByUniversity(
+            @PathVariable Integer universityId,
+            Pageable pageable,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        Page<TopicSummaryDto> topics = universityService.getTopicsByUniversity(universityId, pageable, currentUser);
+        return ResponseEntity.ok(topics);
     }
 }

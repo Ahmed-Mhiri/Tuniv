@@ -7,6 +7,7 @@ import java.util.Set;
 import org.hibernate.annotations.CreationTimestamp;
 
 import com.tuniv.backend.qa.model.Post;
+import com.tuniv.backend.qa.model.Topic;
 import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.user.model.User;
 
@@ -53,33 +54,33 @@ public class Community {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    // Denormalized count for performance
     @Column(name = "member_count", nullable = false)
     private int memberCount = 0;
 
-    // Denormalized question count for performance
-    @Column(name = "question_count", nullable = false)
-    private int questionCount = 0;
+    // ✅ MODIFIED: Renamed from question_count to topic_count
+    @Column(name = "topic_count", nullable = false)
+    private int topicCount = 0;
 
     @OneToMany(mappedBy = "community", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<CommunityMembership> members = new HashSet<>();
 
-    // ✅ Helper method to increment question count
-    public void incrementQuestionCount() {
-        this.questionCount++;
+    // ✅ MODIFIED: Relationship now points to Topic
+    @OneToMany(mappedBy = "community", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<Topic> topics = new HashSet<>();
+
+    // ✅ MODIFIED: Helper methods updated for topicCount
+    public void incrementTopicCount() {
+        this.topicCount++;
     }
 
-    // ✅ Helper method to decrement question count
-    public void decrementQuestionCount() {
-        this.questionCount = Math.max(0, this.questionCount - 1);
+    public void decrementTopicCount() {
+        this.topicCount = Math.max(0, this.topicCount - 1);
     }
 
-    // ✅ NEW: Helper method to increment member count
     public void incrementMemberCount() {
         this.memberCount++;
     }
 
-    // ✅ NEW: Helper method to decrement member count
     public void decrementMemberCount() {
         this.memberCount = Math.max(0, this.memberCount - 1);
     }

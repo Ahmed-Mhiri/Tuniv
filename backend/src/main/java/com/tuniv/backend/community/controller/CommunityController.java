@@ -1,11 +1,15 @@
 package com.tuniv.backend.community.controller;
 
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -15,16 +19,18 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.tuniv.backend.community.dto.CommunityCreateRequest;
 import com.tuniv.backend.community.dto.CommunityDetailDto;
+import com.tuniv.backend.community.dto.CommunityStatsDto;
 import com.tuniv.backend.community.dto.CommunitySummaryDto;
+import com.tuniv.backend.community.dto.CommunityUpdateRequest;
+import com.tuniv.backend.community.dto.CommunityWithStatsDto;
+import com.tuniv.backend.community.dto.TrendingCommunityDto;
 import com.tuniv.backend.community.service.CommunityService;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import com.tuniv.backend.qa.dto.QuestionSummaryDto;
+import com.tuniv.backend.qa.dto.TopicSummaryDto;
+import com.tuniv.backend.qa.model.TopicType;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-
-import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/communities")
@@ -34,55 +40,9 @@ public class CommunityController {
     private final CommunityService communityService;
 
     /**
-     * GET /api/v1/communities
-     * Get a paginated list of all communities, with optional search and university filter.
-     */
-    @GetMapping
-    public ResponseEntity<Page<CommunitySummaryDto>> getAllCommunities(
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) Integer universityId,
-            Pageable pageable,
-            @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        Page<CommunitySummaryDto> communities = communityService.getAllCommunities(search, universityId, pageable, currentUser);
-        return ResponseEntity.ok(communities);
-    }
-
-    /**
-     * GET /api/v1/communities/top
-     * Get a list of the most popular communities.
-     */
-    @GetMapping("/top")
-    public ResponseEntity<List<CommunitySummaryDto>> getTopCommunities(
-            @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        List<CommunitySummaryDto> communities = communityService.getTopCommunities(currentUser);
-        return ResponseEntity.ok(communities);
-    }
-
-    /**
-     * GET /api/v1/communities/joined
-     * Get a list of communities the current user has joined.
-     */
-    @GetMapping("/joined")
-    public ResponseEntity<List<CommunitySummaryDto>> getJoinedCommunities(
-            @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        List<CommunitySummaryDto> communities = communityService.getJoinedCommunities(currentUser);
-        return ResponseEntity.ok(communities);
-    }
-
-    /**
-     * GET /api/v1/communities/global
-     * Get a list of global communities (not tied to any university).
-     */
-    @GetMapping("/global")
-    public ResponseEntity<List<CommunitySummaryDto>> getGlobalCommunities(
-            @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        List<CommunitySummaryDto> communities = communityService.getGlobalCommunities(currentUser);
-        return ResponseEntity.ok(communities);
-    }
-
-    /**
      * POST /api/v1/communities
-     * Create a new community.
+     * Creates a new community.
+     * The creator automatically becomes a moderator.
      */
     @PostMapping
     public ResponseEntity<CommunityDetailDto> createCommunity(
@@ -93,22 +53,110 @@ public class CommunityController {
     }
 
     /**
+     * PATCH /api/v1/communities/{communityId}
+     * Updates a community's information. Only moderators can perform this action.
+     */
+    @PatchMapping("/{communityId}")
+    public ResponseEntity<CommunityDetailDto> updateCommunity(
+            @PathVariable Integer communityId,
+            @RequestBody @Valid CommunityUpdateRequest request,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        CommunityDetailDto updatedCommunity = communityService.updateCommunity(communityId, request, currentUser);
+        return ResponseEntity.ok(updatedCommunity);
+    }
+    
+    /**
+     * GET /api/v1/communities/search
+     * Provides an advanced search for communities with multiple filters.
+     * Replaces the previous simple GET /.
+     */
+    @GetMapping("/search")
+    public ResponseEntity<Page<CommunitySummaryDto>> searchCommunities(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Integer minTopics,
+            @RequestParam(required = false) Integer minMembers,
+            Pageable pageable,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        Page<CommunitySummaryDto> communities = communityService.searchCommunitiesWithFilters(
+            search, minTopics, minMembers, pageable, currentUser
+        );
+        return ResponseEntity.ok(communities);
+    }
+
+    /**
+     * GET /api/v1/communities/trending
+     * Gets a list of communities with the most activity in the last week.
+     */
+    @GetMapping("/trending")
+    public ResponseEntity<List<TrendingCommunityDto>> getTrendingCommunities(
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        List<TrendingCommunityDto> communities = communityService.getTrendingCommunities(currentUser);
+        return ResponseEntity.ok(communities);
+    }
+
+    /**
+     * GET /api/v1/communities/popular
+     * Gets a list of popular communities, optionally filtered by a minimum number of members.
+     */
+    @GetMapping("/popular")
+    public ResponseEntity<List<CommunitySummaryDto>> getPopularCommunities(
+            @RequestParam(required = false, defaultValue = "10") Integer minMembers,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        List<CommunitySummaryDto> communities = communityService.getPopularCommunities(minMembers, currentUser);
+        return ResponseEntity.ok(communities);
+    }
+    
+    /**
+     * GET /api/v1/communities/active
+     * Gets a list of communities with recent topic activity (within the last 24 hours).
+     */
+    @GetMapping("/active")
+    public ResponseEntity<List<CommunitySummaryDto>> getActiveCommunities(
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        List<CommunitySummaryDto> communities = communityService.getActiveCommunities(currentUser);
+        return ResponseEntity.ok(communities);
+    }
+
+    /**
+     * GET /api/v1/communities/joined
+     * Gets a list of communities the current user has joined.
+     */
+    @GetMapping("/joined")
+    public ResponseEntity<List<CommunitySummaryDto>> getJoinedCommunities(
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        List<CommunitySummaryDto> communities = communityService.getJoinedCommunities(currentUser);
+        return ResponseEntity.ok(communities);
+    }
+    
+    /**
+     * GET /api/v1/communities/university/{universityId}
+     * Gets communities associated with a specific university, ordered by topic count.
+     */
+    @GetMapping("/university/{universityId}")
+    public ResponseEntity<List<CommunitySummaryDto>> getCommunitiesByUniversity(
+            @PathVariable Integer universityId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        List<CommunitySummaryDto> communities = communityService.getCommunitiesByUniversity(universityId, currentUser);
+        return ResponseEntity.ok(communities);
+    }
+
+    /**
      * GET /api/v1/communities/{communityId}
-     * Get detailed information about a specific community.
+     * Gets detailed information and statistics for a specific community.
      */
     @GetMapping("/{communityId}")
-    public ResponseEntity<CommunityDetailDto> getCommunityDetails(
+    public ResponseEntity<CommunityWithStatsDto> getCommunityWithStats(
             @PathVariable Integer communityId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        CommunityDetailDto communityDetails = communityService.getCommunityDetails(communityId, currentUser);
+        CommunityWithStatsDto communityDetails = communityService.getCommunityWithStats(communityId, currentUser);
         return ResponseEntity.ok(communityDetails);
     }
 
     /**
-     * POST /api/v1/communities/{communityId}/members
-     * Join a specific community.
+     * POST /api/v1/communities/{communityId}/join
+     * Allows the current user to join a specific community.
      */
-    @PostMapping("/{communityId}/members")
+    @PostMapping("/{communityId}/join")
     public ResponseEntity<?> joinCommunity(
             @PathVariable Integer communityId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -117,10 +165,10 @@ public class CommunityController {
     }
 
     /**
-     * DELETE /api/v1/communities/{communityId}/members
-     * Leave a specific community.
+     * DELETE /api/v1/communities/{communityId}/leave
+     * Allows the current user to leave a specific community.
      */
-    @DeleteMapping("/{communityId}/members")
+    @DeleteMapping("/{communityId}/leave")
     public ResponseEntity<?> leaveCommunity(
             @PathVariable Integer communityId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -129,15 +177,54 @@ public class CommunityController {
     }
 
     /**
-     * GET /api/v1/communities/{communityId}/questions
-     * Get a paginated list of questions for a specific community.
+     * GET /api/v1/communities/{communityId}/topics
+     * Gets a paginated list of topics for a community, with an optional filter for topic type.
      */
-    @GetMapping("/{communityId}/questions")
-    public ResponseEntity<Page<QuestionSummaryDto>> getQuestionsByCommunity(
+    @GetMapping("/{communityId}/topics")
+    public ResponseEntity<Page<TopicSummaryDto>> getTopicsByCommunity(
             @PathVariable Integer communityId,
+            @RequestParam(required = false) TopicType type,
             Pageable pageable,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
-        Page<QuestionSummaryDto> questions = communityService.getQuestionsByCommunity(communityId, pageable, currentUser);
-        return ResponseEntity.ok(questions);
+        
+        Page<TopicSummaryDto> topics;
+        if (type != null) {
+            topics = communityService.getTopicsByCommunityAndType(communityId, type, pageable, currentUser);
+        } else {
+            topics = communityService.getTopicsByCommunity(communityId, pageable, currentUser);
+        }
+        return ResponseEntity.ok(topics);
+    }
+
+    /**
+     * GET /api/v1/communities/{communityId}/stats
+     * Retrieves key statistics for a community.
+     */
+    @GetMapping("/{communityId}/stats")
+    public ResponseEntity<CommunityStatsDto> getCommunityStats(@PathVariable Integer communityId) {
+        CommunityStatsDto stats = communityService.getCommunityStats(communityId);
+        return ResponseEntity.ok(stats);
+    }
+    
+    /**
+     * GET /api/v1/communities/{communityId}/stats/topic-distribution
+     * Gets the distribution of topic types (QUESTION, POST) within a community.
+     */
+    @GetMapping("/{communityId}/stats/topic-distribution")
+    public ResponseEntity<Map<TopicType, Long>> getTopicDistribution(@PathVariable Integer communityId) {
+        Map<TopicType, Long> distribution = communityService.getCommunityTopicDistribution(communityId);
+        return ResponseEntity.ok(distribution);
+    }
+    
+    /**
+     * GET /api/v1/communities/{communityId}/access
+     * Checks if a user can access a specific community.
+     */
+    @GetMapping("/{communityId}/access")
+    public ResponseEntity<Map<String, Boolean>> canAccessCommunity(
+            @PathVariable Integer communityId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        boolean canAccess = communityService.canAccessCommunity(communityId, currentUser);
+        return ResponseEntity.ok(Map.of("canAccess", canAccess));
     }
 }

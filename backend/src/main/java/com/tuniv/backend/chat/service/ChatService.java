@@ -3,7 +3,7 @@ package com.tuniv.backend.chat.service;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map; // <-- IMPORT ADDED
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -44,10 +44,11 @@ public class ChatService {
     private final UserRepository userRepository;
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository conversationParticipantRepository;
-    private final ReactionRepository reactionRepository; // ✨ INJECT THE NEW REPOSITORY
+    private final ReactionRepository reactionRepository;
     private final SimpMessageSendingOperations messagingTemplate;
     private final AttachmentService attachmentService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ChatMapper chatMapper; // Correctly injected
 
     @Transactional
     public Message sendMessage(
@@ -58,17 +59,14 @@ public class ChatService {
     ) {
         Message savedMessage = saveMessageAndAttachments(conversationId, chatMessageDto, senderUsername, files);
 
-        // ✅ UPDATED: Pass an empty list for reactions, as a new message has none.
-        ChatMessageDto dtoToSend = ChatMapper.toChatMessageDto(savedMessage, Collections.emptyList(), senderUsername, chatMessageDto.getClientTempId());
+        // ✅ FIXED: Use the 'chatMapper' instance, not the class
+        ChatMessageDto dtoToSend = chatMapper.toChatMessageDto(savedMessage, Collections.emptyList(), senderUsername, chatMessageDto.getClientTempId());
 
         String destination = "/topic/conversation/" + conversationId;
         messagingTemplate.convertAndSend(destination, dtoToSend);
 
-        // Notification logic remains the same
         Conversation fullConversation = conversationRepository.findByIdWithParticipantsAndUsers(conversationId)
-                .orElseThrow(() -> {
-            return new IllegalStateException("Conversation not found after sending message");
-        });
+                .orElseThrow(() -> new IllegalStateException("Conversation not found after sending message"));
         User author = savedMessage.getAuthor();
         List<User> recipients = fullConversation.getParticipants().stream()
                 .map(ConversationParticipant::getUser)
@@ -86,8 +84,7 @@ public class ChatService {
         if (!conversationRepository.existsById(conversationId)) {
             throw new ResourceNotFoundException("Conversation not found with id: " + conversationId);
         }
-        
-        // ✅ OPTIMIZED: Fetch all messages first, then fetch all their reactions in a single second query.
+
         List<Message> messages = messageRepository.findByConversation_ConversationIdOrderBySentAtAsc(conversationId);
         if (messages.isEmpty()) {
             return Collections.emptyList();
@@ -96,16 +93,14 @@ public class ChatService {
         List<Integer> messageIds = messages.stream().map(Message::getId).toList();
         List<Reaction> allReactions = reactionRepository.findByPost_IdIn(messageIds);
 
-        // Group reactions by their message ID for efficient lookup.
         Map<Integer, List<Reaction>> reactionsByMessageId = allReactions.stream()
-            .collect(Collectors.groupingBy(r -> r.getPost().getId()));
+                .collect(Collectors.groupingBy(r -> r.getPost().getId()));
 
-        // Map messages to DTOs, providing the correct list of reactions for each one.
         return messages.stream()
-                .map(message -> ChatMapper.toChatMessageDto(
-                    message,
-                    reactionsByMessageId.getOrDefault(message.getId(), Collections.emptyList()),
-                    currentUser.getUsername()
+                .map(message -> chatMapper.toChatMessageDto( // ✅ FIXED: Use the 'chatMapper' instance
+                        message,
+                        reactionsByMessageId.getOrDefault(message.getId(), Collections.emptyList()),
+                        currentUser.getUsername()
                 ))
                 .collect(Collectors.toList());
     }
@@ -117,9 +112,9 @@ public class ChatService {
         Message message = messageRepository.findById(messageId)
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
 
-        // ✅ UPDATED: Fetch reactions for the message and pass them to the mapper.
         List<Reaction> reactions = reactionRepository.findByPost_Id(messageId);
-        return ChatMapper.toChatMessageDto(message, reactions, currentUser.getUsername());
+        // ✅ FIXED: Use the 'chatMapper' instance
+        return chatMapper.toChatMessageDto(message, reactions, currentUser.getUsername());
     }
 
     @Transactional
@@ -132,11 +127,11 @@ public class ChatService {
         }
 
         message.setDeleted(true);
-        message.setBody(""); // Clear content
+        message.setBody("");
         messageRepository.save(message);
 
-        // ✅ UPDATED: Pass an empty list for reactions, as a deleted message has none.
-        ChatMessageDto deletedMessageDto = ChatMapper.toChatMessageDto(message, Collections.emptyList(), currentUsername);
+        // ✅ FIXED: Use the 'chatMapper' instance
+        ChatMessageDto deletedMessageDto = chatMapper.toChatMessageDto(message, Collections.emptyList(), currentUsername);
         String destination = "/topic/conversation/" + message.getConversation().getConversationId();
         messagingTemplate.convertAndSend(destination, deletedMessageDto);
     }
@@ -149,9 +144,9 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found: " + messageId));
 
         Optional<Reaction> existingReaction = reactionRepository.findByUser_UserIdAndPost_IdAndEmoji(
-            user.getUserId(),
-            messageId,
-            emoji
+                user.getUserId(),
+                messageId,
+                emoji
         );
 
         if (existingReaction.isPresent()) {
@@ -160,15 +155,16 @@ public class ChatService {
             MessageReaction newReaction = new MessageReaction(user, message, emoji);
             reactionRepository.save(newReaction);
         }
-        
+
         List<Reaction> updatedReactions = reactionRepository.findByPost_Id(messageId);
 
-        ChatMessageDto messageDto = ChatMapper.toChatMessageDto(message, updatedReactions, username);
+        // ✅ FIXED: Use the 'chatMapper' instance
+        ChatMessageDto messageDto = chatMapper.toChatMessageDto(message, updatedReactions, username);
         String destination = "/topic/conversation/" + message.getConversation().getConversationId();
         messagingTemplate.convertAndSend(destination, messageDto);
     }
-    
-    // --- Methods below this line did not require changes ---
+
+    // --- Methods below this line are unchanged ---
 
     @Transactional
     public Message saveMessageAndAttachments(
@@ -240,53 +236,50 @@ public class ChatService {
     }
 
     @Transactional
-public void markConversationAsRead(Integer conversationId, String username) {
-    User currentUser = userRepository.findByUsername(username)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
-    ConversationParticipant participant = conversationParticipantRepository
-            .findByUserUserIdAndConversationConversationId(currentUser.getUserId(), conversationId)
-            .orElseThrow(() -> new ResourceNotFoundException("Participant not found in conversation"));
+    public void markConversationAsRead(Integer conversationId, String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+        ConversationParticipant participant = conversationParticipantRepository
+                .findByUserUserIdAndConversationConversationId(currentUser.getUserId(), conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Participant not found in conversation"));
 
-    // ✅ FIX: Use Instant.now() to match the updated entity field type
-    participant.setLastReadTimestamp(Instant.now());
-    
-    conversationParticipantRepository.save(participant);
-}
+        participant.setLastReadTimestamp(Instant.now());
+
+        conversationParticipantRepository.save(participant);
+    }
 
     private ConversationSummaryDto mapToConversationSummaryDto(Conversation conv, User currentUser) {
-    User otherParticipant = conv.getParticipants().stream()
-            .map(ConversationParticipant::getUser)
-            .filter(user -> !user.getUserId().equals(currentUser.getUserId()))
-            .findFirst()
-            .orElse(null);
-    if (otherParticipant == null) return null;
+        User otherParticipant = conv.getParticipants().stream()
+                .map(ConversationParticipant::getUser)
+                .filter(user -> !user.getUserId().equals(currentUser.getUserId()))
+                .findFirst()
+                .orElse(null);
+        if (otherParticipant == null) return null;
 
-    Optional<Message> lastMessageOpt = messageRepository.findTopByConversation_ConversationIdOrderBySentAtDesc(conv.getConversationId());
+        Optional<Message> lastMessageOpt = messageRepository.findTopByConversation_ConversationIdOrderBySentAtDesc(conv.getConversationId());
 
-    // ✅ FIX: The local variable is now correctly typed as Instant
-    Instant lastReadTimestamp = conv.getParticipants().stream()
-            .filter(p -> p.getUser().getUserId().equals(currentUser.getUserId()))
-            .findFirst()
-            .map(ConversationParticipant::getLastReadTimestamp)
-            .orElse(null);
+        Instant lastReadTimestamp = conv.getParticipants().stream()
+                .filter(p -> p.getUser().getUserId().equals(currentUser.getUserId()))
+                .findFirst()
+                .map(ConversationParticipant::getLastReadTimestamp)
+                .orElse(null);
 
-    // ✅ FIX: The logic is simplified as both variables are now Instants
-    Instant sinceTimestamp = lastReadTimestamp != null ? lastReadTimestamp : conv.getCreatedAt();
+        Instant sinceTimestamp = lastReadTimestamp != null ? lastReadTimestamp : conv.getCreatedAt();
 
-    long unreadCount = messageRepository.countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
-            conv.getConversationId(),
-            currentUser.getUserId(),
-            sinceTimestamp
-    );
+        long unreadCount = messageRepository.countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
+                conv.getConversationId(),
+                currentUser.getUserId(),
+                sinceTimestamp
+        );
 
-    return ConversationSummaryDto.builder()
-            .conversationId(conv.getConversationId())
-            .participantId(otherParticipant.getUserId())
-            .participantName(otherParticipant.getUsername())
-            .participantAvatarUrl(otherParticipant.getProfilePhotoUrl())
-            .lastMessage(lastMessageOpt.map(Message::getBody).orElse("No messages yet..."))
-            .lastMessageTimestamp(lastMessageOpt.map(m -> m.getSentAt().toString()).orElse(conv.getCreatedAt().toString()))
-            .unreadCount(unreadCount)
-            .build();
-}
+        return ConversationSummaryDto.builder()
+                .conversationId(conv.getConversationId())
+                .participantId(otherParticipant.getUserId())
+                .participantName(otherParticipant.getUsername())
+                .participantAvatarUrl(otherParticipant.getProfilePhotoUrl())
+                .lastMessage(lastMessageOpt.map(Message::getBody).orElse("No messages yet..."))
+                .lastMessageTimestamp(lastMessageOpt.map(m -> m.getSentAt().toString()).orElse(conv.getCreatedAt().toString()))
+                .unreadCount(unreadCount)
+                .build();
+    }
 }

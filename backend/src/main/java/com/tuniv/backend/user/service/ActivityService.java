@@ -3,18 +3,19 @@ package com.tuniv.backend.user.service;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.tuniv.backend.qa.model.Answer;
-import com.tuniv.backend.qa.model.Comment;
 import com.tuniv.backend.qa.model.Post;
-import com.tuniv.backend.qa.model.Question;
-import com.tuniv.backend.qa.repository.AnswerRepository;
-import com.tuniv.backend.qa.repository.CommentRepository;
-import com.tuniv.backend.qa.repository.QuestionRepository;
+import com.tuniv.backend.qa.model.Reply;
+import com.tuniv.backend.qa.model.Topic;
+import com.tuniv.backend.qa.model.TopicType;
+
+import com.tuniv.backend.qa.repository.ReplyRepository;
+import com.tuniv.backend.qa.repository.TopicRepository;
 import com.tuniv.backend.qa.repository.VoteRepository;
 import com.tuniv.backend.user.dto.UserActivityItemDto;
 import com.tuniv.backend.user.dto.UserActivityItemDto.ActivityType;
@@ -25,51 +26,154 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ActivityService {
 
-    private final QuestionRepository questionRepository;
-    private final AnswerRepository answerRepository;
-    private final CommentRepository commentRepository;
-    private final VoteRepository voteRepository; // ✅ REPLACED 3 REPOS WITH 1
+    private final TopicRepository topicRepository;
+    private final ReplyRepository replyRepository;
+    private final VoteRepository voteRepository;
 
     @Transactional(readOnly = true)
     public List<UserActivityItemDto> getActivityForUser(Integer userId) {
-        // --- 1. Fetch all posts, accepted answers, and votes for the user ---
-        var questions = questionRepository.findByAuthor_UserIdOrderByCreatedAtDesc(userId);
-        var answers = answerRepository.findByAuthor_UserIdOrderByCreatedAtDesc(userId);
-        var comments = commentRepository.findByAuthor_UserIdOrderByCreatedAtDesc(userId);
-        var acceptedAnswers = answerRepository.findByQuestion_Author_UserIdAndIsSolutionTrueOrderByUpdatedAtDesc(userId);
-        // ✅ FETCH ALL VOTES IN A SINGLE CALL
+        // Fetch user activities
+        var topics = topicRepository.findByAuthor_UserIdOrderByCreatedAtDesc(userId);
+        var allReplies = replyRepository.findByAuthor_UserIdOrderByCreatedAtDesc(userId);
+        var acceptedSolutions = getAcceptedSolutionsByUser(userId);
         var votes = voteRepository.findByUser_UserIdOrderByCreatedAtDesc(userId);
 
-        // --- 2. Convert each list into a stream of standardized DTOs ---
-        Stream<UserActivityItemDto> questionActivities = questions.stream()
-                .map(q -> new UserActivityItemDto(ActivityType.QUESTION_ASKED, q.getCreatedAt(), q.getScore(), null, q.getId(), q.getTitle(), null, false, null));
+        // Separate answers from comments
+        var answers = allReplies.stream()
+                .filter(this::isAnswer)
+                .collect(Collectors.toList());
+        var comments = allReplies.stream()
+                .filter(this::isComment)
+                .collect(Collectors.toList());
+
+        // Convert to activity streams - FIXED CONSTRUCTOR CALLS
+        Stream<UserActivityItemDto> topicActivities = topics.stream()
+                .map(t -> new UserActivityItemDto(
+                    UserActivityItemDto.ActivityType.TOPIC_CREATED,
+                    t.getCreatedAt(), 
+                    t.getScore(), 
+                    null, // voteValue
+                    t.getId(), // questionId (topic ID)
+                    t.getTitle(), // questionTitle (topic title)
+                    null, // answerId
+                    t.isSolved(), // isSolution
+                    null  // commentId
+                ));
 
         Stream<UserActivityItemDto> answerActivities = answers.stream()
-                .map(a -> new UserActivityItemDto(ActivityType.ANSWER_POSTED, a.getCreatedAt(), a.getScore(), null, a.getQuestion().getId(), a.getQuestion().getTitle(), a.getId(), a.getIsSolution(), null));
+                .map(a -> new UserActivityItemDto(
+                    UserActivityItemDto.ActivityType.ANSWER_POSTED,
+                    a.getCreatedAt(), 
+                    a.getScore(), 
+                    null, // voteValue
+                    a.getTopic().getId(), // questionId
+                    a.getTopic().getTitle(), // questionTitle
+                    a.getId(), // answerId
+                    isReplyAccepted(a), // isSolution
+                    null  // commentId
+                ));
 
         Stream<UserActivityItemDto> commentActivities = comments.stream()
-                .map(c -> new UserActivityItemDto(ActivityType.COMMENT_POSTED, c.getCreatedAt(), c.getScore(), null, c.getAnswer().getQuestion().getId(), c.getAnswer().getQuestion().getTitle(), c.getAnswer().getId(), false, c.getId()));
+                .map(c -> new UserActivityItemDto(
+                    UserActivityItemDto.ActivityType.COMMENT_POSTED,
+                    c.getCreatedAt(), 
+                    c.getScore(), 
+                    null, // voteValue
+                    c.getTopic().getId(), // questionId
+                    c.getTopic().getTitle(), // questionTitle
+                    null, // answerId
+                    false, // isSolution (comments can't be solutions)
+                    c.getId()  // commentId
+                ));
 
-        Stream<UserActivityItemDto> acceptedAnswerActivities = acceptedAnswers.stream()
-                .map(a -> new UserActivityItemDto(ActivityType.ACCEPTED_AN_ANSWER, a.getUpdatedAt(), a.getScore(), null, a.getQuestion().getId(), a.getQuestion().getTitle(), a.getId(), true, null));
+        Stream<UserActivityItemDto> acceptedSolutionActivities = acceptedSolutions.stream()
+                .map(r -> new UserActivityItemDto(
+                    UserActivityItemDto.ActivityType.SOLUTION_ACCEPTED,
+                    r.getTopic().getCreatedAt(), // or r.getCreatedAt()?
+                    r.getScore(), 
+                    null, // voteValue
+                    r.getTopic().getId(), // questionId
+                    r.getTopic().getTitle(), // questionTitle
+                    r.getId(), // answerId
+                    true, // isSolution
+                    null  // commentId
+                ));
 
-        // ✅ NEW LOGIC: Map the single stream of votes, checking the type of post
+        // Map votes - FIXED CONSTRUCTOR CALLS
         Stream<UserActivityItemDto> voteActivities = votes.stream().map(vote -> {
             Post post = vote.getPost();
-            if (post instanceof Question q) {
-                return new UserActivityItemDto(ActivityType.VOTE_CAST, vote.getCreatedAt(), q.getScore(), (int) vote.getValue(), q.getId(), q.getTitle(), null, false, null);
-            } else if (post instanceof Answer a) {
-                return new UserActivityItemDto(ActivityType.VOTE_CAST, vote.getCreatedAt(), a.getScore(), (int) vote.getValue(), a.getQuestion().getId(), a.getQuestion().getTitle(), a.getId(), a.getIsSolution(), null);
-            } else if (post instanceof Comment c) {
-                return new UserActivityItemDto(ActivityType.VOTE_CAST, vote.getCreatedAt(), c.getScore(), (int) vote.getValue(), c.getAnswer().getQuestion().getId(), c.getAnswer().getQuestion().getTitle(), c.getAnswer().getId(), false, c.getId());
+            
+            if (post instanceof Topic topic) {
+                return new UserActivityItemDto(
+                    UserActivityItemDto.ActivityType.VOTE_CAST, 
+                    vote.getCreatedAt(), 
+                    topic.getScore(), 
+                    (int) vote.getValue(), // voteValue
+                    topic.getId(), // questionId
+                    topic.getTitle(), // questionTitle
+                    null, // answerId
+                    topic.isSolved(), // isSolution
+                    null  // commentId
+                );
+            } else if (post instanceof Reply reply) {
+                // Determine if it's an answer or comment vote
+                if (isAnswer(reply)) {
+                    return new UserActivityItemDto(
+                        UserActivityItemDto.ActivityType.VOTE_CAST, 
+                        vote.getCreatedAt(), 
+                        reply.getScore(), 
+                        (int) vote.getValue(), // voteValue
+                        reply.getTopic().getId(), // questionId
+                        reply.getTopic().getTitle(), // questionTitle
+                        reply.getId(), // answerId
+                        isReplyAccepted(reply), // isSolution
+                        null  // commentId
+                    );
+                } else {
+                    return new UserActivityItemDto(
+                        UserActivityItemDto.ActivityType.VOTE_CAST, 
+                        vote.getCreatedAt(), 
+                        reply.getScore(), 
+                        (int) vote.getValue(), // voteValue
+                        reply.getTopic().getId(), // questionId
+                        reply.getTopic().getTitle(), // questionTitle
+                        null, // answerId
+                        false, // isSolution (comments can't be solutions)
+                        reply.getId()  // commentId
+                    );
+                }
             }
-            return null; // Should not happen
+            return null;
         }).filter(Objects::nonNull);
 
-        // --- 3. Combine all streams, sort by date, and collect into a list ---
-        return Stream.of(questionActivities, answerActivities, commentActivities, acceptedAnswerActivities, voteActivities)
+        // Combine and return
+        return Stream.of(topicActivities, answerActivities, commentActivities, acceptedSolutionActivities, voteActivities)
                 .flatMap(s -> s)
                 .sorted(Comparator.comparing(UserActivityItemDto::createdAt).reversed())
                 .toList();
+    }
+
+    // ... helper methods remain the same ...
+    private boolean isAnswer(Reply reply) {
+        return reply.getTopic().getTopicType() == TopicType.QUESTION && 
+               reply.getParentReply() == null;
+    }
+
+    private boolean isComment(Reply reply) {
+        return reply.getTopic().getTopicType() == TopicType.POST || 
+               reply.getParentReply() != null;
+    }
+
+    private List<Reply> getAcceptedSolutionsByUser(Integer userId) {
+        List<Topic> topicsWithUserSolutions = topicRepository.findByAcceptedSolution_Author_UserId(userId);
+        return topicsWithUserSolutions.stream()
+                .map(Topic::getAcceptedSolution)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    private boolean isReplyAccepted(Reply reply) {
+        return reply.getTopic().getAcceptedSolution() != null && 
+               reply.getTopic().getAcceptedSolution().getId().equals(reply.getId());
     }
 }

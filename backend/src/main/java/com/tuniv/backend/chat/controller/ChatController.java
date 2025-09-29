@@ -36,53 +36,115 @@ import lombok.RequiredArgsConstructor;
 public class ChatController {
 
     private final ChatService chatService;
+    private final ChatMapper chatMapper; // Injected for use in the REST endpoint
 
-    // WebSocket endpoint for sending a text-only message
+    /**
+     * WebSocket endpoint for sending a message. This is typically used for text-only messages
+     * sent from an active WebSocket session. The service handles broadcasting the message.
+     *
+     * @param conversationId The ID of the conversation to send the message to.
+     * @param chatMessageDto The message payload.
+     * @param principal      The currently authenticated user.
+     */
     @MessageMapping("/chat/{conversationId}/sendMessage")
     public void sendMessage(
             @DestinationVariable Integer conversationId,
             @Payload ChatMessageDto chatMessageDto,
             Principal principal
     ) {
+        // Files are null here as this is a text-only WebSocket endpoint
         chatService.sendMessage(conversationId, chatMessageDto, principal.getName(), null);
     }
 
-    // REST endpoint for sending a message with optional files
+    /**
+     * REST endpoint for sending a message, with optional file attachments.
+     * This is ideal for form submissions that include both text and files.
+     *
+     * @param conversationId The ID of the conversation.
+     * @param chatMessageDto The DTO containing message content.
+     * @param files          A list of optional file attachments.
+     * @return A ResponseEntity containing the DTO of the saved message.
+     */
     @PostMapping(value = "/api/v1/chat/{conversationId}/message", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE})
-public ResponseEntity<ChatMessageDto> sendMessageWithAttachment(
-        @PathVariable Integer conversationId,
-        @RequestPart("message") @Valid ChatMessageDto chatMessageDto,
-        @RequestPart(value = "files", required = false) List<MultipartFile> files
-) {
-    UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    Message finalMessage = chatService.sendMessage(conversationId, chatMessageDto, currentUser.getUsername(), files);
+    public ResponseEntity<ChatMessageDto> sendMessageWithAttachment(
+            @PathVariable Integer conversationId,
+            @RequestPart("message") @Valid ChatMessageDto chatMessageDto,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files
+    ) {
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Message savedMessage = chatService.sendMessage(conversationId, chatMessageDto, currentUser.getUsername(), files);
 
-    // ✅ FIX: Provide all required arguments, including the (empty) list of reactions.
-    ChatMessageDto responseDto = ChatMapper.toChatMessageDto(
-        finalMessage,
-        Collections.emptyList(), // A new message has no reactions
-        currentUser.getUsername(),
-        chatMessageDto.getClientTempId()
-    );
-    
-    return ResponseEntity.ok(responseDto);
-}
+        // Map the saved entity back to a DTO for the HTTP response.
+        // This confirms to the client what was saved and includes the server-generated ID and timestamp.
+        ChatMessageDto responseDto = chatMapper.toChatMessageDto(
+                savedMessage,
+                Collections.emptyList(), // A new message has no reactions yet
+                currentUser.getUsername(),
+                chatMessageDto.getClientTempId() // Include the temporary client ID for reconciliation
+        );
 
-    // --- All other methods below are correct and do not need changes ---
+        return ResponseEntity.ok(responseDto);
+    }
 
-    // REST endpoint for fetching message history
+    /**
+     * REST endpoint to fetch the message history for a specific conversation.
+     *
+     * @param conversationId The ID of the conversation.
+     * @return A list of message DTOs.
+     */
     @GetMapping("/api/v1/chat/{conversationId}/messages")
     public ResponseEntity<List<ChatMessageDto>> getMessageHistory(@PathVariable Integer conversationId) {
-        return ResponseEntity.ok(chatService.getMessagesByConversation(conversationId));
+        List<ChatMessageDto> messages = chatService.getMessagesByConversation(conversationId);
+        return ResponseEntity.ok(messages);
     }
 
-    // REST endpoint for fetching a single message
+    /**
+     * REST endpoint to fetch a single message by its ID.
+     *
+     * @param messageId The ID of the message.
+     * @return The message DTO.
+     */
     @GetMapping("/api/v1/messages/{messageId}")
     public ResponseEntity<ChatMessageDto> getSingleMessage(@PathVariable Integer messageId) {
-        return ResponseEntity.ok(chatService.getSingleMessageById(messageId));
+        ChatMessageDto message = chatService.getSingleMessageById(messageId);
+        return ResponseEntity.ok(message);
     }
 
-    // REST endpoint for fetching all conversation summaries for the current user
+    /**
+     * REST endpoint to delete a message. The service layer handles authorization.
+     *
+     * @param messageId The ID of the message to delete.
+     * @return A ResponseEntity with no content.
+     */
+    @DeleteMapping("/api/v1/messages/{messageId}")
+    public ResponseEntity<Void> deleteMessage(@PathVariable Integer messageId) {
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        chatService.deleteMessage(messageId, currentUser.getUsername());
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * REST endpoint to add or remove a reaction from a message.
+     *
+     * @param messageId       The ID of the message to react to.
+     * @param reactionRequest DTO containing the emoji for the reaction.
+     * @return A ResponseEntity indicating success.
+     */
+    @PostMapping("/api/v1/messages/{messageId}/reactions")
+    public ResponseEntity<Void> toggleReaction(
+            @PathVariable Integer messageId,
+            @RequestBody @Valid ReactionRequestDto reactionRequest
+    ) {
+        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        chatService.toggleReaction(messageId, reactionRequest.getEmoji(), currentUser.getUsername());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * REST endpoint to get all conversation summaries for the currently authenticated user.
+     *
+     * @return A list of conversation summaries.
+     */
     @GetMapping("/api/v1/chat/conversations")
     public ResponseEntity<List<ConversationSummaryDto>> getConversationsForCurrentUser() {
         UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -90,10 +152,15 @@ public ResponseEntity<ChatMessageDto> sendMessageWithAttachment(
         return ResponseEntity.ok(summaries);
     }
 
-    // REST endpoint for finding or creating a conversation
+    /**
+     * REST endpoint to find an existing conversation with another user or create a new one.
+     *
+     * @param requestDto DTO containing the ID of the other participant.
+     * @return The conversation summary DTO.
+     */
     @PostMapping("/api/v1/chat/conversations")
     public ResponseEntity<ConversationSummaryDto> findOrCreateConversation(
-            @Valid @RequestBody StartConversationRequestDto requestDto
+            @RequestBody @Valid StartConversationRequestDto requestDto
     ) {
         UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         ConversationSummaryDto summary = chatService.findOrCreateConversation(
@@ -103,29 +170,16 @@ public ResponseEntity<ChatMessageDto> sendMessageWithAttachment(
         return ResponseEntity.ok(summary);
     }
 
-    // REST endpoint for marking a conversation as read
+    /**
+     * REST endpoint to mark all messages in a conversation as read for the current user.
+     *
+     * @param conversationId The ID of the conversation to mark as read.
+     * @return A ResponseEntity indicating success.
+     */
     @PostMapping("/api/v1/chat/conversations/{conversationId}/read")
     public ResponseEntity<Void> markAsRead(@PathVariable Integer conversationId) {
         UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         chatService.markConversationAsRead(conversationId, currentUser.getUsername());
         return ResponseEntity.ok().build();
     }
-
-    @DeleteMapping("/api/v1/messages/{messageId}")
-    public ResponseEntity<Void> deleteMessage(@PathVariable Integer messageId) {
-        UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        chatService.deleteMessage(messageId, currentUser.getUsername());
-        return ResponseEntity.noContent().build();
-    }
-    @PostMapping("/api/v1/messages/{messageId}/reactions")
-public ResponseEntity<Void> toggleReaction(
-        @PathVariable Integer messageId,
-        // ✅ Use the new DTO
-        @RequestBody ReactionRequestDto reactionRequest
-) {
-    UserDetailsImpl currentUser = (UserDetailsImpl) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-    // You can now add validation (e.g., @NotNull) to the DTO
-    chatService.toggleReaction(messageId, reactionRequest.getEmoji(), currentUser.getUsername());
-    return ResponseEntity.ok().build();
-}
 }

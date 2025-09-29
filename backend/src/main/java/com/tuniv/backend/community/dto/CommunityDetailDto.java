@@ -9,10 +9,10 @@ public record CommunityDetailDto(
     String name,
     String description,
     Integer memberCount,
-    Integer questionCount, // ✅ Added
+    Integer topicCount, // ✅ UPDATED: questionCount → topicCount
     Instant createdAt,
     UserSummaryDto creator,
     String universityName,
-    boolean isCurrentUserMember,
-    boolean isCurrentUserModerator
+    boolean isMember,
+    boolean isModerator
 ) {}

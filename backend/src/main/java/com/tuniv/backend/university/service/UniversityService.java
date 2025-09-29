@@ -15,13 +15,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.notification.event.UserJoinedUniversityEvent;
+import com.tuniv.backend.qa.dto.TopicSummaryDto;
+import com.tuniv.backend.qa.repository.TopicRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.university.dto.UniversityDto;
 import com.tuniv.backend.university.mapper.UniversityMapper;
-import com.tuniv.backend.university.model.University; // <-- IMPORT ADDED
+import com.tuniv.backend.university.model.Module; // <-- IMPORT ADDED
+import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.university.model.UniversityMembership;
 import com.tuniv.backend.university.model.UniversitySpecification;
 import com.tuniv.backend.university.model.UserRoleEnum;
+import com.tuniv.backend.university.repository.ModuleRepository;
 import com.tuniv.backend.university.repository.UniversityMembershipRepository;
 import com.tuniv.backend.university.repository.UniversityRepository;
 import com.tuniv.backend.user.model.User;
@@ -35,8 +39,11 @@ public class UniversityService {
 
     private final UniversityRepository universityRepository;
     private final UserRepository userRepository;
+    private final ModuleRepository moduleRepository;
     private final UniversityMembershipRepository membershipRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final TopicRepository topicRepository; // ✅ ADDED: For topic operations
+
 
 
     @Transactional(readOnly = true)
@@ -150,5 +157,43 @@ public class UniversityService {
                         memberUniversityIds.contains(university.getUniversityId())
                 ))
                 .collect(Collectors.toList());
+    }
+
+    // ✅ NEW: Get topics by university
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getTopicsByUniversity(Integer universityId, Pageable pageable, UserDetailsImpl currentUser) {
+        if (!universityRepository.existsById(universityId)) {
+            throw new ResourceNotFoundException("University not found with id: " + universityId);
+        }
+        
+        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
+        
+        // Get all module IDs for this university
+        List<Integer> moduleIds = moduleRepository.findByUniversityUniversityId(universityId)
+                .stream()
+                .map(Module::getModuleId)
+                .collect(Collectors.toList());
+        
+        if (moduleIds.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        
+        return topicRepository.findTopicSummariesByModuleIdIn(moduleIds, currentUserId, pageable);
+    }
+
+    // ✅ NEW: Update university topic count when a topic is created/deleted in its modules
+    @Transactional
+    public void updateUniversityTopicCount(Integer universityId) {
+        University university = universityRepository.findById(universityId)
+                .orElseThrow(() -> new ResourceNotFoundException("University not found"));
+        
+        // Calculate total topics across all modules
+        int totalTopics = moduleRepository.findByUniversityUniversityId(universityId)
+                .stream()
+                .mapToInt(Module::getTopicCount)
+                .sum();
+        
+        university.setTopicCount(totalTopics);
+        universityRepository.save(university);
     }
 }

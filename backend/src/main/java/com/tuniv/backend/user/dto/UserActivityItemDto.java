@@ -17,10 +17,10 @@ public record UserActivityItemDto(
     Integer commentId
 ) {
     public enum ActivityType {
-        QUESTION_ASKED,
-        ANSWER_POSTED,
-        COMMENT_POSTED,
-        ACCEPTED_AN_ANSWER,
-        VOTE_CAST
+        TOPIC_CREATED,      // User created a topic
+    ANSWER_POSTED,      // User posted an answer (reply on QUESTION topic)
+    COMMENT_POSTED,     // User posted a comment (reply on POST topic or nested reply)
+    SOLUTION_ACCEPTED,  // User's answer was accepted as solution
+    VOTE_CAST          // User voted on something
     }
 }

@@ -33,5 +33,5 @@ public class Tag {
     
     // The 'mappedBy' value must match the field name in the Question entity
     @ManyToMany(mappedBy = "tags")
-    private Set<Question> questions = new HashSet<>();
+    private Set<Topic> topics = new HashSet<>();
 }

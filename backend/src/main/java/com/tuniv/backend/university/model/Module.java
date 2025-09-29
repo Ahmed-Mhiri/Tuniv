@@ -1,10 +1,11 @@
 package com.tuniv.backend.university.model;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
-import com.tuniv.backend.qa.model.Question;
+import com.tuniv.backend.qa.model.Topic;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -25,6 +26,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class Module {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer moduleId;
@@ -32,34 +34,25 @@ public class Module {
     @Column(nullable = false)
     private String name;
 
-    // ✅ NEW: Denormalized question count for performance
-    @Column(name = "question_count", nullable = false)
-    private int questionCount = 0;
+    // ✅ MODIFIED: Renamed from question_count to topic_count
+    @Column(name = "topic_count", nullable = false)
+    private int topicCount = 0;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id", nullable = false)
     @JsonBackReference("university-modules")
     private University university;
 
+    // ✅ MODIFIED: Relationship now points to Topic
     @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference("module-questions")
-    private Set<Question> questions;
+    private Set<Topic> topics = new HashSet<>();
 
-    // ✅ Helper method to increment question count
-    public void incrementQuestionCount() {
-        this.questionCount++;
-        // Also update parent university count
-        if (this.university != null) {
-            this.university.incrementQuestionCount();
-        }
+    // ✅ MODIFIED: Helper methods updated for topicCount
+    public void incrementTopicCount() {
+        this.topicCount++;
     }
 
-    // ✅ Helper method to decrement question count
-    public void decrementQuestionCount() {
-        this.questionCount = Math.max(0, this.questionCount - 1);
-        // Also update parent university count
-        if (this.university != null) {
-            this.university.decrementQuestionCount();
-        }
+    public void decrementTopicCount() {
+        this.topicCount = Math.max(0, this.topicCount - 1);
     }
 }

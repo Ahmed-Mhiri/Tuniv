@@ -29,21 +29,15 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "posts", indexes = {
-    @Index(name = "idx_posts_score", columnList = "score") // Add index for fast sorting
+    // This index will live on the 'posts' table.
+    // Rows for non-votable posts (like Message) will have NULL in the score column.
+    @Index(name = "idx_posts_score", columnList = "score") 
 })
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "post_type", discriminatorType = DiscriminatorType.STRING)
 @Getter
 @Setter
 public abstract class Post {
-
-    public enum PostType {
-        QUESTION,
-        ANSWER,
-        COMMENT,
-        MESSAGE
-    }
-
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -52,7 +46,7 @@ public abstract class Post {
     @Column(columnDefinition = "TEXT")
     private String body;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
     private User author;
 

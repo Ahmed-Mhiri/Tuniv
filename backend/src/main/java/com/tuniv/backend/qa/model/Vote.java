@@ -36,16 +36,12 @@ public abstract class Vote {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    /**
-     * This is the polymorphic association to the Post base class.
-     * It allows a vote to be associated with a Question, Answer, or Comment.
-     */
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "post_id", nullable = false)
     private Post post;
 
     @Column(nullable = false)
-    private short value;
+    private short value; // e.g., +1 or -1
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt = Instant.now();

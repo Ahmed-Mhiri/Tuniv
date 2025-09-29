@@ -17,6 +17,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import com.tuniv.backend.chat.model.Message;
+import com.tuniv.backend.chat.model.MessageReaction;
 import com.tuniv.backend.community.model.Community;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.follow.model.Follow;
@@ -24,21 +25,25 @@ import com.tuniv.backend.follow.model.FollowableType;
 import com.tuniv.backend.follow.repository.FollowRepository;
 import com.tuniv.backend.notification.dto.NotificationDto;
 import com.tuniv.backend.notification.event.NewAnswerEvent;
+import com.tuniv.backend.notification.event.NewChatMessageReactionEvent;
 import com.tuniv.backend.notification.event.NewCommentEvent;
 import com.tuniv.backend.notification.event.NewFollowerEvent;
 import com.tuniv.backend.notification.event.NewMessageEvent;
-import com.tuniv.backend.notification.event.NewQuestionEvent;
-import com.tuniv.backend.notification.event.NewQuestionInUniversityEvent;
+import com.tuniv.backend.notification.event.NewTopicEvent;
 import com.tuniv.backend.notification.event.NewVoteEvent;
-import com.tuniv.backend.notification.event.SolutionMarkedEvent;
+import com.tuniv.backend.notification.event.SolutionAcceptedEvent;
+import com.tuniv.backend.notification.event.SolutionUnmarkedEvent;
 import com.tuniv.backend.notification.event.UserJoinedUniversityEvent;
 import com.tuniv.backend.notification.mapper.NotificationMapper;
 import com.tuniv.backend.notification.model.Notification;
 import com.tuniv.backend.notification.model.NotificationType;
 import com.tuniv.backend.notification.repository.NotificationRepository;
-import com.tuniv.backend.qa.model.Question;
-import com.tuniv.backend.university.model.Module;
+import com.tuniv.backend.qa.model.PostType;
+import com.tuniv.backend.qa.model.Reply;
+import com.tuniv.backend.qa.model.Topic;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
+import com.tuniv.backend.university.model.Module;
+import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
 
@@ -66,7 +71,7 @@ public class NotificationService {
         return text.length() <= maxLength ? text : text.substring(0, maxLength) + "...";
     }
 
-    // ✅ NEW: Handle when someone follows you
+    // ✅ UPDATED: Handle when someone follows you
     @Async
     @EventListener
     public void handleNewFollower(NewFollowerEvent event) {
@@ -81,20 +86,20 @@ public class NotificationService {
         createNotificationAndSendEmail(followedUser, follower, NotificationType.NEW_FOLLOWER, message, link);
     }
 
-    // ✅ NEW: Handle new question from followed user
+    // ✅ UPDATED: Handle new topic from followed user
     @Async
     @EventListener
-    public void handleNewQuestionFromFollowedUser(NewQuestionEvent event) {
-        Question question = event.getQuestion();
-        User author = question.getAuthor();
+    public void handleNewTopicFromFollowedUser(NewTopicEvent event) {
+        Topic topic = event.getTopic();
+        User author = topic.getAuthor();
         
         // Get all users who follow this author
         List<Follow> followers = followRepository.findByTargetTypeAndTargetId(
             FollowableType.USER, author.getUserId()
         );
         
-        String message = author.getUsername() + " asked a new question: \"" + truncate(question.getTitle(), 30) + "\"";
-        String link = "/questions/" + question.getId();
+        String message = author.getUsername() + " created a new " + topic.getTopicType().toString().toLowerCase() + ": \"" + truncate(topic.getTitle(), 30) + "\"";
+        String link = "/topics/" + topic.getId();
         
         followers.forEach(follow -> {
             User recipient = follow.getUser();
@@ -104,23 +109,23 @@ public class NotificationService {
         });
     }
 
-    // ✅ NEW: Handle new question in followed community
+    // ✅ UPDATED: Handle new topic in followed community
     @Async
     @EventListener
-    public void handleNewQuestionInFollowedCommunity(NewQuestionEvent event) {
-        Question question = event.getQuestion();
-        if (question.getCommunity() == null) return;
+    public void handleNewTopicInFollowedCommunity(NewTopicEvent event) {
+        Topic topic = event.getTopic();
+        if (topic.getCommunity() == null) return;
         
-        Community community = question.getCommunity();
-        User author = question.getAuthor();
+        Community community = topic.getCommunity();
+        User author = topic.getAuthor();
         
         // Get all users who follow this community
         List<Follow> followers = followRepository.findByTargetTypeAndTargetId(
             FollowableType.COMMUNITY, community.getCommunityId()
         );
         
-        String message = "New question in " + community.getName() + ": \"" + truncate(question.getTitle(), 30) + "\"";
-        String link = "/questions/" + question.getId();
+        String message = "New " + topic.getTopicType().toString().toLowerCase() + " in " + community.getName() + ": \"" + truncate(topic.getTitle(), 30) + "\"";
+        String link = "/topics/" + topic.getId();
         
         followers.forEach(follow -> {
             User recipient = follow.getUser();
@@ -130,23 +135,23 @@ public class NotificationService {
         });
     }
 
-    // ✅ NEW: Handle new question in followed module
+    // ✅ UPDATED: Handle new topic in followed module
     @Async
     @EventListener
-    public void handleNewQuestionInFollowedModule(NewQuestionEvent event) {
-        Question question = event.getQuestion();
-        if (question.getModule() == null) return;
+    public void handleNewTopicInFollowedModule(NewTopicEvent event) {
+        Topic topic = event.getTopic();
+        if (topic.getModule() == null) return;
         
-        Module module = question.getModule();
-        User author = question.getAuthor();
+        Module module = topic.getModule();
+        User author = topic.getAuthor();
         
         // Get all users who follow this module
         List<Follow> followers = followRepository.findByTargetTypeAndTargetId(
             FollowableType.MODULE, module.getModuleId()
         );
         
-        String message = "New question in " + module.getName() + ": \"" + truncate(question.getTitle(), 30) + "\"";
-        String link = "/questions/" + question.getId();
+        String message = "New " + topic.getTopicType().toString().toLowerCase() + " in " + module.getName() + ": \"" + truncate(topic.getTitle(), 30) + "\"";
+        String link = "/topics/" + topic.getId();
         
         followers.forEach(follow -> {
             User recipient = follow.getUser();
@@ -156,21 +161,21 @@ public class NotificationService {
         });
     }
 
-    // ✅ NEW: Handle new question with followed tag
+    // ✅ UPDATED: Handle new topic with followed tag
     @Async
     @EventListener
-    public void handleNewQuestionWithFollowedTag(NewQuestionEvent event) {
-        Question question = event.getQuestion();
-        User author = question.getAuthor();
+    public void handleNewTopicWithFollowedTag(NewTopicEvent event) {
+        Topic topic = event.getTopic();
+        User author = topic.getAuthor();
         
-        // For each tag in the question, notify users who follow that tag
-        question.getTags().forEach(tag -> {
+        // For each tag in the topic, notify users who follow that tag
+        topic.getTags().forEach(tag -> {
             List<Follow> followers = followRepository.findByTargetTypeAndTargetId(
                 FollowableType.TAG, tag.getId()
             );
             
-            String message = "New question with tag #" + tag.getName() + ": \"" + truncate(question.getTitle(), 30) + "\"";
-            String link = "/questions/" + question.getId();
+            String message = "New " + topic.getTopicType().toString().toLowerCase() + " with tag #" + tag.getName() + ": \"" + truncate(topic.getTitle(), 30) + "\"";
+            String link = "/topics/" + topic.getId();
             
             followers.forEach(follow -> {
                 User recipient = follow.getUser();
@@ -181,90 +186,128 @@ public class NotificationService {
         });
     }
 
+    // ✅ UPDATED: Handle new answer (reply on QUESTION topic)
     @Async
     @EventListener
     public void handleNewAnswer(NewAnswerEvent event) {
-        var answer = event.getAnswer();
-        var actor = answer.getAuthor();
-        var recipient = answer.getQuestion().getAuthor();
+        Reply answer = event.getAnswer();
+        User actor = answer.getAuthor();
+        User recipient = answer.getTopic().getAuthor();
+        
         if (actor.equals(recipient)) return;
-        var message = actor.getUsername() + " answered your question: \"" + truncate(answer.getQuestion().getTitle(), 40) + "\"";
-        var link = "/questions/" + answer.getQuestion().getId() + "?answerId=" + answer.getId();
+        
+        String message = actor.getUsername() + " answered your " + answer.getTopic().getTopicType().toString().toLowerCase() + ": \"" + truncate(answer.getTopic().getTitle(), 40) + "\"";
+        String link = "/topics/" + answer.getTopic().getId() + "?replyId=" + answer.getId();
+        
         createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_ANSWER, message, link);
     }
 
+    // ✅ NEW: Handle new comment (reply on POST topic or nested reply)
     @Async
     @EventListener
     public void handleNewComment(NewCommentEvent event) {
-        var comment = event.getComment();
-        var actor = comment.getAuthor();
-        var answer = comment.getAnswer();
-        var question = answer.getQuestion();
+        Reply comment = event.getComment();
+        User actor = comment.getAuthor();
+        Topic topic = comment.getTopic();
 
-        if (comment.getParentComment() != null) {
-            var recipient = comment.getParentComment().getAuthor();
+        if (comment.getParentReply() != null) {
+            // This is a reply to another comment
+            User recipient = comment.getParentReply().getAuthor();
             if (actor.equals(recipient)) return;
-            var message = actor.getUsername() + " replied to your comment.";
-            var link = "/questions/" + question.getId() + "?commentId=" + comment.getId() + "#comment-" + comment.getId();
+            
+            String message = actor.getUsername() + " replied to your comment on: \"" + truncate(topic.getTitle(), 30) + "\"";
+            String link = "/topics/" + topic.getId() + "?commentId=" + comment.getId() + "#comment-" + comment.getId();
+            
             createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_REPLY_TO_COMMENT, message, link);
         } else {
-            var recipient = answer.getAuthor();
+            // This is a comment on a POST topic
+            User recipient = topic.getAuthor();
             if (actor.equals(recipient)) return;
-            var message = actor.getUsername() + " commented on your answer for \"" + truncate(question.getTitle(), 30) + "\".";
-            var link = "/questions/" + question.getId() + "?answerId=" + answer.getId() + "#comment-" + comment.getId();
+            
+            String message = actor.getUsername() + " commented on your " + topic.getTopicType().toString().toLowerCase() + ": \"" + truncate(topic.getTitle(), 30) + "\"";
+            String link = "/topics/" + topic.getId() + "?commentId=" + comment.getId() + "#comment-" + comment.getId();
+            
             createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_COMMENT_ON_ANSWER, message, link);
         }
     }
 
+    // ✅ UPDATED: Handle new vote
     @Async
     @EventListener
     public void handleNewVote(NewVoteEvent event) {
         userRepository.findById(event.getAuthorId()).ifPresent(recipient -> {
             userRepository.findById(event.getVoterId()).ifPresent(actor -> {
                 if (actor.equals(recipient)) return;
-                String message = actor.getUsername() + " upvoted your " + event.getPostType().toString().toLowerCase() + ".";
-                String link = "/questions/" + event.getQuestionId();
-                NotificationType type;
-                switch (event.getPostType()) {
-                    case QUESTION: type = NotificationType.NEW_VOTE_ON_QUESTION; break;
-                    case ANSWER: type = NotificationType.NEW_VOTE_ON_ANSWER; break;
-                    case COMMENT: type = NotificationType.NEW_VOTE_ON_COMMENT; break;
-                    default: return;
+                
+                String postType = getPostTypeDescription(event.getPostType());
+                String message = actor.getUsername() + " upvoted your " + postType + " on: \"" + truncate(event.getQuestionTitle(), 30) + "\"";
+                String link = "/topics/" + event.getQuestionId();
+                
+                NotificationType type = getVoteNotificationType(event.getPostType());
+                if (type != null) {
+                    createNotificationAndSendEmail(recipient, actor, type, message, link);
                 }
-                createNotificationAndSendEmail(recipient, actor, type, message, link);
             });
         });
     }
 
+    // ✅ UPDATED: Handle solution marked
     @Async
     @EventListener
-    public void handleSolutionMarked(SolutionMarkedEvent event) {
-        var answer = event.getAnswer();
-        var recipient = answer.getAuthor();
-        var actor = answer.getQuestion().getAuthor();
+    public void handleSolutionMarked(SolutionAcceptedEvent event) {
+        Reply solution = event.getSolution();
+        User recipient = solution.getAuthor();
+        User actor = solution.getTopic().getAuthor();
+        
         if (actor.equals(recipient)) return;
-        var message = "Your answer to \"" + truncate(answer.getQuestion().getTitle(), 30) + "\" was marked as the solution!";
-        var link = "/questions/" + answer.getQuestion().getId() + "?answerId=" + answer.getId();
+        
+        String message = "Your answer to \"" + truncate(solution.getTopic().getTitle(), 30) + "\" was marked as the solution!";
+        String link = "/topics/" + solution.getTopic().getId() + "?solutionId=" + solution.getId();
+        
         createNotificationAndSendEmail(recipient, actor, NotificationType.ANSWER_MARKED_AS_SOLUTION, message, link);
     }
 
+    // ✅ NEW: Handle solution unmarked
     @Async
     @EventListener
-    public void handleNewQuestion(NewQuestionInUniversityEvent event) {
-        var question = event.getQuestion();
-        var actor = question.getAuthor();
-        var university = question.getModule().getUniversity();
+    public void handleSolutionUnmarked(SolutionUnmarkedEvent event) {
+        Reply previousSolution = event.getPreviousSolution();
+        User recipient = previousSolution.getAuthor();
+        User actor = event.getTopic().getAuthor();
+        
+        if (actor.equals(recipient)) return;
+        
+        String message = "Your solution to \"" + truncate(event.getTopic().getTitle(), 30) + "\" was unmarked";
+        String link = "/topics/" + event.getTopic().getId();
+        
+        // You might want to create a new NotificationType for this, or use existing
+        createNotificationAndSendEmail(recipient, actor, NotificationType.ANSWER_MARKED_AS_SOLUTION, message, link);
+    }
+
+    // ✅ UPDATED: Handle new topic in university
+    @Async
+    @EventListener
+    public void handleNewTopicInUniversity(NewTopicEvent event) {
+        Topic topic = event.getTopic();
+        User actor = topic.getAuthor();
+        
+        if (topic.getModule() == null || topic.getModule().getUniversity() == null) return;
+        
+        University university = topic.getModule().getUniversity();
         List<User> recipients = userRepository.findAllMembersOfUniversityExcludingAuthor(
                 university.getUniversityId(),
                 actor.getUserId()
         );
-        var message = "A new question was asked in " + university.getName() + ": \"" + truncate(question.getTitle(), 30) + "\"";
-        var link = "/questions/" + question.getId();
+        
+        String message = "A new " + topic.getTopicType().toString().toLowerCase() + " was posted in " + university.getName() + ": \"" + truncate(topic.getTitle(), 30) + "\"";
+        String link = "/topics/" + topic.getId();
+        
         recipients.forEach(recipient ->
                 createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_QUESTION_IN_UNI, message, link)
         );
     }
 
+    // ✅ Keep existing chat message handler
     @Async
     @EventListener
     public void handleNewMessage(NewMessageEvent event) {
@@ -290,17 +333,63 @@ public class NotificationService {
             );
         });
     }
+    @Async
+    @EventListener
+    public void handleNewChatMessageReaction(NewChatMessageReactionEvent event) {
+        MessageReaction reaction = event.getReaction();
+        User actor = reaction.getUser();
+        Message message = (Message) reaction.getPost();
+        User recipient = message.getAuthor();
 
+        // Don't create a notification if users react to their own message
+        if (actor.equals(recipient)) {
+            return;
+        }
+
+        // Create a link that directs the user to the specific conversation
+        String link = "/chat/" + message.getConversation().getConversationId();
+
+        // Create a descriptive notification message
+        String messageText = String.format("%s reacted with %s to your message: \"%s\"",
+                actor.getUsername(),
+                reaction.getEmoji(),
+                truncate(message.getBody(), 30)
+        );
+
+        // Create the notification and send the email/websocket push
+        createNotificationAndSendEmail(recipient, actor, NotificationType.NEW_REACTION_ON_CHAT_MESSAGE, messageText, link);
+    }
+
+    // ✅ Keep existing university join handler
     @Async
     @EventListener
     public void handleUserJoinedUniversity(UserJoinedUniversityEvent event) {
-        var recipient = event.getUser();
-        var university = event.getUniversity();
-        var message = "Welcome to " + university.getName() + "! We're glad to have you.";
-        var link = "/universities/" + university.getUniversityId();
+        User recipient = event.getUser();
+        University university = event.getUniversity();
+        String message = "Welcome to " + university.getName() + "! We're glad to have you.";
+        String link = "/universities/" + university.getUniversityId();
         sendEmail(recipient, null, NotificationType.WELCOME_TO_UNIVERSITY, message, link);
     }
 
+    // ✅ NEW: Helper method to get post type description
+    private String getPostTypeDescription(PostType postType) {
+        switch (postType) {
+            case TOPIC: return "topic";
+            case REPLY: return "reply";
+            default: return "post";
+        }
+    }
+
+    // ✅ NEW: Helper method to get vote notification type
+    private NotificationType getVoteNotificationType(PostType postType) {
+        switch (postType) {
+            case TOPIC: return NotificationType.NEW_VOTE_ON_QUESTION;
+            case REPLY: return NotificationType.NEW_VOTE_ON_ANSWER;
+            default: return null;
+        }
+    }
+
+    // ✅ Keep existing notification creation and email methods
     private void createNotificationAndSendEmail(User recipient, User actor, NotificationType type, String message, String link) {
         Notification notification = Notification.builder()
                 .recipient(recipient)
@@ -328,27 +417,38 @@ public class NotificationService {
 
             switch (type) {
                 case NEW_ANSWER:
-                    subject = "New Answer for your question";
+                    subject = "New Answer for your " + (actor != null ? "question" : "topic");
                     templateName = "new-answer-template";
+                    break;
+                case NEW_COMMENT_ON_ANSWER:
+                    subject = "New Comment on your " + (actor != null ? "post" : "topic");
+                    templateName = "new-comment-template";
+                    break;
+                case NEW_REPLY_TO_COMMENT:
+                    subject = "New Reply to your comment";
+                    templateName = "new-reply-template";
                     break;
                 case NEW_CHAT_MESSAGE:
                     subject = "New Chat Message from " + (actor != null ? actor.getUsername() : "a user");
                     templateName = "new-message-template";
+                    break;
+                case NEW_REACTION_ON_CHAT_MESSAGE:
+                    subject = "New reaction on your chat message";
+                    templateName = "new-reaction-template"; // You can reuse or create a new one
                     break;
                 case NEW_FOLLOWER:
                     subject = "You have a new follower";
                     templateName = "new-follower-template";
                     break;
                 case NEW_QUESTION_FROM_FOLLOWED_USER:
-                    subject = "New question from " + (actor != null ? actor.getUsername() : "a user you follow");
-                    templateName = "new-question-template";
-                    break;
-                case NEW_QUESTION_IN_FOLLOWED_COMMUNITY:
-                case NEW_QUESTION_IN_FOLLOWED_MODULE:
-                case NEW_QUESTION_WITH_FOLLOWED_TAG:
-                    subject = "New content in your feed";
+                    subject = "New content from " + (actor != null ? actor.getUsername() : "a user you follow");
                     templateName = "new-content-template";
                     break;
+                case ANSWER_MARKED_AS_SOLUTION:
+                    subject = "Your answer was marked as solution!";
+                    templateName = "solution-marked-template";
+                    break;
+
             }
 
             context.setVariable("recipientUsername", recipient.getUsername());
@@ -375,6 +475,7 @@ public class NotificationService {
         }
     }
 
+    // ✅ Keep existing service methods
     @Transactional(readOnly = true)
     public List<NotificationDto> getNotificationsForUser(UserDetailsImpl currentUser) {
         List<Notification> notifications = notificationRepository

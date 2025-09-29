@@ -26,12 +26,12 @@ public final class UniversityMapper {
             university.getName(),
             university.getModules() != null ?
                 university.getModules().stream()
-                    .map(module -> UniversityMapper.toModuleDto(module, isMember)) // ✅ Pass isMember to modules
+                    .map(module -> UniversityMapper.toModuleDto(module, isMember))
                     .collect(Collectors.toList()) :
                 Collections.emptyList(),
             isMember,
-            university.getMemberCount(),  // ✅ Use stored denormalized count
-            university.getQuestionCount() // ✅ Use stored denormalized count
+            university.getMemberCount(),
+            university.getTopicCount()  // ✅ UPDATED: getQuestionCount() → getTopicCount()
         );
     }
 
@@ -46,8 +46,8 @@ public final class UniversityMapper {
         return new ModuleDto(
             module.getModuleId(),
             module.getName(),
-            module.getQuestionCount(), // ✅ Use stored denormalized count
-            false // Default value, will be set in service
+            module.getTopicCount(),  // ✅ UPDATED: getQuestionCount() → getTopicCount()
+            false
         );
     }
 
@@ -58,8 +58,8 @@ public final class UniversityMapper {
         return new ModuleDto(
             module.getModuleId(),
             module.getName(),
-            module.getQuestionCount(), // ✅ Use stored denormalized count
-            isMember // ✅ Added member status
+            module.getTopicCount(),  // ✅ UPDATED: getQuestionCount() → getTopicCount()
+            isMember
         );
     }
     
@@ -72,16 +72,16 @@ public final class UniversityMapper {
             module.getUniversity().getUniversityId(),
             module.getUniversity().getName(),
             isMember,
-            module.getUniversity().getQuestionCount(), // ✅ Use stored denormalized count
-            module.getUniversity().getMemberCount()    // ✅ Use stored denormalized count
+            module.getUniversity().getTopicCount(),  // ✅ UPDATED: getQuestionCount() → getTopicCount()
+            module.getUniversity().getMemberCount()
         );
 
         return new ModuleDetailDto(
             module.getModuleId(),
             module.getName(),
             universityDto,
-            module.getQuestionCount(), // ✅ Use stored denormalized count
-            isMember // ✅ Module member status
+            module.getTopicCount(),  // ✅ UPDATED: getQuestionCount() → getTopicCount()
+            isMember
         );
     }
 
@@ -94,8 +94,8 @@ public final class UniversityMapper {
             university.getUniversityId(),
             university.getName(),
             isMember,
-            university.getQuestionCount(), // ✅ Use stored denormalized count
-            university.getMemberCount()    // ✅ Use stored denormalized count
+            university.getTopicCount(),  // ✅ UPDATED: getQuestionCount() → getTopicCount()
+            university.getMemberCount()
         );
     }
 }
