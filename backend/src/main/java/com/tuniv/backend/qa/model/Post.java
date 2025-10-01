@@ -12,6 +12,7 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.DiscriminatorColumn;
 import jakarta.persistence.DiscriminatorType;
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -29,9 +30,9 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "posts", indexes = {
-    // This index will live on the 'posts' table.
-    // Rows for non-votable posts (like Message) will have NULL in the score column.
-    @Index(name = "idx_posts_score", columnList = "score") 
+    @Index(name = "idx_posts_score", columnList = "score"),
+    @Index(name = "idx_posts_created_at", columnList = "created_at"), // ✅ NEW: For sorting
+    @Index(name = "idx_posts_author_created", columnList = "user_id, created_at") // ✅ NEW: For user activity
 })
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "post_type", discriminatorType = DiscriminatorType.STRING)
@@ -65,5 +66,11 @@ public abstract class Post {
     public void removeAttachment(Attachment attachment) {
         this.attachments.remove(attachment);
         attachment.setPost(null);
+    }
+
+    // ✅ NEW: Helper method to get post type safely
+    public String getPostType() {
+        DiscriminatorValue discriminator = this.getClass().getAnnotation(DiscriminatorValue.class);
+        return discriminator != null ? discriminator.value() : null;
     }
 }

@@ -3,6 +3,8 @@ package com.tuniv.backend.qa.model;
 import java.time.LocalDateTime;
 import java.util.Objects;
 
+import org.hibernate.Hibernate;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -14,6 +16,7 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
+
 
 @Entity
 @Table(name = "attachments")
@@ -44,28 +47,17 @@ public class Attachment {
     @JoinColumn(name = "post_id", nullable = false)
     private Post post;
     
-    // ✨ --- THE PERSISTENT FIX: Implement equals() and hashCode() --- ✨
-    // This provides a stable way for Hibernate and Java Sets to manage attachments.
-
+    // ✅ FIXED: Improved equals and hashCode for Hibernate
     @Override
     public boolean equals(Object o) {
-        // 1. Check if it's the exact same object in memory
         if (this == o) return true;
-        
-        // 2. Check if the other object is null or of a different class
-        if (o == null || getClass() != o.getClass()) return false;
-        
-        // 3. Cast the object to an Attachment
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
         Attachment that = (Attachment) o;
-        
-        // 4. Compare by the unique ID. If attachmentId is null, they are not equal.
-        return this.attachmentId != null && Objects.equals(this.attachmentId, that.attachmentId);
+        return attachmentId != null && Objects.equals(attachmentId, that.attachmentId);
     }
 
     @Override
     public int hashCode() {
-        // 5. Generate a hash code based on the class and the ID.
-        // Using getClass() ensures that subclasses are not considered equal.
-        return Objects.hash(getClass(), this.attachmentId);
+        return getClass().hashCode();
     }
 }

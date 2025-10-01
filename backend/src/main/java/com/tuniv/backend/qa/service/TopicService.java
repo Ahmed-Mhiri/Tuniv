@@ -1,5 +1,6 @@
 package com.tuniv.backend.qa.service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -8,13 +9,13 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,17 +40,21 @@ import com.tuniv.backend.qa.model.Reply;
 import com.tuniv.backend.qa.model.Tag;
 import com.tuniv.backend.qa.model.Topic;
 import com.tuniv.backend.qa.model.TopicType;
+import com.tuniv.backend.qa.repository.AttachmentRepository;
 import com.tuniv.backend.qa.repository.ReplyRepository;
 import com.tuniv.backend.qa.repository.TopicRepository;
 import com.tuniv.backend.qa.repository.VoteRepository;
+import com.tuniv.backend.qa.specification.TopicSpecifications;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
+import com.tuniv.backend.university.model.Module;
 import com.tuniv.backend.university.repository.ModuleRepository;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
-import com.tuniv.backend.university.model.Module; // Your custom Module class
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class TopicService {
@@ -60,6 +65,7 @@ public class TopicService {
     private final CommunityRepository communityRepository;
     private final UserRepository userRepository;
     private final AttachmentService attachmentService;
+    private final AttachmentRepository attachmentRepository;
     private final PostAuthorizationService postAuthorizationService;
     private final VoteRepository voteRepository;
     private final TagService tagService;
@@ -90,6 +96,243 @@ public class TopicService {
         return TopicMapper.buildTopicResponseDto(topic, currentUser, currentUserVotes);
     }
 
+    // ✅ NEW: Optimized personalized feed using specifications
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getPersonalizedFeedUsingSpecifications(
+            List<Integer> userIds, List<Integer> communityIds, 
+            List<Integer> tagIds, List<Integer> moduleIds, 
+            Integer currentUserId, Pageable pageable) {
+        
+        long startTime = System.currentTimeMillis();
+        
+        // Build specification for personalized feed
+        Specification<Topic> spec = TopicSpecifications.withPersonalizedFeed(
+            userIds, communityIds, tagIds, moduleIds
+        );
+        
+        // Execute query with specification
+        Page<Topic> topics = topicRepository.findAll(spec, pageable);
+        
+        // Batch load additional data efficiently
+        final Map<Integer, Integer> currentUserVotes = new HashMap<>();
+        if (!topics.getContent().isEmpty()) {
+            currentUserVotes.putAll(loadAdditionalDataBatch(topics.getContent(), currentUserId));
+        }
+        
+        log.debug("Personalized feed generated in {}ms for {} topics", 
+                System.currentTimeMillis() - startTime, topics.getNumberOfElements());
+        
+        return topics.map(topic -> convertToSummaryDto(topic, currentUserVotes));
+    }
+
+    // ✅ NEW: Advanced search with multiple criteria
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> searchTopics(
+            String searchTerm, 
+            TopicType topicType,
+            Boolean isSolved,
+            Integer minScore,
+            Integer minReplies,
+            Instant createdAfter,
+            List<Integer> communityIds,
+            List<Integer> moduleIds,
+            List<String> tagNames,
+            Integer currentUserId,
+            Pageable pageable) {
+        
+        // Build complex specification
+        Specification<Topic> spec = buildSearchSpecification(
+            searchTerm, topicType, isSolved, minScore, minReplies, 
+            createdAfter, communityIds, moduleIds, tagNames
+        );
+        
+        Page<Topic> topics = topicRepository.findAll(spec, pageable);
+        
+        // Batch load additional data
+        final Map<Integer, Integer> currentUserVotes = new HashMap<>();
+        if (!topics.getContent().isEmpty()) {
+            currentUserVotes.putAll(loadAdditionalDataBatch(topics.getContent(), currentUserId));
+        }
+        
+        return topics.map(topic -> convertToSummaryDto(topic, currentUserVotes));
+    }
+
+    // ✅ NEW: Build complex search specification
+    private Specification<Topic> buildSearchSpecification(
+            String searchTerm, TopicType topicType, Boolean isSolved,
+            Integer minScore, Integer minReplies, Instant createdAfter,
+            List<Integer> communityIds, List<Integer> moduleIds, List<String> tagNames) {
+        
+        List<Specification<Topic>> specs = new ArrayList<>();
+        
+        // Search in title or body
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) {
+            specs.add(TopicSpecifications.titleOrBodyContains(searchTerm));
+        }
+        
+        // Topic type filter
+        if (topicType != null) {
+            specs.add(TopicSpecifications.hasTopicType(topicType));
+        }
+        
+        // Solved status filter
+        if (isSolved != null) {
+            specs.add(TopicSpecifications.isSolved(isSolved));
+        }
+        
+        // Minimum score filter
+        if (minScore != null && minScore > 0) {
+            specs.add(TopicSpecifications.withMinimumScore(minScore));
+        }
+        
+        // Minimum replies filter
+        if (minReplies != null && minReplies > 0) {
+            specs.add(TopicSpecifications.withMinimumReplies(minReplies));
+        }
+        
+        // Date filter
+        if (createdAfter != null) {
+            specs.add(TopicSpecifications.createdAfter(createdAfter));
+        }
+        
+        // Community filter
+        if (communityIds != null && !communityIds.isEmpty()) {
+            specs.add(TopicSpecifications.inCommunities(communityIds));
+        }
+        
+        // Module filter
+        if (moduleIds != null && !moduleIds.isEmpty()) {
+            specs.add(TopicSpecifications.inModules(moduleIds));
+        }
+        
+        // Tag filter
+        if (tagNames != null && !tagNames.isEmpty()) {
+            specs.add(TopicSpecifications.hasTags(tagNames));
+        }
+        
+        // Combine all specifications with AND
+        return TopicSpecifications.combineAnd(specs.toArray(new Specification[0]));
+    }
+
+    // ✅ NEW: Get popular topics with specifications
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getPopularTopics(
+            int minScore, 
+            int minReplies,
+            Integer currentUserId,
+            Pageable pageable) {
+        
+        Specification<Topic> spec = TopicSpecifications.popularTopics(minScore, minReplies);
+        Page<Topic> topics = topicRepository.findAll(spec, pageable);
+        
+        final Map<Integer, Integer> currentUserVotes = new HashMap<>();
+        if (!topics.getContent().isEmpty()) {
+            currentUserVotes.putAll(loadAdditionalDataBatch(topics.getContent(), currentUserId));
+        }
+        
+        return topics.map(topic -> convertToSummaryDto(topic, currentUserVotes));
+    }
+
+    // ✅ NEW: Get recent unsolved questions
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getRecentUnsolvedQuestions(
+            Integer currentUserId,
+            Pageable pageable) {
+        
+        Specification<Topic> spec = TopicSpecifications.recentUnsolvedQuestions();
+        Page<Topic> topics = topicRepository.findAll(spec, pageable);
+        
+        final Map<Integer, Integer> currentUserVotes = new HashMap<>();
+        if (!topics.getContent().isEmpty()) {
+            currentUserVotes.putAll(loadAdditionalDataBatch(topics.getContent(), currentUserId));
+        }
+        
+        return topics.map(topic -> convertToSummaryDto(topic, currentUserVotes));
+    }
+
+    // ✅ NEW: Batch load additional data for performance
+    private Map<Integer, Integer> loadAdditionalDataBatch(List<Topic> topics, Integer currentUserId) {
+        List<Integer> topicIds = topics.stream()
+                .map(Topic::getId)
+                .collect(Collectors.toList());
+        
+        // Batch load attachments using optimized repository method
+        var attachments = attachmentRepository.findByPostIdIn(topicIds);
+        var attachmentsByTopicId = attachments.stream()
+                .collect(Collectors.groupingBy(attachment -> attachment.getPost().getId()));
+        
+        // Batch load user votes if current user is provided
+        Map<Integer, Integer> currentUserVotes = new HashMap<>();
+        if (currentUserId != null) {
+            var userVotes = voteRepository.findAllVotesForUserByPostIds(currentUserId, topicIds);
+            currentUserVotes = userVotes.stream()
+                    .collect(Collectors.toMap(
+                        VoteInfo::postId,
+                        VoteInfo::value
+                    ));
+        }
+        
+        // Attach attachments to topics
+        topics.forEach(topic -> {
+            var topicAttachments = attachmentsByTopicId.get(topic.getId());
+            if (topicAttachments != null) {
+                topic.getAttachments().addAll(topicAttachments);
+            }
+        });
+        
+        return currentUserVotes;
+    }
+
+    // ✅ NEW: Convert Topic to TopicSummaryDto
+    private TopicSummaryDto convertToSummaryDto(Topic topic) {
+        return convertToSummaryDto(topic, null);
+    }
+
+    // ✅ NEW: Convert Topic to TopicSummaryDto with vote status
+    private TopicSummaryDto convertToSummaryDto(Topic topic, Map<Integer, Integer> currentUserVotes) {
+        // Determine container ID and name
+        Integer containerId = null;
+        String containerName = null;
+        
+        if (topic.getCommunity() != null) {
+            containerId = topic.getCommunity().getCommunityId();
+            containerName = topic.getCommunity().getName();
+        } else if (topic.getModule() != null) {
+            containerId = topic.getModule().getModuleId();
+            containerName = topic.getModule().getName();
+        }
+        
+        // Get tags as string list
+        List<String> tags = topic.getTags().stream()
+                .map(Tag::getName)
+                .collect(Collectors.toList());
+        
+        // Determine current user's vote status
+        String currentUserVote = null;
+        if (currentUserVotes != null) {
+            Integer voteValue = currentUserVotes.get(topic.getId());
+            if (voteValue != null) {
+                currentUserVote = voteValue == 1 ? "UPVOTE" : voteValue == -1 ? "DOWNVOTE" : null;
+            }
+        }
+        
+        return new TopicSummaryDto(
+            topic.getId(),
+            topic.getTitle(),
+            topic.getTopicType(),
+            topic.getAuthor().getUserId(),
+            topic.getAuthor().getUsername(),
+            topic.getCreatedAt(),
+            topic.getScore(),
+            topic.getReplyCount(), // Using denormalized count
+            currentUserVote,
+            topic.isSolved(),
+            containerId,
+            containerName,
+            tags
+        );
+    }
+
     @Transactional
     public TopicResponseDto createTopic(TopicCreateRequest request, UserDetailsImpl currentUser, List<MultipartFile> files) {
         // Validation
@@ -115,9 +358,10 @@ public class TopicService {
         topic.setAuthor(author);
         topic.setTags(tags);
         topic.setTopicType(request.topicType());
-        // ✅ ENHANCED: Initialize solution state
+        // ✅ ENHANCED: Initialize solution state and reply count
         topic.setSolved(false);
         topic.setAcceptedSolution(null);
+        topic.setReplyCount(0); // Initialize denormalized count
 
         // Assign to container (module or community)
         if (request.moduleId() != null) {
@@ -183,14 +427,14 @@ public class TopicService {
         
         Reply reply = new Reply();
         reply.setBody(request.body());
-        reply.setTopic(topic);
+        reply.setTopic(topic); // This automatically updates replyCount via setter
         reply.setAuthor(author);
         
         // Handle parent reply for nested replies
         if (request.parentReplyId() != null) {
             Reply parentReply = replyRepository.findById(request.parentReplyId())
                     .orElseThrow(() -> new ResourceNotFoundException("Parent reply not found"));
-            reply.setParentReply(parentReply);
+            reply.setParentReply(parentReply); // This handles replyCount updates
         }
 
         Reply savedReply = replyRepository.save(reply);
@@ -430,5 +674,17 @@ public class TopicService {
             .toList();
 
         return new PageImpl<>(enrichedSummaries, pageable, summaryPage.getTotalElements());
+    }
+
+    // ✅ NEW: Performance monitoring
+    public void logPerformanceMetrics() {
+        long totalTopics = topicRepository.count();
+        long solvedTopics = topicRepository.count(TopicSpecifications.isSolved(true));
+        long recentTopics = topicRepository.count(TopicSpecifications.createdAfter(
+            Instant.now().minusSeconds(24 * 60 * 60)
+        ));
+        
+        log.info("Topic Metrics - Total: {}, Solved: {}, Recent (24h): {}", 
+                 totalTopics, solvedTopics, recentTopics);
     }
 }
