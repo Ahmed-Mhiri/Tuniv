@@ -4,6 +4,8 @@ import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
 
+import org.hibernate.Hibernate;
+
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.Column;
@@ -38,23 +40,28 @@ public class ConversationParticipant {
     private Conversation conversation;
 
     @Column(name = "last_read_timestamp")
-    private Instant  lastReadTimestamp;
+    private Instant lastReadTimestamp;
 
-    /**
-     * ✅ FIX: Default constructor required by JPA.
-     */
-    public ConversationParticipant() {
-    }
+    public ConversationParticipant() {}
 
-    /**
-     * ✅ FIX: Add a constructor to easily create new instances.
-     * This constructor sets the user, the conversation, and correctly
-     * initializes the composite primary key (id).
-     */
     public ConversationParticipant(User user, Conversation conversation) {
         this.user = user;
         this.conversation = conversation;
         this.id = new ConversationParticipantId(user.getUserId(), conversation.getConversationId());
+    }
+
+    // ✅ IMPROVED: Standardized equals and hashCode
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
+        ConversationParticipant that = (ConversationParticipant) o;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
     }
 
     @Embeddable
@@ -67,8 +74,7 @@ public class ConversationParticipant {
         @Column(name = "conversation_id")
         private Integer conversationId;
 
-        public ConversationParticipantId() {
-        }
+        public ConversationParticipantId() {}
 
         public ConversationParticipantId(Integer userId, Integer conversationId) {
             this.userId = userId;

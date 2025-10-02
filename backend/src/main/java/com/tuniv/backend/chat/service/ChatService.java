@@ -48,7 +48,7 @@ public class ChatService {
     private final SimpMessageSendingOperations messagingTemplate;
     private final AttachmentService attachmentService;
     private final ApplicationEventPublisher eventPublisher;
-    private final ChatMapper chatMapper; // Correctly injected
+    private final ChatMapper chatMapper;
 
     @Transactional
     public Message sendMessage(
@@ -59,7 +59,11 @@ public class ChatService {
     ) {
         Message savedMessage = saveMessageAndAttachments(conversationId, chatMessageDto, senderUsername, files);
 
-        // ✅ FIXED: Use the 'chatMapper' instance, not the class
+        // ✅ UPDATE: Update conversation's denormalized fields
+        Conversation conversation = savedMessage.getConversation();
+        conversation.updateLastMessage(savedMessage);
+        conversationRepository.save(conversation);
+
         ChatMessageDto dtoToSend = chatMapper.toChatMessageDto(savedMessage, Collections.emptyList(), senderUsername, chatMessageDto.getClientTempId());
 
         String destination = "/topic/conversation/" + conversationId;
@@ -97,7 +101,7 @@ public class ChatService {
                 .collect(Collectors.groupingBy(r -> r.getPost().getId()));
 
         return messages.stream()
-                .map(message -> chatMapper.toChatMessageDto( // ✅ FIXED: Use the 'chatMapper' instance
+                .map(message -> chatMapper.toChatMessageDto(
                         message,
                         reactionsByMessageId.getOrDefault(message.getId(), Collections.emptyList()),
                         currentUser.getUsername()
@@ -113,7 +117,6 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
 
         List<Reaction> reactions = reactionRepository.findByPost_Id(messageId);
-        // ✅ FIXED: Use the 'chatMapper' instance
         return chatMapper.toChatMessageDto(message, reactions, currentUser.getUsername());
     }
 
@@ -130,7 +133,6 @@ public class ChatService {
         message.setBody("");
         messageRepository.save(message);
 
-        // ✅ FIXED: Use the 'chatMapper' instance
         ChatMessageDto deletedMessageDto = chatMapper.toChatMessageDto(message, Collections.emptyList(), currentUsername);
         String destination = "/topic/conversation/" + message.getConversation().getConversationId();
         messagingTemplate.convertAndSend(destination, deletedMessageDto);
@@ -158,13 +160,10 @@ public class ChatService {
 
         List<Reaction> updatedReactions = reactionRepository.findByPost_Id(messageId);
 
-        // ✅ FIXED: Use the 'chatMapper' instance
         ChatMessageDto messageDto = chatMapper.toChatMessageDto(message, updatedReactions, username);
         String destination = "/topic/conversation/" + message.getConversation().getConversationId();
         messagingTemplate.convertAndSend(destination, messageDto);
     }
-
-    // --- Methods below this line are unchanged ---
 
     @Transactional
     public Message saveMessageAndAttachments(
@@ -199,7 +198,14 @@ public class ChatService {
     public List<ConversationSummaryDto> getConversationSummaries(String username) {
         User currentUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
-        return conversationRepository.findConversationSummariesForUser(currentUser.getUserId());
+        
+        // ✅ UPDATED: Use simple query with denormalized fields
+        List<Conversation> conversations = conversationRepository.findConversationsByUser(currentUser.getUserId());
+        
+        return conversations.stream()
+                .map(conv -> mapToConversationSummaryDtoSimple(conv, currentUser))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -211,7 +217,7 @@ public class ChatService {
                 .map(conversation -> {
                     User currentUser = userRepository.findById(currentUserId)
                             .orElseThrow(() -> new ResourceNotFoundException("Current user not found"));
-                    return mapToConversationSummaryDto(conversation, currentUser);
+                    return mapToConversationSummaryDtoSimple(conversation, currentUser);
                 })
                 .orElseGet(() -> {
                     User currentUser = userRepository.findById(currentUserId)
@@ -244,11 +250,14 @@ public class ChatService {
                 .orElseThrow(() -> new ResourceNotFoundException("Participant not found in conversation"));
 
         participant.setLastReadTimestamp(Instant.now());
-
         conversationParticipantRepository.save(participant);
     }
 
-    private ConversationSummaryDto mapToConversationSummaryDto(Conversation conv, User currentUser) {
+    /**
+     * ✅ UPDATED: Simple version using denormalized fields
+     */
+    private ConversationSummaryDto mapToConversationSummaryDtoSimple(Conversation conv, User currentUser) {
+        // Get other participant
         User otherParticipant = conv.getParticipants().stream()
                 .map(ConversationParticipant::getUser)
                 .filter(user -> !user.getUserId().equals(currentUser.getUserId()))
@@ -256,30 +265,142 @@ public class ChatService {
                 .orElse(null);
         if (otherParticipant == null) return null;
 
-        Optional<Message> lastMessageOpt = messageRepository.findTopByConversation_ConversationIdOrderBySentAtDesc(conv.getConversationId());
-
-        Instant lastReadTimestamp = conv.getParticipants().stream()
+        // ✅ USE DENORMALIZED FIELDS - no extra queries needed for last message!
+        String lastMessage = conv.getLastMessageBody() != null ? 
+            (conv.getLastMessageBody().length() > 100 ? 
+             conv.getLastMessageBody().substring(0, 100) + "..." : 
+             conv.getLastMessageBody()) : 
+            "No messages yet...";
+        
+        Instant lastMessageTime = conv.getLastMessageSentAt() != null ?
+            conv.getLastMessageSentAt() : conv.getCreatedAt();
+        
+        // Get current user's participant to find last read time
+        ConversationParticipant currentParticipant = conv.getParticipants().stream()
                 .filter(p -> p.getUser().getUserId().equals(currentUser.getUserId()))
                 .findFirst()
-                .map(ConversationParticipant::getLastReadTimestamp)
                 .orElse(null);
-
-        Instant sinceTimestamp = lastReadTimestamp != null ? lastReadTimestamp : conv.getCreatedAt();
-
-        long unreadCount = messageRepository.countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
-                conv.getConversationId(),
-                currentUser.getUserId(),
-                sinceTimestamp
-        );
+        
+        long unreadCount = 0;
+        if (currentParticipant != null && conv.getLastMessageSentAt() != null) {
+            Instant lastRead = currentParticipant.getLastReadTimestamp();
+            // If last message is after last read time, calculate unread count
+            if (lastRead == null || conv.getLastMessageSentAt().isAfter(lastRead)) {
+                unreadCount = calculateUnreadCount(conv.getConversationId(), currentUser.getUserId(), lastRead);
+            }
+        }
 
         return ConversationSummaryDto.builder()
                 .conversationId(conv.getConversationId())
                 .participantId(otherParticipant.getUserId())
                 .participantName(otherParticipant.getUsername())
                 .participantAvatarUrl(otherParticipant.getProfilePhotoUrl())
-                .lastMessage(lastMessageOpt.map(Message::getBody).orElse("No messages yet..."))
-                .lastMessageTimestamp(lastMessageOpt.map(m -> m.getSentAt().toString()).orElse(conv.getCreatedAt().toString()))
+                .lastMessage(lastMessage)
+                .lastMessageTimestamp(lastMessageTime.toString())
                 .unreadCount(unreadCount)
                 .build();
+    }
+
+    /**
+     * ✅ HELPER: Calculate unread count only when needed
+     */
+    private long calculateUnreadCount(Integer conversationId, Integer userId, Instant lastReadTimestamp) {
+        if (lastReadTimestamp == null) {
+            // If never read, count all messages from other users
+            return messageRepository.countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
+                conversationId, userId, Instant.EPOCH
+            );
+        } else {
+            // Count messages after last read time
+            return messageRepository.countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
+                conversationId, userId, lastReadTimestamp
+            );
+        }
+    }
+
+    /**
+     * ✅ NEW: Method to update conversation last message when a message is sent
+     * This ensures denormalized fields stay in sync
+     */
+    @Transactional
+    public void updateConversationLastMessage(Message message) {
+        if (!message.isDeleted() && message.getConversation() != null) {
+            Conversation conversation = message.getConversation();
+            conversation.updateLastMessage(message);
+            conversationRepository.save(conversation);
+        }
+    }
+
+    /**
+     * ✅ NEW: Get conversation with participants efficiently
+     */
+    @Transactional(readOnly = true)
+    public Optional<Conversation> getConversationWithParticipants(Integer conversationId) {
+        return conversationRepository.findByIdWithParticipantsAndUsers(conversationId);
+    }
+
+    /**
+     * ✅ NEW: Check if user can access conversation
+     */
+    @Transactional(readOnly = true)
+    public boolean canUserAccessConversation(Integer conversationId, String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+        
+        return conversationParticipantRepository
+                .findByUserUserIdAndConversationConversationId(user.getUserId(), conversationId)
+                .isPresent();
+    }
+
+    /**
+     * ✅ NEW: Get unread count for a specific conversation
+     */
+    @Transactional(readOnly = true)
+    public long getUnreadCountForConversation(Integer conversationId, String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+        
+        ConversationParticipant participant = conversationParticipantRepository
+                .findByUserUserIdAndConversationConversationId(user.getUserId(), conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not in conversation"));
+        
+        Instant sinceTimestamp = participant.getLastReadTimestamp() != null ? 
+            participant.getLastReadTimestamp() : 
+            participant.getConversation().getCreatedAt();
+        
+        return messageRepository.countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
+            conversationId, user.getUserId(), sinceTimestamp
+        );
+    }
+
+    /**
+     * ✅ NEW: Get total unread count across all conversations
+     */
+    @Transactional(readOnly = true)
+    public long getTotalUnreadCount(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + username));
+        
+        List<Conversation> conversations = conversationRepository.findConversationsByUser(user.getUserId());
+        
+        long totalUnread = 0;
+        for (Conversation conv : conversations) {
+            ConversationParticipant participant = conv.getParticipants().stream()
+                    .filter(p -> p.getUser().getUserId().equals(user.getUserId()))
+                    .findFirst()
+                    .orElse(null);
+            
+            if (participant != null) {
+                Instant sinceTimestamp = participant.getLastReadTimestamp() != null ? 
+                    participant.getLastReadTimestamp() : conv.getCreatedAt();
+                
+                long unread = messageRepository.countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
+                    conv.getConversationId(), user.getUserId(), sinceTimestamp
+                );
+                totalUnread += unread;
+            }
+        }
+        
+        return totalUnread;
     }
 }

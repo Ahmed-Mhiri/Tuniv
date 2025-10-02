@@ -1,7 +1,9 @@
 package com.tuniv.backend.follow.model;
 
 import java.time.Instant;
+import java.util.Objects;
 
+import org.hibernate.Hibernate;
 import org.hibernate.annotations.CreationTimestamp;
 
 import com.tuniv.backend.user.model.User;
@@ -96,13 +98,16 @@ public class Follow {
                 '}';
     }
 
-    // ✅ NEW: Override equals and hashCode for proper entity management
+    // ✅ IMPROVED: Standardized equals and hashCode using Hibernate.getClass()
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this != o) {
+        } else {
+            return true;
+        }
+        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
         Follow follow = (Follow) o;
-        return followId != null && followId.equals(follow.followId);
+        return followId != null && Objects.equals(followId, follow.followId);
     }
 
     @Override

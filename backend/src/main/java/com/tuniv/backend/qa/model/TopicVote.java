@@ -6,7 +6,7 @@ import jakarta.persistence.Entity;
 import lombok.NoArgsConstructor;
 
 @Entity
-@DiscriminatorValue("TOPIC")
+@DiscriminatorValue("TOPIC_VOTE") // ✅ FIXED: Added proper discriminator value
 @NoArgsConstructor
 public class TopicVote extends Vote {
     public TopicVote(User user, Post post, short value) {

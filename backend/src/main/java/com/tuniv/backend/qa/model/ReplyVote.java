@@ -7,7 +7,7 @@ import jakarta.persistence.Entity;
 import lombok.NoArgsConstructor;
 
 @Entity
-@DiscriminatorValue("REPLY")
+@DiscriminatorValue("REPLY_VOTE") // ✅ FIXED: Added proper discriminator value
 @NoArgsConstructor
 public class ReplyVote extends Vote {
     public ReplyVote(User user, Post post, short value) {

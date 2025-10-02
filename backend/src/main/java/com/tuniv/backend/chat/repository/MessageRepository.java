@@ -14,10 +14,7 @@ import com.tuniv.backend.chat.model.Message;
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Integer> {
 
-    /**
-     * ✅ RENAMED: Added underscore for nested property traversal (Conversation -> conversationId).
-     * The @Query ensures author and attachments are fetched efficiently to prevent N+1 problems.
-     */
+    // ✅ KEEP: This is efficient with the index
     @Query("""
     SELECT m FROM Message m
     LEFT JOIN FETCH m.author
@@ -27,18 +24,15 @@ public interface MessageRepository extends JpaRepository<Message, Integer> {
     """)
     List<Message> findByConversation_ConversationIdOrderBySentAtAsc(@Param("conversationId") Integer conversationId);
 
-    /**
-     * ✅ RENAMED: Added underscore for nested property traversal.
-     */
+    // ✅ KEEP: Simple and useful
     Optional<Message> findTopByConversation_ConversationIdOrderBySentAtDesc(Integer conversationId);
 
-    /**
-     * ✅ RENAMED & UPDATED: Added underscores for nested properties and changed parameter type
-     * from LocalDateTime to Instant to match the entity fields.
-     */
+    // ✅ KEEP: This is fine for calculating unread counts
     long countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
             Integer conversationId,
             Integer userId,
             Instant timestamp
     );
+
+    // ❌ REMOVE: The batch unread count method - not needed yet
 }
