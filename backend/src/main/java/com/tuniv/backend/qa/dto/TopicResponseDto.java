@@ -13,9 +13,11 @@ public record TopicResponseDto(
     boolean isSolved,
     UserDto author,
     Instant createdAt,
+    Instant editedAt, // ✅ ADDED: To show if/when a topic was edited
     int score,
     String currentUserVote, // "UPVOTE", "DOWNVOTE", or null
     int replyCount,
+    int viewCount, // ✅ ADDED: To display engagement
     SolutionInfoDto acceptedSolution,
     ContainerInfoDto container,
     List<String> tags,

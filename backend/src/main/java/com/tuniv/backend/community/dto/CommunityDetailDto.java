@@ -8,11 +8,15 @@ public record CommunityDetailDto(
     Integer communityId,
     String name,
     String description,
+    String bannerUrl, // ADDED
+    String iconUrl,   // ADDED
     Integer memberCount,
-    Integer topicCount, // ✅ UPDATED: questionCount → topicCount
+    Integer followerCount, // ADDED
+    Integer topicCount,
     Instant createdAt,
     UserSummaryDto creator,
     String universityName,
-    boolean isMember,
-    boolean isModerator
+    boolean isVerified, // ADDED
+    CommunitySettingsDto settings, // ADDED: All policies in one object
+    CommunityMembershipStatusDto membership // ADDED: Detailed status for the current user
 ) {}

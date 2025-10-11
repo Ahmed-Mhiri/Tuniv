@@ -1,11 +1,9 @@
 package com.tuniv.backend.follow.model;
 
-import java.time.Instant;
 import java.util.Objects;
 
-import org.hibernate.Hibernate;
-import org.hibernate.annotations.CreationTimestamp;
-
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.Column;
@@ -21,97 +19,56 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
 @Table(name = "follows", 
     indexes = {
-        @Index(name = "idx_follows_target", columnList = "target_type, target_id"), // ✅ NEW: For finding followers of a target
-        @Index(name = "idx_follows_user_target", columnList = "user_id, target_type, target_id"), // ✅ NEW: For checking specific follow relationships
-        @Index(name = "idx_follows_user_created", columnList = "user_id, created_at") // ✅ NEW: For user activity feeds
-    },
-    uniqueConstraints = {
-        // A user can only follow a specific target once
-        @UniqueConstraint(columnNames = {"user_id", "target_type", "target_id"})
-    })
+        @Index(name = "idx_follows_user_followable", columnList = "user_id, followable_id", unique = true),
+        @Index(name = "idx_follows_followable", columnList = "followable_id"),
+        @Index(name = "idx_follows_user_created", columnList = "user_id, created_at"),
+        @Index(name = "idx_follows_mutual", columnList = "is_mutual, created_at")
+    }
+)
 @Getter
 @Setter
-public class Follow {
+@NoArgsConstructor
+public class Follow extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer followId;
 
-    // The user performing the follow action
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== FOLLOWER RELATIONSHIP ==========
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    private User follower;
 
-    // What is being followed (e.g., 'USER', 'COMMUNITY')
-    @Enumerated(EnumType.STRING)
-    @Column(name = "target_type", nullable = false)
-    private FollowableType targetType;
+    // ========== TARGET (Now using Followable) ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "followable_id", nullable = false)
+    private Followable target;
 
-    // The ID of the thing being followed (e.g., the userId, communityId)
-    @Column(name = "target_id", nullable = false)
-    private Integer targetId;
-    
-    @CreationTimestamp
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private Instant createdAt;
+    // ========== SETTINGS ==========
+    @Column(name = "notifications_enabled", nullable = false)
+    private boolean notificationsEnabled = true;
 
-    // No-args constructor for JPA
-    public Follow() {}
+    @Column(name = "is_mutual", nullable = false)
+    private boolean isMutual = false;
 
-    // Convenience constructor
-    public Follow(User user, FollowableType targetType, Integer targetId) {
-        this.user = user;
-        this.targetType = targetType;
-        this.targetId = targetId;
-    }
-
-    // ✅ NEW: Helper method to get target identifier
-    public String getTargetIdentifier() {
-        return targetType + ":" + targetId;
-    }
-
-    // ✅ NEW: Check if this follow is for a specific target
-    public boolean isForTarget(FollowableType type, Integer id) {
-        return this.targetType == type && this.targetId.equals(id);
-    }
-
-    // ✅ NEW: Check if this follow is by a specific user
-    public boolean isByUser(Integer userId) {
-        return this.user != null && this.user.getUserId().equals(userId);
-    }
-
-    // ✅ NEW: Override toString for better logging
-    @Override
-    public String toString() {
-        return "Follow{" +
-                "followId=" + followId +
-                ", userId=" + (user != null ? user.getUserId() : "null") +
-                ", targetType=" + targetType +
-                ", targetId=" + targetId +
-                ", createdAt=" + createdAt +
-                '}';
-    }
-
-    // ✅ IMPROVED: Standardized equals and hashCode using Hibernate.getClass()
-    @Override
-    public boolean equals(Object o) {
-        if (this != o) {
-        } else {
-            return true;
-        }
-        if (o == null || Hibernate.getClass(this) != Hibernate.getClass(o)) return false;
-        Follow follow = (Follow) o;
-        return followId != null && Objects.equals(followId, follow.followId);
-    }
-
-    @Override
-    public int hashCode() {
-        return getClass().hashCode();
+    // ========== CONSTRUCTORS ==========
+    public Follow(User follower, Followable target) {
+        this.follower = follower;
+        this.target = target;
     }
 }

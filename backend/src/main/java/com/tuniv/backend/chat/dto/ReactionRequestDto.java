@@ -1,8 +1,12 @@
 package com.tuniv.backend.chat.dto;
 
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
-@Data
+@Getter
+@Setter
 public class ReactionRequestDto {
     private String emoji;
+    private Integer skinTone;
+    private String customText;
 }

@@ -1,117 +1,207 @@
 package com.tuniv.backend.qa.service;
 
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.qa.dto.TopicSummaryDto;
+import com.tuniv.backend.qa.mapper.TopicMapper;
+import com.tuniv.backend.qa.model.Tag;
+import com.tuniv.backend.qa.model.Topic;
+import com.tuniv.backend.qa.model.TopicTag;
+import com.tuniv.backend.qa.model.TopicType;
+import com.tuniv.backend.qa.repository.TopicRepository;
+import com.tuniv.backend.qa.repository.TopicTagRepository;
+import com.tuniv.backend.qa.repository.VoteRepository;
+import com.tuniv.backend.qa.specification.TopicSpecifications;
+import com.tuniv.backend.shared.exception.ResourceNotFoundException;
+import com.tuniv.backend.user.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import com.tuniv.backend.follow.model.Follow;
-import com.tuniv.backend.follow.repository.FollowRepository;
-import com.tuniv.backend.qa.dto.TopicSummaryDto;
-import com.tuniv.backend.qa.model.Tag;
-import com.tuniv.backend.qa.model.Topic;
-import com.tuniv.backend.qa.repository.TopicRepository;
-
-import lombok.RequiredArgsConstructor;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FeedService {
 
+    //<editor-fold desc="Dependencies">
     private final TopicRepository topicRepository;
-    private final FollowRepository followRepository;
+    private final VoteRepository voteRepository;
+    private final TopicTagRepository topicTagRepository;
+    private final UserRepository userRepository;
+    private final TopicMapper topicMapper;
+    //</editor-fold>
+
+    //<editor-fold desc="Public Feed Methods">
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getPersonalizedFeed(
+            List<Integer> userIds, List<Integer> communityIds,
+            List<Integer> tagIds, List<Integer> moduleIds,
+            UserDetailsImpl currentUser, Pageable pageable) {
+        
+        Specification<Topic> spec = TopicSpecifications.withPersonalizedFeed(userIds, communityIds, tagIds, moduleIds);
+        return getFeed(spec, pageable, currentUser);
+    }
 
     @Transactional(readOnly = true)
-    public Page<TopicSummaryDto> getPersonalizedFeed(UserDetailsImpl currentUser, Pageable pageable) {
-        // 1. Fetch all of the user's follow relationships
-        List<Follow> follows = followRepository.findAllByUser_UserId(currentUser.getId());
-
-        if (follows.isEmpty()) {
-            return Page.empty(pageable); // If the user follows nothing, their feed is empty
-        }
-
-        // 2. Separate the followed IDs into lists based on their type
-        List<Integer> followedUserIds = new ArrayList<>();
-        List<Integer> followedCommunityIds = new ArrayList<>();
-        List<Integer> followedTagIds = new ArrayList<>();
-        List<Integer> followedModuleIds = new ArrayList<>();
-
-        for (Follow follow : follows) {
-            switch (follow.getTargetType()) {
-                case USER -> followedUserIds.add(follow.getTargetId());
-                case COMMUNITY -> followedCommunityIds.add(follow.getTargetId());
-                case TAG -> followedTagIds.add(follow.getTargetId());
-                case MODULE -> followedModuleIds.add(follow.getTargetId());
-            }
-        }
+    public Page<TopicSummaryDto> searchTopics(
+            String searchTerm, TopicType topicType, Boolean isSolved,
+            Integer minScore, Integer minReplies, Instant createdAfter,
+            List<Integer> communityIds, List<Integer> moduleIds, List<String> tagNames,
+            UserDetailsImpl currentUser, Pageable pageable) {
         
-        // 3. Call the new repository method to get the feed (now using TopicRepository)
-        Page<TopicSummaryDto> summaryPage = topicRepository.findPersonalizedFeed(
-            followedUserIds, followedCommunityIds, followedTagIds, followedModuleIds,
-            currentUser.getId(), pageable
+        Specification<Topic> spec = buildSearchSpecification(
+            searchTerm, topicType, isSolved, minScore, minReplies,
+            createdAfter, communityIds, moduleIds, tagNames
         );
-
-        return enrichSummariesWithTags(summaryPage, pageable);
+        return getFeed(spec, pageable, currentUser);
     }
-    
+
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getPopularTopics(UserDetailsImpl currentUser, Pageable pageable) {
+        Specification<Topic> spec = TopicSpecifications.popularTopics(10, 5); // Example thresholds
+        return getFeed(spec, pageable, currentUser);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getRecentUnsolvedQuestions(UserDetailsImpl currentUser, Pageable pageable) {
+        Specification<Topic> spec = TopicSpecifications.recentUnsolvedQuestions();
+        return getFeed(spec, pageable, currentUser);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getSolvedTopicsByUser(Integer userId, Pageable pageable, UserDetailsImpl currentUser) {
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        Specification<Topic> spec = Specification.where(TopicSpecifications.byAuthor(userId)).and(TopicSpecifications.isSolved(true));
+        return getFeed(spec, pageable, currentUser);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getTopicsWithUserSolutions(Integer userId, Pageable pageable, UserDetailsImpl currentUser) {
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User not found with id: " + userId);
+        }
+        Specification<Topic> spec = TopicSpecifications.withSolutionByAuthor(userId);
+        return getFeed(spec, pageable, currentUser);
+    }
+
     @Transactional(readOnly = true)
     public Page<TopicSummaryDto> getTopicsByModule(Integer moduleId, Pageable pageable, UserDetailsImpl currentUser) {
-        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
-        Page<TopicSummaryDto> summaryPage = topicRepository.findTopicSummariesByModuleId(moduleId, currentUserId, pageable);
-        return enrichSummariesWithTags(summaryPage, pageable);
+        Specification<Topic> spec = TopicSpecifications.inModules(Collections.singletonList(moduleId));
+        return getFeed(spec, pageable, currentUser);
     }
-    
+
     @Transactional(readOnly = true)
     public Page<TopicSummaryDto> getTopicsByCommunity(Integer communityId, Pageable pageable, UserDetailsImpl currentUser) {
-        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
-        Page<TopicSummaryDto> summaryPage = topicRepository.findTopicSummariesByCommunityId(communityId, currentUserId, pageable);
-        return enrichSummariesWithTags(summaryPage, pageable);
+        Specification<Topic> spec = TopicSpecifications.inCommunities(Collections.singletonList(communityId));
+        return getFeed(spec, pageable, currentUser);
     }
 
     @Transactional(readOnly = true)
-    public Page<TopicSummaryDto> getTopicsByTag(String tagName, Pageable pageable, UserDetailsImpl currentUser) {
-        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
-        Page<TopicSummaryDto> summaryPage = topicRepository.findTopicSummariesByTag(tagName.toLowerCase(), currentUserId, pageable);
-        return enrichSummariesWithTags(summaryPage, pageable);
+    public Page<TopicSummaryDto> getRecentRepliesFeed(UserDetailsImpl currentUser, Pageable pageable) {
+        Specification<Topic> spec = TopicSpecifications.hasRecentActivity();
+        return getFeed(spec, pageable, currentUser);
     }
 
     @Transactional(readOnly = true)
-    public Page<TopicSummaryDto> getPopularFeed(Pageable pageable, UserDetailsImpl currentUser) {
-        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
-        Page<TopicSummaryDto> summaryPage = topicRepository.findPopularTopicSummaries(currentUserId, pageable);
-        return enrichSummariesWithTags(summaryPage, pageable);
+    public Page<TopicSummaryDto> getTrendingTopics(UserDetailsImpl currentUser, Pageable pageable) {
+        Instant trendingSince = Instant.now().minusSeconds(7 * 24 * 60 * 60); // Last 7 days
+        Specification<Topic> spec = TopicSpecifications.trendingTopics(trendingSince, 10, 5);
+        return getFeed(spec, pageable, currentUser);
     }
 
-    private Page<TopicSummaryDto> enrichSummariesWithTags(Page<TopicSummaryDto> summaryPage, Pageable pageable) {
-        if (summaryPage.isEmpty()) {
-            return summaryPage;
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getFastRisingTopics(UserDetailsImpl currentUser, Pageable pageable) {
+        Specification<Topic> spec = TopicSpecifications.fastRisingTopics();
+        return getFeed(spec, pageable, currentUser);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<TopicSummaryDto> getHighEngagementTopics(UserDetailsImpl currentUser, Pageable pageable) {
+        Instant lastWeek = Instant.now().minusSeconds(7 * 24 * 60 * 60);
+        Specification<Topic> spec = TopicSpecifications.trendingTopicsWithEngagement(lastWeek, 20); // min 20 total engagement
+        return getFeed(spec, pageable, currentUser);
+    }
+
+    public void logPerformanceMetrics() {
+        long totalTopics = topicRepository.count();
+        long solvedTopics = topicRepository.count(TopicSpecifications.isSolved(true));
+        long recentTopics = topicRepository.count(TopicSpecifications.createdAfter(Instant.now().minusSeconds(24 * 60 * 60)));
+        log.info("Feed Metrics - Total Topics: {}, Solved: {}, Recent (24h): {}", totalTopics, solvedTopics, recentTopics);
+    }
+    //</editor-fold>
+
+    //<editor-fold desc="Private Helper Methods">
+
+    /**
+     * The unified pattern for fetching and mapping any feed of topics.
+     * All public methods now delegate to this central, performant logic.
+     */
+    private Page<TopicSummaryDto> getFeed(Specification<Topic> spec, Pageable pageable, UserDetailsImpl currentUser) {
+        Page<Topic> topics = topicRepository.findAll(spec, pageable);
+        if (topics.isEmpty()) {
+            return Page.empty(pageable);
         }
 
-        List<Integer> topicIds = summaryPage.getContent().stream()
-                .map(TopicSummaryDto::id)
-                .toList();
+        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
+        Map<Integer, String> currentUserVotes = loadUserVotesForTopics(topics.getContent(), currentUserId);
+        Map<Integer, List<Tag>> tagsByTopicId = loadTagsForTopics(topics.getContent());
 
-        // ✅ UPDATED: Use TopicRepository instead of QuestionRepository
-        List<Topic> topicsWithTags = topicRepository.findWithTagsByIdIn(topicIds);
-
-        Map<Integer, List<String>> tagsMap = topicsWithTags.stream()
-                .collect(Collectors.toMap(
-                    Topic::getId,
-                    t -> t.getTags().stream().map(Tag::getName).toList()
-                ));
-
-        List<TopicSummaryDto> enrichedSummaries = summaryPage.getContent().stream()
-                .map(summary -> summary.withTags(tagsMap.getOrDefault(summary.id(), Collections.emptyList())))
-                .toList();
-
-        return new PageImpl<>(enrichedSummaries, pageable, summaryPage.getTotalElements());
+        return topics.map(topic -> 
+            topicMapper.toTopicSummaryDto(topic, tagsByTopicId.getOrDefault(topic.getId(), Collections.emptyList()), currentUserVotes.get(topic.getId()))
+        );
     }
+    
+    private Specification<Topic> buildSearchSpecification(
+            String searchTerm, TopicType topicType, Boolean isSolved,
+            Integer minScore, Integer minReplies, Instant createdAfter,
+            List<Integer> communityIds, List<Integer> moduleIds, List<String> tagNames) {
+        
+        List<Specification<Topic>> specs = new ArrayList<>();
+        if (searchTerm != null && !searchTerm.trim().isEmpty()) specs.add(TopicSpecifications.titleOrBodyContains(searchTerm));
+        if (topicType != null) specs.add(TopicSpecifications.hasTopicType(topicType));
+        if (isSolved != null) specs.add(TopicSpecifications.isSolved(isSolved));
+        if (minScore != null && minScore > 0) specs.add(TopicSpecifications.withMinimumScore(minScore));
+        if (minReplies != null && minReplies > 0) specs.add(TopicSpecifications.withMinimumReplies(minReplies));
+        if (createdAfter != null) specs.add(TopicSpecifications.createdAfter(createdAfter));
+        if (communityIds != null && !communityIds.isEmpty()) specs.add(TopicSpecifications.inCommunities(communityIds));
+        if (moduleIds != null && !moduleIds.isEmpty()) specs.add(TopicSpecifications.inModules(moduleIds));
+        if (tagNames != null && !tagNames.isEmpty()) specs.add(TopicSpecifications.hasTags(tagNames));
+        
+        return TopicSpecifications.combineWithAnd(specs);
+    }
+
+    private Map<Integer, String> loadUserVotesForTopics(List<Topic> topics, Integer currentUserId) {
+        if (currentUserId == null || topics.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Integer> topicIds = topics.stream().map(Topic::getId).collect(Collectors.toList());
+        return voteRepository.findUserVoteStatusForPosts(currentUserId, topicIds);
+    }
+
+    private Map<Integer, List<Tag>> loadTagsForTopics(List<Topic> topics) {
+        if (topics.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        List<Integer> topicIds = topics.stream().map(Topic::getId).collect(Collectors.toList());
+        List<TopicTag> topicTags = topicTagRepository.findByTopic_IdIn(topicIds);
+
+        return topicTags.stream()
+            .collect(Collectors.groupingBy(
+                topicTag -> topicTag.getTopic().getId(),
+                Collectors.mapping(TopicTag::getTag, Collectors.toList())
+            ));
+    }
+    //</editor-fold>
 }

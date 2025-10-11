@@ -4,5 +4,6 @@ public enum FollowableType {
     USER,
     COMMUNITY,
     TAG,
+    UNIVERSITY,
     MODULE
 }

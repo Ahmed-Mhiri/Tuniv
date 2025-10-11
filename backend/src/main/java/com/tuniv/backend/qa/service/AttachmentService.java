@@ -34,54 +34,52 @@ public class AttachmentService {
     /**
      * Saves a list of uploaded files and associates them with a given Post.
      */
-    @Transactional
+@Transactional
     public List<Attachment> saveAttachments(List<MultipartFile> files, Post post) {
         if (files == null || files.isEmpty() || post == null || post.getId() == null) {
             return Collections.emptyList();
         }
 
-        List<Attachment> savedAttachments = new ArrayList<>();
-
         List<MultipartFile> validFiles = files.stream()
-                .filter(Objects::nonNull)
-                .filter(file -> file.getSize() > 0)
-                .filter(this::isAllowedFileType)
-                .collect(Collectors.toList());
+            .filter(file -> file != null && !file.isEmpty() && isAllowedFileType(file))
+            .collect(Collectors.toList());
 
-        // ✅ NEW: Check total file size limit
+        if (validFiles.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         validateTotalFileSize(validFiles);
+
+        List<Attachment> newAttachments = new ArrayList<>();
+        String subDirectory = post.getPostType().toLowerCase() + "s";
 
         for (MultipartFile file : validFiles) {
             try {
-                // Determine subdirectory from the Post's class name (e.g., "Topic" -> "topics")
-                String postType = getPostType(post);
-                String subDirectory = postType + "s";
                 String fileUrl = fileStorageService.storeFile(file, subDirectory);
-
+                
                 Attachment attachment = new Attachment();
                 attachment.setFileName(file.getOriginalFilename());
                 attachment.setFileUrl(fileUrl);
-                attachment.setFileType(file.getContentType());
+                attachment.setMimeType(file.getContentType());
+                attachment.setFileType(file.getContentType()); // You might want to derive a simpler type
                 attachment.setFileSize(file.getSize());
                 
-                // ✨ FIX: Use the helper method from the Post entity.
-                // This correctly sets both sides of the relationship in memory,
-                // ensuring the Post object's attachment collection is aware of the new file.
-                post.addAttachment(attachment);
+                // ✅ ARCHITECTURAL FIX: Set the relationship directly on the attachment.
+                attachment.setPost(post);
+                attachment.setUploadedBy(post.getAuthor());
 
-                Attachment savedAttachment = attachmentRepository.save(attachment);
-                savedAttachments.add(savedAttachment);
+                // ✅ REMOVED: post.addAttachment(attachment); - This is no longer valid.
                 
-                log.debug("Successfully saved attachment: {} for post ID: {}", 
-                         file.getOriginalFilename(), post.getId());
-                
+                newAttachments.add(attachment);
             } catch (Exception e) {
                 log.error("Failed to store file: {}", file.getOriginalFilename(), e);
-                // Depending on requirements, you might want to stop or continue
+                // Rollback transaction by rethrowing
                 throw new RuntimeException("Failed to store file: " + file.getOriginalFilename(), e);
             }
         }
         
+        // ✅ OPTIMIZED: Save all new attachments in a single batch query.
+        List<Attachment> savedAttachments = attachmentRepository.saveAll(newAttachments);
         log.info("Saved {} attachments for post ID: {}", savedAttachments.size(), post.getId());
         return savedAttachments;
     }

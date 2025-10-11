@@ -1,199 +1,131 @@
 package com.tuniv.backend.university.service;
 
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.jpa.domain.Specification;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import com.tuniv.backend.notification.event.UserJoinedUniversityEvent;
-import com.tuniv.backend.qa.dto.TopicSummaryDto;
-import com.tuniv.backend.qa.repository.TopicRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
+import com.tuniv.backend.university.dto.UniversityBasicDto;
 import com.tuniv.backend.university.dto.UniversityDto;
 import com.tuniv.backend.university.mapper.UniversityMapper;
-import com.tuniv.backend.university.model.Module; // <-- IMPORT ADDED
 import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.university.model.UniversityMembership;
-import com.tuniv.backend.university.model.UniversitySpecification;
-import com.tuniv.backend.university.model.UserRoleEnum;
+import com.tuniv.backend.university.model.UniversityRole;
 import com.tuniv.backend.university.repository.ModuleRepository;
 import com.tuniv.backend.university.repository.UniversityMembershipRepository;
 import com.tuniv.backend.university.repository.UniversityRepository;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
-
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UniversityService {
 
     private final UniversityRepository universityRepository;
     private final UserRepository userRepository;
     private final ModuleRepository moduleRepository;
     private final UniversityMembershipRepository membershipRepository;
-    private final ApplicationEventPublisher eventPublisher;
-    private final TopicRepository topicRepository; // ✅ ADDED: For topic operations
-
-
+    private final UniversityMapper universityMapper;
 
     @Transactional(readOnly = true)
-    public Page<UniversityDto> getAllUniversities(String searchTerm, Pageable pageable, UserDetailsImpl currentUserDetails) {
-        // 1. Create the search specification
-        Specification<University> spec = UniversitySpecification.searchByName(searchTerm);
+    public Page<UniversityBasicDto> getAllUniversities(Pageable pageable, UserDetailsImpl currentUser) {
+        Page<University> universityPage = universityRepository.findAll(pageable);
+        Set<Integer> memberUniversityIds = getMemberUniversityIds(currentUser);
 
-        // 2. Fetch the paginated list of universities from the repository
-        Page<University> universityPage = universityRepository.findAll(spec, pageable);
-
-        // 3. Determine which universities the current user is a member of
-        final Set<Integer> memberUniversityIds;
-        if (currentUserDetails != null) {
-            User currentUser = userRepository.findById(currentUserDetails.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            memberUniversityIds = currentUser.getMemberships().stream()
-                    .map(membership -> membership.getUniversity().getUniversityId())
-                    .collect(Collectors.toSet());
-        } else {
-            memberUniversityIds = Collections.emptySet(); // Anonymous user is a member of nothing
-        }
-        
-        // 4. Map the Page<University> to a Page<UniversityDto>
-        return universityPage.map(university -> UniversityMapper.toUniversityDto(
-                university,
-                memberUniversityIds.contains(university.getUniversityId())
-        ));
+        return universityPage.map(uni -> universityMapper.toUniversityBasicDto(uni, memberUniversityIds.contains(uni.getUniversityId())));
     }
 
-     @Transactional
-    @CacheEvict(value = "universities", allEntries = true)
-    public void joinUniversity(Integer universityId, UserDetailsImpl currentUser) {
-        User user = userRepository.findById(currentUser.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + currentUser.getId()));
-        
+    @Transactional(readOnly = true)
+    public UniversityDto getUniversity(Integer universityId, UserDetailsImpl currentUser) {
         University university = universityRepository.findById(universityId)
             .orElseThrow(() -> new ResourceNotFoundException("University not found with id: " + universityId));
 
-        UniversityMembership.UniversityMembershipId membershipId = new UniversityMembership.UniversityMembershipId();
-        membershipId.setUserId(user.getUserId());
-        membershipId.setUniversityId(university.getUniversityId());
+        Set<Integer> memberUniversityIds = getMemberUniversityIds(currentUser);
+        boolean isMember = memberUniversityIds.contains(universityId);
 
-        if (membershipRepository.existsById(membershipId)) {
+        // Fetch modules and map them to DTOs separately
+        List<ModuleDto> moduleDtos = moduleRepository.findByUniversityUniversityId(universityId).stream()
+            .map(module -> universityMapper.toModuleDto(module, isMember))
+            .collect(Collectors.toList());
+
+        return universityMapper.toUniversityDto(university, isMember, moduleDtos);
+    }
+
+    @Transactional
+    public void joinUniversity(Integer universityId, UserDetailsImpl currentUser) {
+        User user = userRepository.findById(currentUser.getId())
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        University university = universityRepository.findById(universityId)
+            .orElseThrow(() -> new ResourceNotFoundException("University not found"));
+
+        boolean alreadyExists = membershipRepository.existsByUser_UserIdAndUniversity_UniversityId(user.getUserId(), university.getUniversityId());
+        if (alreadyExists) {
             throw new IllegalArgumentException("User is already a member of this university.");
         }
 
-        UniversityMembership membership = new UniversityMembership();
-        membership.setId(membershipId);
-        membership.setUser(user);
-        membership.setUniversity(university);
-        membership.setRole(UserRoleEnum.STUDENT);
+        // ✅ CLEANER: Use the entity constructor
+        UniversityMembership membership = new UniversityMembership(user, university, UniversityRole.UNVERIFIED_STUDENT);
         membershipRepository.save(membership);
 
-        // ✅ Update university member count
-        university.incrementMemberCount();
-        universityRepository.save(university);
-        
-        eventPublisher.publishEvent(new UserJoinedUniversityEvent(this, user, university));
+        // ✅ UPDATE COUNT: This logic is now safe.
+        // For production, this could be handled by a trigger or async event for even better performance.
+        universityRepository.incrementMemberCount(universityId);
+        log.info("User '{}' joined university '{}'. Member count updated.", user.getUsername(), university.getName());
     }
 
     @Transactional
-    @CacheEvict(value = "universities", allEntries = true)
     public void unjoinUniversity(Integer universityId, UserDetailsImpl currentUser) {
-        University university = universityRepository.findById(universityId)
-            .orElseThrow(() -> new ResourceNotFoundException("University not found with id: " + universityId));
+        UniversityMembership membership = membershipRepository
+            .findByUser_UserIdAndUniversity_UniversityId(currentUser.getId(), universityId)
+            .orElseThrow(() -> new ResourceNotFoundException("Membership not found for this user and university."));
+
+        membershipRepository.delete(membership);
         
-        membershipRepository.deleteByUserIdAndUniversityId(currentUser.getId(), universityId);
-        
-        // ✅ Update university member count
-        university.decrementMemberCount();
-        universityRepository.save(university);
+        // ✅ UPDATE COUNT:
+        universityRepository.decrementMemberCount(universityId);
+        log.info("User with id {} left university with id {}. Member count updated.", currentUser.getId(), universityId);
     }
 
     @Transactional(readOnly = true)
-    public List<UniversityDto> getJoinedUniversities(UserDetailsImpl currentUserDetails) {
-    if (currentUserDetails == null) {
-        return Collections.emptyList(); // A non-logged-in user has joined nothing
-    }
-
-    User currentUser = userRepository.findById(currentUserDetails.getId())
-            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-    return currentUser.getMemberships().stream()
-            .map(membership -> {
-                // Map the University from the membership to its DTO
-                // The 'isMember' flag is always true here by definition
-                return UniversityMapper.toUniversityDto(membership.getUniversity(), true);
-            })
+    public List<UniversityBasicDto> getJoinedUniversities(UserDetailsImpl currentUser) {
+        if (currentUser == null) return Collections.emptyList();
+        
+        // ✅ EFFICIENT: Fetch universities directly via a JOIN, instead of going through the User entity.
+        return membershipRepository.findUniversitiesByUserId(currentUser.getId()).stream()
+            .map(university -> universityMapper.toUniversityBasicDto(university, true))
             .collect(Collectors.toList());
-}
-
-@Transactional(readOnly = true)
-    public List<UniversityDto> getTopUniversities(UserDetailsImpl currentUserDetails) {
-        List<University> topUniversities = universityRepository.findTop5ByOrderByMembershipsSizeDesc();
-
-        final Set<Integer> memberUniversityIds;
-        if (currentUserDetails != null) {
-            // This logic is duplicated, consider refactoring to a private helper method if used often
-            User currentUser = userRepository.findById(currentUserDetails.getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-            memberUniversityIds = currentUser.getMemberships().stream()
-                    .map(membership -> membership.getUniversity().getUniversityId())
-                    .collect(Collectors.toSet());
-        } else {
-            memberUniversityIds = Collections.emptySet();
-        }
-
-        return topUniversities.stream()
-                .map(university -> UniversityMapper.toUniversityDto(
-                        university,
-                        memberUniversityIds.contains(university.getUniversityId())
-                ))
-                .collect(Collectors.toList());
     }
 
-    // ✅ NEW: Get topics by university
     @Transactional(readOnly = true)
-    public Page<TopicSummaryDto> getTopicsByUniversity(Integer universityId, Pageable pageable, UserDetailsImpl currentUser) {
-        if (!universityRepository.existsById(universityId)) {
-            throw new ResourceNotFoundException("University not found with id: " + universityId);
-        }
+    public List<UniversityBasicDto> getTopUniversities(UserDetailsImpl currentUser) {
+        // ✅ CORRECT: Sort by the denormalized `memberCount` field.
+        List<University> topUniversities = universityRepository.findTop5ByOrderByMemberCountDesc();
+        Set<Integer> memberUniversityIds = getMemberUniversityIds(currentUser);
         
-        Integer currentUserId = (currentUser != null) ? currentUser.getId() : null;
-        
-        // Get all module IDs for this university
-        List<Integer> moduleIds = moduleRepository.findByUniversityUniversityId(universityId)
-                .stream()
-                .map(Module::getModuleId)
-                .collect(Collectors.toList());
-        
-        if (moduleIds.isEmpty()) {
-            return Page.empty(pageable);
-        }
-        
-        return topicRepository.findTopicSummariesByModuleIdIn(moduleIds, currentUserId, pageable);
+        return topUniversities.stream()
+            .map(uni -> universityMapper.toUniversityBasicDto(uni, memberUniversityIds.contains(uni.getUniversityId())))
+            .collect(Collectors.toList());
     }
 
-    // ✅ NEW: Update university topic count when a topic is created/deleted in its modules
-    @Transactional
-    public void updateUniversityTopicCount(Integer universityId) {
-        University university = universityRepository.findById(universityId)
-                .orElseThrow(() -> new ResourceNotFoundException("University not found"));
-        
-        // Calculate total topics across all modules
-        int totalTopics = moduleRepository.findByUniversityUniversityId(universityId)
-                .stream()
-                .mapToInt(Module::getTopicCount)
-                .sum();
-        
-        university.setTopicCount(totalTopics);
-        universityRepository.save(university);
+    /**
+     * ✅ REFACTORED: Private helper to safely get the university IDs a user is a member of.
+     * This replaces all broken `currentUser.getMemberships()` calls.
+     */
+    private Set<Integer> getMemberUniversityIds(UserDetailsImpl currentUser) {
+        if (currentUser == null) {
+            return Collections.emptySet();
+        }
+        return membershipRepository.findUniversityIdsByUserId(currentUser.getId());
     }
 }

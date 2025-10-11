@@ -1,0 +1,748 @@
+﻿//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\auth\mapper\AuthMapper.java
+package com.tuniv.backend.auth.mapper;
+
+import java.util.Optional;
+
+import org.springframework.stereotype.Component;
+
+import com.tuniv.backend.auth.dto.JwtResponse;
+import com.tuniv.backend.auth.dto.VerificationInfo;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.university.model.UniversityMembership;
+import com.tuniv.backend.user.model.User;
+
+@Component
+public class AuthMapper {
+
+    /**
+     * Creates a JwtResponse DTO from a User entity and other authentication details.
+     *
+     * @param token           The generated JSON Web Token. Can be null for 2FA challenges.
+     * @param user            The fully hydrated User entity.
+     * @param primaryMembership An Optional containing the user's primary university membership.
+     * @param is2faRequired   A flag indicating if the frontend should prompt for a 2FA code.
+     * @return A fully populated JwtResponse object.
+     */
+    public static JwtResponse toJwtResponse(
+            String token,
+            User user,
+            Optional<UniversityMembership> primaryMembership,
+            boolean is2faRequired) {
+
+        // Create VerificationInfo DTO from the primary membership, or null if not present
+        VerificationInfo verificationInfo = primaryMembership
+                .map(membership -> new VerificationInfo(
+                        membership.getUniversity().getName(),
+                        membership.getStatus(),
+                        membership.getRole()
+                ))
+                .orElse(null);
+
+        // Map all fields from the User entity to the JwtResponse
+        return new JwtResponse(
+                token,
+                user.getUserId(),
+                user.getUsername(),
+                user.getEmail(),
+                user.getProfilePhotoUrl(),
+                user.getBio(),
+                user.getMajor(),
+                user.getReputationScore(),
+                verificationInfo,
+                user.getTopicCount(),
+                user.getReplyCount(),
+                user.getFollowerCount(),
+                user.getFollowingCount(),
+                0L, // Placeholder for unreadNotificationsCount
+                0L, // Placeholder for unreadMessagesCount
+                is2faRequired,
+                user.is2faEnabled()
+        );
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\mapper\ChatMapper.java
+package com.tuniv.backend.chat.mapper;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Component;
+
+import com.tuniv.backend.chat.dto.ChatMessageDto;
+import com.tuniv.backend.chat.dto.ReactionDto;
+import com.tuniv.backend.chat.model.Message;
+import com.tuniv.backend.chat.model.Reaction;
+import com.tuniv.backend.qa.dto.AttachmentDto;
+import com.tuniv.backend.qa.mapper.TopicMapper;
+import com.tuniv.backend.qa.model.Attachment;
+
+import lombok.RequiredArgsConstructor;
+
+@Component
+@RequiredArgsConstructor
+public class ChatMapper {
+
+    // No TopicMapper field needed here since its methods are static
+
+    public ChatMessageDto toChatMessageDto(Message message, List<Reaction> reactions, String currentUsername) {
+        if (message == null) {
+            return null;
+        }
+
+        ChatMessageDto dto = new ChatMessageDto();
+        dto.setMessageId(message.getId());
+        dto.setDeleted(message.isDeleted());
+        dto.setSenderUsername(message.getAuthor() != null ? message.getAuthor().getUsername() : "Unknown User");
+        dto.setSentAt(message.getSentAt() != null ? message.getSentAt().toString() : message.getCreatedAt().toString());
+
+        if (message.isDeleted()) {
+            dto.setContent("This message was deleted.");
+            dto.setAttachments(Collections.emptyList());
+            dto.setReactions(Collections.emptyList());
+        } else {
+            dto.setContent(message.getBody());
+            dto.setAttachments(mapAttachmentsToDto(message.getAttachments()));
+            dto.setReactions(mapReactionsToDto(reactions, currentUsername));
+        }
+        return dto;
+    }
+
+    public ChatMessageDto toChatMessageDto(Message message, List<Reaction> reactions, String currentUsername, Long clientTempId) {
+        ChatMessageDto dto = toChatMessageDto(message, reactions, currentUsername);
+        if (dto != null) {
+            dto.setClientTempId(clientTempId);
+        }
+        return dto;
+    }
+
+    /**
+     * Helper method to map attachments.
+     */
+    private List<AttachmentDto> mapAttachmentsToDto(Set<Attachment> attachments) {
+        if (attachments == null || attachments.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return attachments.stream()
+                .map(TopicMapper::toAttachmentDto) // Correctly uses static method
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Helper method to group and map reactions to their DTO representation.
+     */
+    private List<ReactionDto> mapReactionsToDto(List<Reaction> reactions, String currentUsername) {
+        if (reactions == null || reactions.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return reactions.stream()
+                .collect(Collectors.groupingBy(Reaction::getEmoji))
+                .entrySet().stream()
+                .map(entry -> {
+                    String emoji = entry.getKey();
+                    List<Reaction> reactionGroup = entry.getValue();
+                    List<String> usernames = reactionGroup.stream()
+                            .map(r -> r.getUser().getUsername())
+                            .collect(Collectors.toList());
+                    boolean currentUserReacted = currentUsername != null && usernames.contains(currentUsername);
+                    return new ReactionDto(emoji, reactionGroup.size(), usernames, currentUserReacted);
+                })
+                .collect(Collectors.toList());
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\mapper\CommunityMapper.java
+package com.tuniv.backend.community.mapper;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Component;
+
+import com.tuniv.backend.community.dto.CommunityBasicDto;
+import com.tuniv.backend.community.dto.CommunityDetailDto;
+import com.tuniv.backend.community.dto.CommunityStatsDto;
+import com.tuniv.backend.community.dto.CommunitySummaryDto;
+import com.tuniv.backend.community.dto.CommunityTopicStatsDto;
+import com.tuniv.backend.community.dto.CommunityWithStatsDto;
+import com.tuniv.backend.community.dto.TrendingCommunityDto;
+import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.community.model.CommunityMembership;
+import com.tuniv.backend.community.model.CommunityRole;
+import com.tuniv.backend.qa.model.TopicType;
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import com.tuniv.backend.user.mapper.UserMapper;
+import com.tuniv.backend.user.model.User;
+
+import lombok.RequiredArgsConstructor;
+
+@Component
+@RequiredArgsConstructor
+public class CommunityMapper {
+
+    private final UserMapper userMapper;
+
+    public CommunitySummaryDto toSummaryDto(Community community) {
+        if (community == null) {
+            return null;
+        }
+        
+        String universityName = (community.getUniversity() != null) ? community.getUniversity().getName() : null;
+        
+        return new CommunitySummaryDto(
+            community.getCommunityId(),
+            community.getName(),
+            community.getMemberCount(),
+            community.getTopicCount(),
+            universityName
+        );
+    }
+
+    public CommunityDetailDto toDetailDto(Community community, User currentUser) {
+        if (community == null) {
+            return null;
+        }
+
+        boolean isMember = false;
+        boolean isModerator = false;
+
+        // Check the current user's status within the community
+        if (currentUser != null && community.getMembers() != null) {
+            for (CommunityMembership membership : community.getMembers()) {
+                if (membership.getUser().getUserId().equals(currentUser.getUserId())) {
+                    isMember = true;
+                    if (membership.getRole() == CommunityRole.MODERATOR) {
+                        isModerator = true;
+                    }
+                    break;
+                }
+            }
+        }
+        
+        String universityName = (community.getUniversity() != null) ? community.getUniversity().getName() : null;
+        UserSummaryDto creatorSummary = userMapper.toUserSummaryDto(community.getCreator());
+
+        return new CommunityDetailDto(
+            community.getCommunityId(),
+            community.getName(),
+            community.getDescription(),
+            community.getMemberCount(),
+            community.getTopicCount(),
+            community.getCreatedAt(),
+            creatorSummary,
+            universityName,
+            isMember,
+            isModerator
+        );
+    }
+
+    public List<CommunitySummaryDto> toSummaryDtoList(List<Community> communities) {
+        return communities.stream()
+            .map(this::toSummaryDto)
+            .collect(Collectors.toList());
+    }
+
+    public CommunityBasicDto toBasicDto(Community community) {
+        if (community == null) {
+            return null;
+        }
+        
+        return new CommunityBasicDto(
+            community.getCommunityId(),
+            community.getName(),
+            community.getUniversity() != null ? community.getUniversity().getName() : null
+        );
+    }
+
+    // âœ… NEW: Convert CommunityTopicStatsDto to CommunityStatsDto
+    public CommunityStatsDto toStatsDto(CommunityTopicStatsDto statsDto, Community community) {
+        if (statsDto == null || community == null) {
+            return null;
+        }
+
+        Map<TopicType, Long> topicTypeDistribution = new HashMap<>();
+        topicTypeDistribution.put(TopicType.QUESTION, statsDto.questionTopics());
+        topicTypeDistribution.put(TopicType.POST, statsDto.postTopics());
+
+        return new CommunityStatsDto(
+            statsDto.communityId(),
+            statsDto.communityName(),
+            statsDto.totalTopics().intValue(),
+            community.getMemberCount(),
+            statsDto.solvedTopics().intValue(),
+            topicTypeDistribution,
+            statsDto.getSolutionRate(),
+            statsDto.getQuestionPercentage(),
+            statsDto.getPostPercentage()
+        );
+    }
+
+    // âœ… NEW: Convert to CommunityWithStatsDto (combined detail + stats)
+    public CommunityWithStatsDto toCommunityWithStatsDto(Community community, CommunityTopicStatsDto statsDto, User currentUser) {
+        CommunityDetailDto detailDto = toDetailDto(community, currentUser);
+        CommunityStatsDto stats = toStatsDto(statsDto, community);
+
+        return new CommunityWithStatsDto(
+            detailDto,
+            stats
+        );
+    }
+
+    // âœ… NEW: Convert to TrendingCommunityDto
+    public TrendingCommunityDto toTrendingCommunityDto(Community community, Long recentActivityCount) {
+        if (community == null) {
+            return null;
+        }
+
+        String universityName = (community.getUniversity() != null) ? community.getUniversity().getName() : null;
+
+        return new TrendingCommunityDto(
+            community.getCommunityId(),
+            community.getName(),
+            community.getMemberCount(),
+            community.getTopicCount(),
+            universityName,
+            recentActivityCount != null ? recentActivityCount : 0L,
+            calculateActivityScore(community, recentActivityCount)
+        );
+    }
+
+    // âœ… NEW: Helper method to calculate activity score
+    private Double calculateActivityScore(Community community, Long recentActivityCount) {
+        if (recentActivityCount == null || community.getTopicCount() == 0) {
+            return 0.0;
+        }
+
+        double activityRatio = (double) recentActivityCount / community.getTopicCount();
+        double memberRatio = community.getMemberCount() > 0 ? 
+            (double) recentActivityCount / community.getMemberCount() : 0;
+
+        return (activityRatio * 0.6) + (memberRatio * 0.4);
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\mapper\NotificationMapper.java
+package com.tuniv.backend.notification.mapper;
+
+import com.tuniv.backend.notification.dto.NotificationDto;
+import com.tuniv.backend.notification.model.Notification;
+
+public class NotificationMapper {
+
+    public static NotificationDto toDto(Notification notification) {
+        if (notification == null) {
+            return null;
+        }
+
+        return NotificationDto.builder()
+                .notificationId(notification.getNotificationId())
+                .actorUsername(notification.getActor() != null ? notification.getActor().getUsername() : "System")
+                .message(notification.getMessage())
+                .link(notification.getLink())
+                .isRead(notification.isRead())
+                .createdAt(notification.getCreatedAt())
+                .type(notification.getType())
+                .build();
+    }
+}
+
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\mapper\TopicMapper.java
+package com.tuniv.backend.qa.mapper;
+
+import com.tuniv.backend.qa.dto.*;
+import com.tuniv.backend.qa.model.*;
+import com.tuniv.backend.shared.model.ContainerType;
+import com.tuniv.backend.user.model.User;
+import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Maps Topic, Reply, and related entities to their corresponding DTOs.
+ * Centralizes complex object graph assembly to keep services clean.
+ * This component is designed to work with data fetched from repositories,
+ * not from direct, lazy-loaded entity collections.
+ */
+@Component
+public class TopicMapper {
+
+    /**
+     * The primary method for building the detailed Topic view.
+     * It orchestrates the mapping of the topic and all its related, pre-fetched data.
+     *
+     * @param topic            The core Topic entity.
+     * @param allReplies       A flat list of all replies belonging to the topic.
+     * @param tags             A list of tags associated with the topic.
+     * @param attachments      A list of attachments for the topic.
+     * @param currentUserVotes A map of the current user's votes [postId -> voteType].
+     * @return A fully assembled TopicResponseDto.
+     */
+    public TopicResponseDto toTopicResponseDto(
+        Topic topic,
+        List<Reply> allReplies,
+        List<Tag> tags,
+        List<Attachment> attachments,
+        Map<Integer, String> currentUserVotes) {
+
+        List<AttachmentDto> attachmentDtos = attachments.stream()
+            .map(this::toAttachmentDto)
+            .collect(Collectors.toList());
+
+        List<String> tagNames = tags.stream()
+            .map(Tag::getName)
+            .collect(Collectors.toList());
+
+        // âœ… Efficiently build the nested reply tree from the flat list
+        List<ReplyResponseDto> nestedReplies = buildReplyTree(allReplies, currentUserVotes);
+
+        return new TopicResponseDto(
+            topic.getId(),
+            topic.getTitle(),
+            topic.getBody(),
+            topic.getTopicType(),
+            topic.isSolved(),
+            toUserDto(topic.getAuthor()),
+            topic.getCreatedAt(),
+            topic.getEditedAt(),
+            topic.getScore(),
+            currentUserVotes.get(topic.getId()),
+            topic.getReplyCount(), // âœ… Use denormalized count
+            topic.getViewCount(),  // âœ… Use denormalized count
+            toSolutionInfoDto(topic.getAcceptedSolution()),
+            toContainerInfoDto(topic),
+            tagNames,
+            attachmentDtos,
+            nestedReplies
+        );
+    }
+
+    /**
+     * Maps a Topic to its summary DTO, used in lists.
+     *
+     * @param topic           The Topic entity.
+     * @param tags            The pre-fetched list of tags for this topic.
+     * @param currentUserVote The current user's vote status for this topic.
+     * @return A TopicSummaryDto.
+     */
+    public TopicSummaryDto toTopicSummaryDto(Topic topic, List<Tag> tags, String currentUserVote) {
+        return new TopicSummaryDto(
+            topic.getId(),
+            topic.getTitle(),
+            topic.getTopicType(),
+            topic.getAuthor().getUserId(),
+            topic.getAuthor().getUsername(),
+            topic.getCreatedAt(),
+            topic.getScore(),
+            topic.getReplyCount(), // âœ… Use denormalized count
+            currentUserVote,
+            topic.isSolved(),
+            getContainerId(topic),
+            getContainerName(topic),
+            tags.stream().map(Tag::getName).collect(Collectors.toList())
+        );
+    }
+
+    //<editor-fold desc="Tree Building and Helper Methods">
+
+    /**
+     * Efficiently builds a nested reply tree from a flat list. This avoids N+1 query problems
+     * and deep recursion issues that can occur with lazy-loaded collections.
+     *
+     * @param flatReplies      A list of ALL replies for a single topic.
+     * @param currentUserVotes A map of the current user's votes.
+     * @return A list of only the top-level replies, with their children nested correctly.
+     */
+    private List<ReplyResponseDto> buildReplyTree(List<Reply> flatReplies, Map<Integer, String> currentUserVotes) {
+        if (flatReplies == null || flatReplies.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 1. Create a map of all reply DTOs, keyed by their ID, for quick access.
+        Map<Integer, ReplyResponseDto> replyDtoMap = flatReplies.stream()
+            .collect(Collectors.toMap(Reply::getId, reply -> toReplyResponseDto(reply, currentUserVotes)));
+
+        // 2. Group the DTOs by their parent's ID.
+        Map<Integer, List<ReplyResponseDto>> childrenByParentId = flatReplies.stream()
+            .filter(reply -> reply.getParentReply() != null)
+            .collect(Collectors.groupingBy(
+                reply -> reply.getParentReply().getId(),
+                Collectors.mapping(reply -> replyDtoMap.get(reply.getId()), Collectors.toList())
+            ));
+
+        // 3. Attach the children lists to their respective parents.
+        replyDtoMap.values().forEach(dto -> 
+            dto.childReplies().addAll(childrenByParentId.getOrDefault(dto.id(), new ArrayList<>()))
+        );
+
+        // 4. Return only the top-level replies (those without a parent).
+        return replyDtoMap.values().stream()
+            .filter(dto -> dto.parentReplyId() == null)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Helper to map a single Reply entity to its DTO.
+     * Initializes `childReplies` as an empty list, which is populated by the `buildReplyTree` method.
+     */
+    private ReplyResponseDto toReplyResponseDto(Reply reply, Map<Integer, String> currentUserVotes) {
+        // Here, you would fetch attachments for the reply if they were needed on a per-reply basis.
+        // For simplicity, we assume attachments are primarily on the main topic.
+        List<AttachmentDto> attachments = new ArrayList<>();
+
+        return new ReplyResponseDto(
+            reply.getId(),
+            reply.getBody(),
+            toUserDto(reply.getAuthor()),
+            reply.getCreatedAt(),
+            reply.getEditedAt(),
+            reply.getScore(),
+            currentUserVotes.get(reply.getId()),
+            reply.getTopic().getId(),
+            reply.getParentReply() != null ? reply.getParentReply().getId() : null,
+            reply.isSolution(),
+            attachments,
+            new ArrayList<>() // Children are populated by the tree-building algorithm
+        );
+    }
+    
+    private UserDto toUserDto(User user) {
+        if (user == null) return null;
+        return new UserDto(
+            user.getUserId(),
+            user.getUsername(),
+            user.getReputationScore(),
+            user.getProfilePhotoUrl()
+        );
+    }
+
+    private AttachmentDto toAttachmentDto(Attachment attachment) {
+        if (attachment == null) return null;
+        return new AttachmentDto(
+            attachment.getAttachmentId(),
+            attachment.getFileName(),
+            attachment.getFileUrl(),
+            attachment.getFileType(),
+            attachment.getFileSize()
+        );
+    }
+
+    private SolutionInfoDto toSolutionInfoDto(Reply solution) {
+        if (solution == null) return null;
+        return new SolutionInfoDto(
+            solution.getId(),
+            solution.getBody(),
+            toUserDto(solution.getAuthor()),
+            solution.getCreatedAt()
+        );
+    }
+
+    private ContainerInfoDto toContainerInfoDto(Topic topic) {
+        if (topic.getModule() != null) {
+            return new ContainerInfoDto(topic.getModule().getModuleId(), topic.getModule().getName(), ContainerType.MODULE);
+        }
+        if (topic.getCommunity() != null) {
+            return new ContainerInfoDto(topic.getCommunity().getCommunityId(), topic.getCommunity().getName(), ContainerType.COMMUNITY);
+        }
+        return null;
+    }
+
+    private Integer getContainerId(Topic topic) {
+        if (topic.getModule() != null) return topic.getModule().getModuleId();
+        if (topic.getCommunity() != null) return topic.getCommunity().getCommunityId();
+        return null;
+    }
+    
+    private String getContainerName(Topic topic) {
+        if (topic.getModule() != null) return topic.getModule().getName();
+        if (topic.getCommunity() != null) return topic.getCommunity().getName();
+        return null;
+    }
+
+    //</editor-fold>
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\mapper\UniversityMapper.java
+package com.tuniv.backend.university.mapper;
+
+import com.tuniv.backend.university.dto.ModuleDetailDto;
+import com.tuniv.backend.university.dto.ModuleDto;
+import com.tuniv.backend.university.dto.UniversityBasicDto;
+import com.tuniv.backend.university.dto.UniversityDto;
+import com.tuniv.backend.university.model.Module;
+import com.tuniv.backend.university.model.University;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/**
+ * Maps University and Module entities to their corresponding DTOs.
+ * Follows a component-based approach for dependency injection.
+ */
+@Component
+public class UniversityMapper {
+
+    /**
+     * âœ… REFACTORED: Maps a University and a separately provided list of its modules to a UniversityDto.
+     * This decouples the mapper from the university entity's structure, avoiding N+1 problems.
+     */
+    public UniversityDto toUniversityDto(University university, boolean isMember, List<ModuleDto> moduleDtos) {
+        if (university == null) {
+            return null;
+        }
+
+        return new UniversityDto(
+            university.getUniversityId(),
+            university.getName(),
+            moduleDtos, // âœ… Use the provided list
+            isMember,
+            university.getMemberCount(),
+            university.getTopicCount()
+        );
+    }
+
+    public UniversityBasicDto toUniversityBasicDto(University university, boolean isMember) {
+        if (university == null) {
+            return null;
+        }
+        return new UniversityBasicDto(
+            university.getUniversityId(),
+            university.getName(),
+            isMember,
+            university.getTopicCount(),
+            university.getMemberCount()
+        );
+    }
+    
+    public ModuleDto toModuleDto(Module module, boolean isMemberOfParentUniversity) {
+        if (module == null) {
+            return null;
+        }
+        return new ModuleDto(
+            module.getModuleId(),
+            module.getName(),
+            module.getTopicCount(),
+            isMemberOfParentUniversity
+        );
+    }
+    
+    public ModuleDetailDto toModuleDetailDto(Module module, boolean isMemberOfParentUniversity) {
+        if (module == null) {
+            return null;
+        }
+        UniversityBasicDto universityDto = toUniversityBasicDto(module.getUniversity(), isMemberOfParentUniversity);
+        return new ModuleDetailDto(
+            module.getModuleId(),
+            module.getName(),
+            universityDto,
+            module.getTopicCount(),
+            isMemberOfParentUniversity
+        );
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\mapper\UserMapper.java
+package com.tuniv.backend.user.mapper;
+
+import com.tuniv.backend.auth.dto.VerificationInfo;
+import com.tuniv.backend.university.model.UniversityMembership;
+import com.tuniv.backend.user.dto.LeaderboardUserDto;
+import com.tuniv.backend.user.dto.UserProfileDto;
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import com.tuniv.backend.user.model.User;
+import org.springframework.stereotype.Component;
+
+import java.util.Optional;
+
+@Component
+public class UserMapper {
+
+    /**
+     * Maps a User entity to a lightweight summary DTO.
+     */
+    public UserSummaryDto toUserSummaryDto(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new UserSummaryDto(
+                user.getUserId(),
+                user.getUsername(),
+                user.getProfilePhotoUrl(),
+                user.getReputationScore()
+        );
+    }
+
+    /**
+     * âœ… UPDATED: Maps a User entity and their optional primary membership to a detailed profile DTO.
+     * This method now leverages the denormalized counts directly from the User object for efficiency.
+     *
+     * @param user              The User entity to map.
+     * @param primaryMembership An Optional containing the user's primary university membership.
+     * @return A detailed UserProfileDto.
+     */
+    public UserProfileDto toUserProfileDto(User user, Optional<UniversityMembership> primaryMembership) {
+        if (user == null) {
+            return null;
+        }
+
+        // Map the optional membership to a VerificationInfo DTO
+        VerificationInfo verificationInfo = primaryMembership
+        .map(membership -> new VerificationInfo(
+                membership.getUniversity().getName(),
+                membership.getStatus(), // âœ… ADD THIS
+                membership.getRole()
+        ))
+        .orElse(null);
+
+
+        return new UserProfileDto(
+                user.getUserId(),
+                user.getUsername(),
+                user.getProfilePhotoUrl(),
+                user.getBio(),
+                user.getMajor(),
+                user.getReputationScore(),
+                user.getTopicCount(),      // âœ… Use denormalized count
+                user.getReplyCount(),      // âœ… Use denormalized count
+                user.getFollowerCount(),   // âœ… Use denormalized count
+                verificationInfo
+        );
+    }
+
+    /**
+     * Maps a User entity to a specialized DTO for the leaderboard.
+     */
+    public LeaderboardUserDto toLeaderboardUserDto(User user) {
+        if (user == null) {
+            return null;
+        }
+        return new LeaderboardUserDto(
+                user.getUserId(),
+                user.getUsername(),
+                user.getReputationScore(),
+                user.getProfilePhotoUrl()
+        );
+    }
+}
+
+
+

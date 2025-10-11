@@ -13,96 +13,101 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.tuniv.backend.qa.model.Attachment;
-
 @Repository
 public interface AttachmentRepository extends JpaRepository<Attachment, Integer> {
-    
-    // ✅ OPTIMIZED: Single method with EntityGraph for efficient fetching
+
+    // ✅ Great methods for finding attachments for one or more posts.
     @EntityGraph(attributePaths = {"post"})
     List<Attachment> findByPostIdIn(List<Integer> postIds);
 
-    // ✅ NEW: Efficient bulk deletion
-    @Modifying
-    @Query("DELETE FROM Attachment a WHERE a.post.id = :postId")
-    void deleteByPostId(@Param("postId") Integer postId);
-
-    // ✅ NEW: Find by multiple posts with pagination
-    @EntityGraph(attributePaths = {"post"})
-    Page<Attachment> findByPostIdIn(List<Integer> postIds, Pageable pageable);
-
-    // ✅ NEW: Find attachments by post ID with pagination
     @EntityGraph(attributePaths = {"post"})
     Page<Attachment> findByPostId(Integer postId, Pageable pageable);
 
-    // ✅ NEW: Count attachments by post ID
-    long countByPostId(Integer postId);
+    @EntityGraph(attributePaths = {"post"})
+    Page<Attachment> findByPostIdIn(List<Integer> postIds, Pageable pageable);
 
-    // ✅ NEW: Find attachments by file type
+    // ✅ Standard count method.
+    long countByPostId(Integer postId);
+    
+    // ✅ Efficient batch operation for getting attachment counts for multiple posts.
+    @Query("SELECT a.post.id, COUNT(a) FROM Attachment a WHERE a.post.id IN :postIds GROUP BY a.post.id")
+    List<Object[]> countAttachmentsByPostIds(@Param("postIds") List<Integer> postIds);
+
+    // ✅ Useful methods for filtering by file type.
     @EntityGraph(attributePaths = {"post"})
     List<Attachment> findByFileType(String fileType);
 
-    // ✅ NEW: Find attachments by multiple file types
     @EntityGraph(attributePaths = {"post"})
     List<Attachment> findByFileTypeIn(List<String> fileTypes);
-
-    // ✅ NEW: Find large attachments (above certain size)
-    @EntityGraph(attributePaths = {"post"})
-    @Query("SELECT a FROM Attachment a WHERE a.fileSize > :minSize")
-    List<Attachment> findLargeAttachments(@Param("minSize") Long minSize);
-
-    // ✅ NEW: Find recent attachments
-    @EntityGraph(attributePaths = {"post"})
-    List<Attachment> findTop10ByOrderByUploadedAtDesc();
-
-    // ✅ NEW: Find attachments by post and file type
+    
     @EntityGraph(attributePaths = {"post"})
     List<Attachment> findByPostIdAndFileType(Integer postId, String fileType);
 
-    // ✅ NEW: Batch delete attachments by post IDs
-    @Modifying
-    @Query("DELETE FROM Attachment a WHERE a.post.id IN :postIds")
-    void deleteByPostIdIn(@Param("postIds") List<Integer> postIds);
-
-    // ✅ NEW: Find attachment with post and author details
-    @EntityGraph(attributePaths = {"post", "post.author"})
-    Optional<Attachment> findWithPostAndAuthorById(Integer attachmentId);
-
-    // ✅ NEW: Count attachments by file type
-    @Query("SELECT a.fileType, COUNT(a) FROM Attachment a GROUP BY a.fileType")
-    List<Object[]> countAttachmentsByFileType();
-
-    // ✅ NEW: Find orphaned attachments (attachments without posts)
-    @Query("SELECT a FROM Attachment a WHERE a.post IS NULL")
-    List<Attachment> findOrphanedAttachments();
-
-    // ✅ NEW: Efficient cleanup of orphaned attachments
-    @Modifying
-    @Query("DELETE FROM Attachment a WHERE a.post IS NULL")
-    void deleteOrphanedAttachments();
-
-    // ✅ NEW: Get total storage used by attachments
-    @Query("SELECT COALESCE(SUM(a.fileSize), 0) FROM Attachment a")
-    Long getTotalStorageUsed();
-
-    // ✅ NEW: Get storage used by specific user's attachments
-    @Query("SELECT COALESCE(SUM(a.fileSize), 0) FROM Attachment a WHERE a.post.author.userId = :userId")
-    Long getStorageUsedByUser(@Param("userId") Integer userId);
-
-    // ✅ NEW: Find attachments with pagination and sorting
-    @EntityGraph(attributePaths = {"post"})
-    Page<Attachment> findAllByOrderByUploadedAtDesc(Pageable pageable);
-
-    // ✅ NEW: Search attachments by filename
-    @EntityGraph(attributePaths = {"post"})
-    @Query("SELECT a FROM Attachment a WHERE LOWER(a.fileName) LIKE LOWER(CONCAT('%', :filename, '%'))")
-    Page<Attachment> findByFileNameContainingIgnoreCase(@Param("filename") String filename, Pageable pageable);
-
-    // ✅ NEW: Find attachments by post ID with specific file types
     @EntityGraph(attributePaths = {"post"})
     @Query("SELECT a FROM Attachment a WHERE a.post.id = :postId AND a.fileType IN :fileTypes")
     List<Attachment> findByPostIdAndFileTypeIn(@Param("postId") Integer postId, @Param("fileTypes") List<String> fileTypes);
 
-    // ✅ NEW: Get attachment count by post IDs (batch operation)
-    @Query("SELECT a.post.id, COUNT(a) FROM Attachment a WHERE a.post.id IN :postIds GROUP BY a.post.id")
-    List<Object[]> countAttachmentsByPostIds(@Param("postIds") List<Integer> postIds);
+    // ✅ Great for admin/moderation tasks to monitor storage.
+    @EntityGraph(attributePaths = {"post"})
+    @Query("SELECT a FROM Attachment a WHERE a.fileSize > :minSize")
+    List<Attachment> findLargeAttachments(@Param("minSize") Long minSize);
+    
+    // ✅ Good for a "recently uploaded" feed.
+    @EntityGraph(attributePaths = {"post"})
+    List<Attachment> findTop10ByOrderByUploadedAtDesc();
+
+    // ✅ Efficient bulk delete operations.
+    @Modifying
+    @Query("DELETE FROM Attachment a WHERE a.post.id = :postId")
+    void deleteByPostId(@Param("postId") Integer postId);
+    
+    @Modifying
+    @Query("DELETE FROM Attachment a WHERE a.post.id IN :postIds")
+    void deleteByPostIdIn(@Param("postIds") List<Integer> postIds);
+
+    // ✅ Excellent use of EntityGraph to fetch related data efficiently.
+    @EntityGraph(attributePaths = {"post", "post.author"})
+    Optional<Attachment> findWithPostAndAuthorById(Integer attachmentId);
+    
+    // ✅ Great analytics queries.
+    @Query("SELECT a.fileType, COUNT(a) FROM Attachment a GROUP BY a.fileType")
+    List<Object[]> countAttachmentsByFileType();
+
+    @Query("SELECT COALESCE(SUM(a.fileSize), 0) FROM Attachment a")
+    Long getTotalStorageUsed();
+
+    @Query("SELECT COALESCE(SUM(a.fileSize), 0) FROM Attachment a WHERE a.post.author.userId = :userId")
+    Long getStorageUsedByPostAuthor(@Param("userId") Integer userId);
+
+    /**
+     * ✅ ADDED: Finds attachments uploaded by a specific user.
+     * This is distinct from the author of the post.
+     */
+    @EntityGraph(attributePaths = {"post"})
+    Page<Attachment> findByUploadedBy_UserId(Integer userId, Pageable pageable);
+
+    /**
+     * ✅ NOTE: In a correctly operating application, these "orphaned attachment" methods
+     * should never find or delete anything. The `post` field on the Attachment entity is
+     * non-nullable, so the database schema prevents attachments from existing without a post.
+     * They are kept here as a failsafe for data cleanup in case of manual database errors.
+     */
+    @Query("SELECT a FROM Attachment a WHERE a.post IS NULL")
+    List<Attachment> findOrphanedAttachments();
+
+    @Modifying
+    @Query("DELETE FROM Attachment a WHERE a.post IS NULL")
+    void deleteOrphanedAttachments();
+    
+    // ✅ Standard paginated find method.
+    @EntityGraph(attributePaths = {"post"})
+    Page<Attachment> findAllByOrderByUploadedAtDesc(Pageable pageable);
+
+    /**
+     * ✅ NOTE: `LIKE '%query%'` searches can be slow on very large tables.
+     * For high-performance searching, consider a database full-text search index.
+     */
+    @EntityGraph(attributePaths = {"post"})
+    @Query("SELECT a FROM Attachment a WHERE LOWER(a.fileName) LIKE LOWER(CONCAT('%', :filename, '%'))")
+    Page<Attachment> findByFileNameContainingIgnoreCase(@Param("filename") String filename, Pageable pageable);
 }

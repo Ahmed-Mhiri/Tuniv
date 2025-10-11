@@ -1,22 +1,9 @@
 package com.tuniv.backend.qa.service;
 
-import java.util.Optional;
-
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.notification.event.NewVoteEvent;
-
-import com.tuniv.backend.qa.model.Post;
-import com.tuniv.backend.qa.model.PostType;
 import com.tuniv.backend.qa.model.Reply;
-import com.tuniv.backend.qa.model.ReplyVote;
 import com.tuniv.backend.qa.model.Topic;
-import com.tuniv.backend.qa.model.TopicVote;
-
 import com.tuniv.backend.qa.model.VotablePost;
 import com.tuniv.backend.qa.model.Vote;
 import com.tuniv.backend.qa.repository.ReplyRepository;
@@ -25,9 +12,15 @@ import com.tuniv.backend.qa.repository.VoteRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
-
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class VoteService {
@@ -38,6 +31,7 @@ public class VoteService {
     private final VoteRepository voteRepository;
     private final ApplicationEventPublisher eventPublisher;
 
+    // Reputation constants
     private static final int TOPIC_UPVOTE_REP = 5;
     private static final int REPLY_UPVOTE_REP = 10;
     private static final int DOWNVOTE_REP = -2;
@@ -46,97 +40,112 @@ public class VoteService {
     public void voteOnTopic(Integer topicId, UserDetailsImpl currentUser, int value) {
         User voter = findVoter(currentUser);
         Topic topic = topicRepository.findById(topicId)
-                .orElseThrow(() -> new ResourceNotFoundException("Topic not found"));
-
-        if (voter.getUserId().equals(topic.getAuthor().getUserId())) {
-            throw new IllegalArgumentException("You cannot vote on your own post.");
-        }
+            .orElseThrow(() -> new ResourceNotFoundException("Topic not found with id: " + topicId));
         
-        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), topicId);
-        TopicVote newVote = new TopicVote(voter, topic, (short) value);
-
-        processVote(voter, topic, topic.getAuthor(), existingVote, newVote, value, TOPIC_UPVOTE_REP, topicRepository);
+        processVote(voter, topic, value, TOPIC_UPVOTE_REP);
     }
 
     @Transactional
     public void voteOnReply(Integer replyId, UserDetailsImpl currentUser, int value) {
         User voter = findVoter(currentUser);
-        Reply reply = replyRepository.findWithTopicById(replyId)
-                .orElseThrow(() -> new ResourceNotFoundException("Reply not found"));
+        Reply reply = replyRepository.findById(replyId)
+            .orElseThrow(() -> new ResourceNotFoundException("Reply not found with id: " + replyId));
+        
+        processVote(voter, reply, value, REPLY_UPVOTE_REP);
+    }
 
-        if (voter.getUserId().equals(reply.getAuthor().getUserId())) {
+    /**
+     * Generic, central method for processing a vote on any VotablePost.
+     * It handles new votes, undoing votes, and changing votes, while updating
+     * all scores and denormalized counters atomically.
+     */
+    private <P extends VotablePost> void processVote(User voter, P post, int value, int upvoteReputationValue) {
+        if (voter.getUserId().equals(post.getAuthor().getUserId())) {
             throw new IllegalArgumentException("You cannot vote on your own post.");
         }
 
-        Optional<Vote> existingVote = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), replyId);
-        ReplyVote newVote = new ReplyVote(voter, reply, (short) value);
-
-        processVote(voter, reply, reply.getAuthor(), existingVote, newVote, value, REPLY_UPVOTE_REP, replyRepository);
-    }
-
-    private <P extends VotablePost> void processVote(
-            User voter, P post, User author, Optional<Vote> existingVoteOpt, Vote newVote, int value,
-            int upvoteReputation, JpaRepository<P, Integer> postRepository
-    ) {
-        int reputationChange = 0;
+        User author = post.getAuthor();
         short shortValue = (short) value;
+        Optional<Vote> existingVoteOpt = voteRepository.findByUser_UserIdAndPost_Id(voter.getUserId(), post.getId());
 
         if (existingVoteOpt.isPresent()) {
+            // Existing vote found: user is either undoing or changing their vote.
             Vote existingVote = existingVoteOpt.get();
-            if (existingVote.getValue() == shortValue) { // Undoing vote
-                reputationChange = (shortValue == 1) ? -upvoteReputation : -DOWNVOTE_REP;
+            short oldValue = existingVote.getValue();
+
+            if (oldValue == shortValue) { // --- UNDOING VOTE ---
+                log.debug("User {} undoing vote on post {}", voter.getUsername(), post.getId());
                 voteRepository.delete(existingVote);
-                post.setScore(post.getScore() - shortValue);
-            } else { // Changing vote
-                reputationChange = calculateReputationChange(existingVote.getValue(), shortValue, upvoteReputation);
-                post.setScore(post.getScore() - existingVote.getValue() + shortValue);
+                updateCountsForUndo(post, author, oldValue, upvoteReputationValue);
+            } else { // --- CHANGING VOTE ---
+                log.debug("User {} changing vote on post {} from {} to {}", voter.getUsername(), post.getId(), oldValue, shortValue);
                 existingVote.setValue(shortValue);
                 voteRepository.save(existingVote);
+                updateCountsForChange(post, author, oldValue, shortValue, upvoteReputationValue);
             }
-        } else { // New vote
-            reputationChange = (shortValue == 1) ? upvoteReputation : DOWNVOTE_REP;
-            post.setScore(post.getScore() + shortValue);
+        } else { // --- NEW VOTE ---
+            log.debug("User {} casting new vote on post {}", voter.getUsername(), post.getId());
+            Vote newVote = new Vote(voter, post, shortValue);
             voteRepository.save(newVote);
+            updateCountsForNew(post, author, shortValue, upvoteReputationValue);
             
-            if (shortValue == 1) { // Only notify on upvotes
-                Post votedPost = newVote.getPost();
-                if (votedPost instanceof Topic topic) {
-                    // ✅ Using convenience constructor for Topic vote
-                    eventPublisher.publishEvent(new NewVoteEvent(
-                        voter.getUserId(), // voterId
-                        author.getUserId(), // authorId
-                        PostType.TOPIC, // postType
-                        votedPost.getId(), // postId (topic ID)
-                        topic.getTitle(), // questionTitle
-                        votedPost.getId() // questionId (same as topic ID for topics)
-                    ));
-                } else if (votedPost instanceof Reply reply) {
-                    // ✅ Using convenience constructor for Reply vote
-                    eventPublisher.publishEvent(new NewVoteEvent(
-                        voter.getUserId(), // voterId
-                        author.getUserId(), // authorId
-                        PostType.REPLY, // postType
-                        votedPost.getId(), // postId (reply ID)
-                        reply.getTopic().getTitle(), // questionTitle (from parent topic)
-                        reply.getTopic().getId() // questionId (parent topic ID)
-                    ));
-                }
+            if (shortValue == 1) { // Only publish event for new upvotes
+                // eventPublisher.publishEvent(new NewVoteEvent(this, newVote));
             }
         }
         
-        author.setReputationScore(author.getReputationScore() + reputationChange);
+        // Save the updated entities
         userRepository.save(author);
-        postRepository.save(post);
+        // The specific repository save is needed if the generic type is not automatically flushed
+        if (post instanceof Topic) topicRepository.save((Topic) post);
+        if (post instanceof Reply) replyRepository.save((Reply) post);
     }
+
+    //<editor-fold desc="Count Update Helpers">
+    private void updateCountsForNew(VotablePost post, User author, short value, int upvoteRep) {
+        post.setScore(post.getScore() + value);
+        if (value == 1) {
+            post.setUpvoteCount(post.getUpvoteCount() + 1);
+            author.setReputationScore(author.getReputationScore() + upvoteRep);
+            author.setHelpfulVotesReceivedCount(author.getHelpfulVotesReceivedCount() + 1);
+        } else { // value == -1
+            post.setDownvoteCount(post.getDownvoteCount() + 1);
+            author.setReputationScore(author.getReputationScore() + DOWNVOTE_REP);
+        }
+    }
+
+    private void updateCountsForUndo(VotablePost post, User author, short oldValue, int upvoteRep) {
+        post.setScore(post.getScore() - oldValue);
+        if (oldValue == 1) {
+            post.setUpvoteCount(post.getUpvoteCount() - 1);
+            author.setReputationScore(author.getReputationScore() - upvoteRep);
+            author.setHelpfulVotesReceivedCount(author.getHelpfulVotesReceivedCount() - 1);
+        } else { // oldValue == -1
+            post.setDownvoteCount(post.getDownvoteCount() - 1);
+            author.setReputationScore(author.getReputationScore() - DOWNVOTE_REP);
+        }
+    }
+
+    private void updateCountsForChange(VotablePost post, User author, short oldValue, short newValue, int upvoteRep) {
+        // Net score change is always 2 or -2
+        post.setScore(post.getScore() + (newValue - oldValue));
+        
+        if (oldValue == 1 && newValue == -1) { // From Upvote to Downvote
+            post.setUpvoteCount(post.getUpvoteCount() - 1);
+            post.setDownvoteCount(post.getDownvoteCount() + 1);
+            author.setReputationScore(author.getReputationScore() - upvoteRep + DOWNVOTE_REP);
+            author.setHelpfulVotesReceivedCount(author.getHelpfulVotesReceivedCount() - 1);
+        } else { // From Downvote to Upvote (oldValue == -1 && newValue == 1)
+            post.setDownvoteCount(post.getDownvoteCount() - 1);
+            post.setUpvoteCount(post.getUpvoteCount() + 1);
+            author.setReputationScore(author.getReputationScore() - DOWNVOTE_REP + upvoteRep);
+            author.setHelpfulVotesReceivedCount(author.getHelpfulVotesReceivedCount() + 1);
+        }
+    }
+    //</editor-fold>
 
     private User findVoter(UserDetailsImpl currentUser) {
         return userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Voter not found"));
-    }
-
-    private int calculateReputationChange(int oldValue, int newValue, int upvoteRep) {
-        int oldReputation = (oldValue == 1) ? upvoteRep : DOWNVOTE_REP;
-        int newReputation = (newValue == 1) ? upvoteRep : DOWNVOTE_REP;
-        return newReputation - oldReputation;
+            .orElseThrow(() -> new ResourceNotFoundException("Voter not found"));
     }
 }

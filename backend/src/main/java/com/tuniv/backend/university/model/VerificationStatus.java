@@ -1,6 +1,10 @@
 package com.tuniv.backend.university.model;
 
-public enum VerificationStatus {
-    PENDING,
-    VERIFIED
-}
+ // ========== ENUMS ==========
+    public enum VerificationStatus {
+        PENDING,
+        VERIFIED,
+        REJECTED,
+        EXPIRED,
+        SUSPENDED
+    }

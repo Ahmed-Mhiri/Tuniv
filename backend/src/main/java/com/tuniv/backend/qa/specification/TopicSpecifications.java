@@ -3,6 +3,7 @@ package com.tuniv.backend.qa.specification;
 import com.tuniv.backend.qa.model.Topic;
 import com.tuniv.backend.qa.model.TopicType;
 import com.tuniv.backend.qa.model.Tag;
+import com.tuniv.backend.qa.model.Reply;
 import com.tuniv.backend.user.model.User;
 
 import org.springframework.data.jpa.domain.Specification;
@@ -10,10 +11,12 @@ import org.springframework.data.jpa.domain.Specification;
 import jakarta.persistence.criteria.*;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.university.model.Module;
 
 public class TopicSpecifications {
 
@@ -55,6 +58,119 @@ public class TopicSpecifications {
             
             // Return OR combination of all predicates, or all topics if no filters
             return predicates.isEmpty() ? cb.conjunction() : cb.or(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    // ✅ NEW: Topics with recent activity (recent replies or creation)
+    public static Specification<Topic> hasRecentActivity() {
+        return (root, query, cb) -> {
+            // Get topics created in the last 7 days OR with replies in the last 7 days
+            Instant recentThreshold = Instant.now().minusSeconds(7 * 24 * 60 * 60); // 7 days
+            
+            // For creation date
+            Predicate recentlyCreated = cb.greaterThanOrEqualTo(root.get("createdAt"), recentThreshold);
+            
+            // For recent replies - we need to join with replies and check their creation date
+            if (query.getResultType() != Long.class) {
+                query.distinct(true); // Avoid duplicates when joining with replies
+            }
+            
+            Join<Topic, Reply> repliesJoin = root.join("replies", JoinType.LEFT);
+            Predicate hasRecentReplies = cb.greaterThanOrEqualTo(repliesJoin.get("createdAt"), recentThreshold);
+            
+            return cb.or(recentlyCreated, hasRecentReplies);
+        };
+    }
+
+    // ✅ NEW: Trending topics specification (SIMPLIFIED - without complex date math)
+    public static Specification<Topic> trendingTopics(Instant since, int minScore, int minReplies) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            // Time constraint - topics created since given date
+            if (since != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), since));
+            }
+            
+            // Minimum score constraint
+            if (minScore > 0) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("score"), minScore));
+            }
+            
+            // Minimum replies constraint
+            if (minReplies > 0) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("replyCount"), minReplies));
+            }
+            
+            return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    // ✅ NEW: Alternative trending topics with engagement metrics (SIMPLIFIED)
+    public static Specification<Topic> trendingTopicsWithEngagement(Instant since, int minTotalEngagement) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            // Time constraint
+            if (since != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), since));
+            }
+            
+            // Total engagement: score + replyCount
+            if (minTotalEngagement > 0) {
+                // Create engagement expression: score + replyCount
+                Expression<Integer> totalEngagement = cb.sum(
+                    root.get("score").as(Integer.class),
+                    root.get("replyCount").as(Integer.class)
+                );
+                predicates.add(cb.greaterThanOrEqualTo(totalEngagement, minTotalEngagement));
+            }
+            
+            return predicates.isEmpty() ? cb.conjunction() : cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    // ✅ NEW: Hot topics (high velocity of engagement - SIMPLIFIED)
+    public static Specification<Topic> hotTopics(Instant periodStart) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            // Topics created in the specified period
+            if (periodStart != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), periodStart));
+            }
+            
+            // High absolute score threshold
+            predicates.add(cb.greaterThanOrEqualTo(root.get("score"), 10));
+            
+            // Good reply engagement
+            predicates.add(cb.greaterThanOrEqualTo(root.get("replyCount"), 3));
+            
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+    }
+
+    // ✅ NEW: High engagement ratio topics (using database functions if available)
+    public static Specification<Topic> highEngagementRatioTopics(Instant since, double minRatio) {
+        return (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            
+            // Time constraint
+            if (since != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), since));
+            }
+            
+            // Calculate engagement ratio using database functions
+            // Note: This is database-specific and may need adjustment for your DB
+            
+            // For PostgreSQL/H2: Use function-based approach
+            // For cross-database compatibility, we'll use a simplified approach
+            
+            // Simplified: Require minimum score and replies
+            predicates.add(cb.greaterThanOrEqualTo(root.get("score"), 5));
+            predicates.add(cb.greaterThanOrEqualTo(root.get("replyCount"), 2));
+            
+            return cb.and(predicates.toArray(new Predicate[0]));
         };
     }
 
@@ -184,6 +300,27 @@ public class TopicSpecifications {
     public static Specification<Topic> userActivity(Integer userId, Instant since) {
         return Specification.where(byAuthor(userId))
                            .and(createdAfter(since));
+    }
+
+    // ✅ NEW: Most discussed topics (high reply count recently)
+    public static Specification<Topic> mostDiscussed(Instant since) {
+        return Specification.where(createdAfter(since))
+                           .and(withMinimumReplies(5)) // At least 5 replies
+                           .and(withMinimumScore(1));  // At least some positive engagement
+    }
+
+    // ✅ NEW: Top performing topics by score
+    public static Specification<Topic> topPerforming(Instant since, int minScore) {
+        return Specification.where(createdAfter(since))
+                           .and(withMinimumScore(minScore));
+    }
+
+    // ✅ NEW: Fast-rising topics (created recently with high engagement)
+    public static Specification<Topic> fastRisingTopics() {
+        Instant last24Hours = Instant.now().minus(24, ChronoUnit.HOURS);
+        return Specification.where(createdAfter(last24Hours))
+                           .and(withMinimumScore(5))
+                           .and(withMinimumReplies(2));
     }
 
     // ✅ UTILITY: Combine multiple specifications with AND

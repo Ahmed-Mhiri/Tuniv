@@ -1,33 +1,54 @@
 package com.tuniv.backend.qa.mapper;
 
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.springframework.stereotype.Component;
-
-import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import com.tuniv.backend.qa.dto.AttachmentDto;
-import com.tuniv.backend.qa.dto.ContainerInfoDto;
-import com.tuniv.backend.qa.dto.ReplyResponseDto;
-import com.tuniv.backend.qa.dto.SolutionInfoDto;
-import com.tuniv.backend.qa.dto.TopicResponseDto;
-import com.tuniv.backend.qa.dto.TopicSummaryDto;
-import com.tuniv.backend.qa.dto.UserDto;
-import com.tuniv.backend.qa.model.Attachment;
-import com.tuniv.backend.qa.model.Reply;
-import com.tuniv.backend.qa.model.Tag;
-import com.tuniv.backend.qa.model.Topic;
+import com.tuniv.backend.qa.dto.*;
+import com.tuniv.backend.qa.model.*;
 import com.tuniv.backend.shared.model.ContainerType;
 import com.tuniv.backend.user.model.User;
+import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Maps Topic, Reply, and related entities to their corresponding DTOs.
+ * Centralizes complex object graph assembly to keep services clean.
+ * This component is designed to work with data fetched from repositories,
+ * not from direct, lazy-loaded entity collections.
+ */
 @Component
 public class TopicMapper {
 
-    public static TopicResponseDto buildTopicResponseDto(Topic topic, UserDetailsImpl currentUser, Map<Integer, Integer> currentUserVotes) {
+    /**
+     * The primary method for building the detailed Topic view.
+     * It orchestrates the mapping of the topic and all its related, pre-fetched data.
+     *
+     * @param topic            The core Topic entity.
+     * @param allReplies       A flat list of all replies belonging to the topic.
+     * @param tags             A list of tags associated with the topic.
+     * @param attachments      A list of attachments for the topic.
+     * @param currentUserVotes A map of the current user's votes [postId -> voteType].
+     * @return A fully assembled TopicResponseDto.
+     */
+    public TopicResponseDto toTopicResponseDto(
+        Topic topic,
+        List<Reply> allReplies,
+        List<Tag> tags,
+        List<Attachment> attachments,
+        Map<Integer, String> currentUserVotes) {
+
+        List<AttachmentDto> attachmentDtos = attachments.stream()
+            .map(this::toAttachmentDto)
+            .collect(Collectors.toList());
+
+        List<String> tagNames = tags.stream()
+            .map(Tag::getName)
+            .collect(Collectors.toList());
+
+        // ✅ Efficiently build the nested reply tree from the flat list
+        List<ReplyResponseDto> nestedReplies = buildReplyTree(allReplies, currentUserVotes);
+
         return new TopicResponseDto(
             topic.getId(),
             topic.getTitle(),
@@ -36,18 +57,28 @@ public class TopicMapper {
             topic.isSolved(),
             toUserDto(topic.getAuthor()),
             topic.getCreatedAt(),
+            topic.getEditedAt(),
             topic.getScore(),
-            getVoteType(currentUserVotes.get(topic.getId())),
-            topic.getReplies().size(),
+            currentUserVotes.get(topic.getId()),
+            topic.getReplyCount(), // ✅ Use denormalized count
+            topic.getViewCount(),  // ✅ Use denormalized count
             toSolutionInfoDto(topic.getAcceptedSolution()),
             toContainerInfoDto(topic),
-            toTagNames(topic.getTags()),
-            toAttachmentDtos(topic.getAttachments()),
-            toReplyResponseDtos(topic.getReplies(), currentUser, currentUserVotes)
+            tagNames,
+            attachmentDtos,
+            nestedReplies
         );
     }
 
-    public static TopicSummaryDto toTopicSummaryDto(Topic topic, String currentUserVote, Integer containerId, String containerName) {
+    /**
+     * Maps a Topic to its summary DTO, used in lists.
+     *
+     * @param topic           The Topic entity.
+     * @param tags            The pre-fetched list of tags for this topic.
+     * @param currentUserVote The current user's vote status for this topic.
+     * @return A TopicSummaryDto.
+     */
+    public TopicSummaryDto toTopicSummaryDto(Topic topic, List<Tag> tags, String currentUserVote) {
         return new TopicSummaryDto(
             topic.getId(),
             topic.getTitle(),
@@ -56,85 +87,90 @@ public class TopicMapper {
             topic.getAuthor().getUsername(),
             topic.getCreatedAt(),
             topic.getScore(),
-            topic.getReplies().size(),
+            topic.getReplyCount(), // ✅ Use denormalized count
             currentUserVote,
             topic.isSolved(),
-            containerId,
-            containerName,
-            toTagNames(topic.getTags())
+            getContainerId(topic),
+            getContainerName(topic),
+            tags.stream().map(Tag::getName).collect(Collectors.toList())
         );
     }
 
-    public static ReplyResponseDto toReplyResponseDto(Reply reply, UserDetailsImpl currentUser, Map<Integer, Integer> currentUserVotes) {
+    //<editor-fold desc="Tree Building and Helper Methods">
+
+    /**
+     * Efficiently builds a nested reply tree from a flat list. This avoids N+1 query problems
+     * and deep recursion issues that can occur with lazy-loaded collections.
+     *
+     * @param flatReplies      A list of ALL replies for a single topic.
+     * @param currentUserVotes A map of the current user's votes.
+     * @return A list of only the top-level replies, with their children nested correctly.
+     */
+    private List<ReplyResponseDto> buildReplyTree(List<Reply> flatReplies, Map<Integer, String> currentUserVotes) {
+        if (flatReplies == null || flatReplies.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 1. Create a map of all reply DTOs, keyed by their ID, for quick access.
+        Map<Integer, ReplyResponseDto> replyDtoMap = flatReplies.stream()
+            .collect(Collectors.toMap(Reply::getId, reply -> toReplyResponseDto(reply, currentUserVotes)));
+
+        // 2. Group the DTOs by their parent's ID.
+        Map<Integer, List<ReplyResponseDto>> childrenByParentId = flatReplies.stream()
+            .filter(reply -> reply.getParentReply() != null)
+            .collect(Collectors.groupingBy(
+                reply -> reply.getParentReply().getId(),
+                Collectors.mapping(reply -> replyDtoMap.get(reply.getId()), Collectors.toList())
+            ));
+
+        // 3. Attach the children lists to their respective parents.
+        replyDtoMap.values().forEach(dto -> 
+            dto.childReplies().addAll(childrenByParentId.getOrDefault(dto.id(), new ArrayList<>()))
+        );
+
+        // 4. Return only the top-level replies (those without a parent).
+        return replyDtoMap.values().stream()
+            .filter(dto -> dto.parentReplyId() == null)
+            .collect(Collectors.toList());
+    }
+
+    /**
+     * Helper to map a single Reply entity to its DTO.
+     * Initializes `childReplies` as an empty list, which is populated by the `buildReplyTree` method.
+     */
+    private ReplyResponseDto toReplyResponseDto(Reply reply, Map<Integer, String> currentUserVotes) {
+        // Here, you would fetch attachments for the reply if they were needed on a per-reply basis.
+        // For simplicity, we assume attachments are primarily on the main topic.
+        List<AttachmentDto> attachments = new ArrayList<>();
+
         return new ReplyResponseDto(
             reply.getId(),
             reply.getBody(),
             toUserDto(reply.getAuthor()),
             reply.getCreatedAt(),
+            reply.getEditedAt(),
             reply.getScore(),
-            getVoteType(currentUserVotes.get(reply.getId())),
+            currentUserVotes.get(reply.getId()),
             reply.getTopic().getId(),
             reply.getParentReply() != null ? reply.getParentReply().getId() : null,
-            toAttachmentDtos(reply.getAttachments()),
-            toReplyResponseDtos(reply.getChildReplies(), currentUser, currentUserVotes)
+            reply.isSolution(),
+            attachments,
+            new ArrayList<>() // Children are populated by the tree-building algorithm
         );
     }
-
-    // Helper methods
-    private static UserDto toUserDto(User user) {
-    if (user == null) return null;
-    return new UserDto(
-        user.getUserId(),  // ✅ FIXED: Use getUserId() instead of getId()
-        user.getUsername(),
-        user.getReputationScore(),
-        user.getProfilePhotoUrl() // ✅ FIXED: Use getProfilePhotoUrl() instead of getAvatarUrl()
-    );
-}
-
-    private static SolutionInfoDto toSolutionInfoDto(Reply solution) {
-        if (solution == null) return null;
-        return new SolutionInfoDto(
-            solution.getId(),
-            solution.getBody(),
-            toUserDto(solution.getAuthor()),
-            solution.getCreatedAt()
-        );
-    }
-
-    private static ContainerInfoDto toContainerInfoDto(Topic topic) {
-    if (topic == null) return null;
     
-    if (topic.getModule() != null) {
-        return new ContainerInfoDto(
-            topic.getModule().getModuleId(), // ✅ FIXED: Use getModuleId() instead of getId()
-            topic.getModule().getName(),
-            ContainerType.MODULE
-        );
-    } else if (topic.getCommunity() != null) {
-        return new ContainerInfoDto(
-            topic.getCommunity().getCommunityId(), // ✅ FIXED: Use getCommunityId() instead of getId()
-            topic.getCommunity().getName(),
-            ContainerType.COMMUNITY
+    private UserDto toUserDto(User user) {
+        if (user == null) return null;
+        return new UserDto(
+            user.getUserId(),
+            user.getUsername(),
+            user.getReputationScore(),
+            user.getProfilePhotoUrl()
         );
     }
-    return null;
-}
 
-    private static List<String> toTagNames(Set<Tag> tags) {
-        if (tags == null) return Collections.emptyList();
-        return tags.stream()
-                .map(Tag::getName)
-                .collect(Collectors.toList());
-    }
-
-    private static List<AttachmentDto> toAttachmentDtos(Set<Attachment> attachments) {
-        if (attachments == null) return Collections.emptyList();
-        return attachments.stream()
-                .map(TopicMapper::toAttachmentDto)
-                .collect(Collectors.toList());
-    }
-
-    public static AttachmentDto toAttachmentDto(Attachment attachment) {
+    private AttachmentDto toAttachmentDto(Attachment attachment) {
+        if (attachment == null) return null;
         return new AttachmentDto(
             attachment.getAttachmentId(),
             attachment.getFileName(),
@@ -144,19 +180,37 @@ public class TopicMapper {
         );
     }
 
-    private static List<ReplyResponseDto> toReplyResponseDtos(Set<Reply> replies, UserDetailsImpl currentUser, Map<Integer, Integer> currentUserVotes) {
-        if (replies == null || replies.isEmpty()) return Collections.emptyList();
-        
-        // Filter top-level replies (no parent) and convert to DTOs
-        return replies.stream()
-                .filter(reply -> reply.getParentReply() == null)
-                .sorted(Comparator.comparing(Reply::getCreatedAt))
-                .map(reply -> toReplyResponseDto(reply, currentUser, currentUserVotes))
-                .collect(Collectors.toList());
+    private SolutionInfoDto toSolutionInfoDto(Reply solution) {
+        if (solution == null) return null;
+        return new SolutionInfoDto(
+            solution.getId(),
+            solution.getBody(),
+            toUserDto(solution.getAuthor()),
+            solution.getCreatedAt()
+        );
     }
 
-    private static String getVoteType(Integer voteValue) {
-        if (voteValue == null) return null;
-        return voteValue == 1 ? "UPVOTE" : voteValue == -1 ? "DOWNVOTE" : null;
+    private ContainerInfoDto toContainerInfoDto(Topic topic) {
+        if (topic.getModule() != null) {
+            return new ContainerInfoDto(topic.getModule().getModuleId(), topic.getModule().getName(), ContainerType.MODULE);
+        }
+        if (topic.getCommunity() != null) {
+            return new ContainerInfoDto(topic.getCommunity().getCommunityId(), topic.getCommunity().getName(), ContainerType.COMMUNITY);
+        }
+        return null;
     }
+
+    private Integer getContainerId(Topic topic) {
+        if (topic.getModule() != null) return topic.getModule().getModuleId();
+        if (topic.getCommunity() != null) return topic.getCommunity().getCommunityId();
+        return null;
+    }
+    
+    private String getContainerName(Topic topic) {
+        if (topic.getModule() != null) return topic.getModule().getName();
+        if (topic.getCommunity() != null) return topic.getCommunity().getName();
+        return null;
+    }
+
+    //</editor-fold>
 }

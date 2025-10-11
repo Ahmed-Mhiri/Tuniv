@@ -1,58 +1,86 @@
 package com.tuniv.backend.university.model;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-import com.tuniv.backend.qa.model.Topic;
-
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import org.hibernate.annotations.Where;
+import com.tuniv.backend.follow.model.Followable;
+import com.tuniv.backend.shared.model.Auditable;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "modules")
+@Table(name = "modules", indexes = {
+    @Index(name = "idx_module_name", columnList = "name"),
+    @Index(name = "idx_module_university", columnList = "university_id"),
+    @Index(name = "idx_module_topic_count", columnList = "topic_count DESC"),
+    @Index(name = "idx_module_code", columnList = "code"),
+    @Index(name = "idx_module_active", columnList = "is_active, topic_count DESC")
+})
 @Getter
 @Setter
-public class Module {
+@NoArgsConstructor
+@Where(clause = "is_active = true")
+public class Module extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer moduleId;
 
-    @Column(nullable = false)
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== BASIC INFO ==========
+    @NotBlank
+    @Size(max = 100)
+    @Column(name = "name", nullable = false, length = 100)
     private String name;
 
-    // ✅ MODIFIED: Renamed from question_count to topic_count
+    @Size(max = 1000)
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Size(max = 20)
+    @Column(name = "code", length = 20)
+    private String code;
+
+    // ========== STATISTICS ==========
     @Column(name = "topic_count", nullable = false)
     private int topicCount = 0;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @Column(name = "follower_count", nullable = false)
+    private int followerCount = 0;
+
+    @Column(name = "active_participants")
+    private Integer activeParticipants = 0;
+
+    // ========== ACCESS CONTROL ==========
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "posting_policy", nullable = false)
+    private ModulePostingPolicy postingPolicy = ModulePostingPolicy.UNIVERSITY_MEMBERS;
+
+    @Column(name = "allow_external_posting", nullable = false)
+    private boolean allowExternalPosting = true;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    // ========== RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "university_id", nullable = false)
-    @JsonBackReference("university-modules")
     private University university;
 
-    // ✅ MODIFIED: Relationship now points to Topic
-    @OneToMany(mappedBy = "module", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private Set<Topic> topics = new HashSet<>();
+    // ❌ REMOVED: Dangerous topics collection
+    // @OneToMany(mappedBy = "module", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    // private Set<Topic> topics = new HashSet<>();
 
-    // ✅ MODIFIED: Helper methods updated for topicCount
-    public void incrementTopicCount() {
-        this.topicCount++;
-    }
-
-    public void decrementTopicCount() {
-        this.topicCount = Math.max(0, this.topicCount - 1);
-    }
+    // ========== FOLLOWABLE ==========
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false, orphanRemoval = true)
+    @JoinColumn(name = "followable_id", nullable = false, unique = true)
+    private Followable followable;
 }

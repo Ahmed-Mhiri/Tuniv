@@ -4,5 +4,5 @@ public record UserDto(
     Integer id,
     String username,
     int reputationScore,
-    String avatarUrl
+    String profilePhotoUrl // ✅ Standardized from avatarUrl
 ) {}

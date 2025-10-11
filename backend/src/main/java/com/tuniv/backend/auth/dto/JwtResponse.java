@@ -1,19 +1,41 @@
 package com.tuniv.backend.auth.dto;
 
-public record JwtResponse(
-    String token,
-    Integer userId,
-    String username,
-    String email,
-    String profilePhotoUrl,
-    String bio,
-    String major,
-    Integer reputationScore,
-    // --- NEW FIELDS ---
-    long questionsCount,
-    long answersCount,
-    long followersCount,
-    // --- EXISTING 2FA FIELDS ---
-    boolean is2faRequired,
-    boolean is2faEnabled
-) {}
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class JwtResponse {
+
+    // --- Core Identity & Token ---
+    private String token;
+    private Integer id;
+    private String username;
+    private String email;
+
+    // --- Profile Information ---
+    private String profilePhotoUrl;
+    private String bio;
+    private String major;
+    private int reputationScore;
+    private VerificationInfo verificationInfo;
+
+    // --- Activity Statistics ---
+    private int topicsCount;
+    private int repliesCount;
+    private int followersCount;
+    private int followingCount;
+
+    // --- UI State Counts ---
+    private long unreadNotificationsCount;
+    private long unreadMessagesCount;
+
+    // --- Security ---
+    private boolean is2faRequired;
+    private boolean is2faEnabled;
+    
+    // Add no-args constructor for serialization
+    public JwtResponse() {}
+}

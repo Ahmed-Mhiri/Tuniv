@@ -1,15 +1,21 @@
 package com.tuniv.backend.chat.dto;
 
-import java.util.List;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.Instant;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-
-@Data
-@AllArgsConstructor
+@Getter
+@Setter
 public class ReactionDto {
+    private Integer id;
+    private Integer messageId;
+    private Integer userId;
+    private String username;
+    private String profilePhotoUrl;
     private String emoji;
-    private long count;
-    private List<String> users; // List of usernames who used this emoji
-    private boolean reactedByCurrentUser; // To help the frontend toggle state
+    private Integer skinTone;
+    private String customText;
+    private Instant createdAt;
+    private boolean isRemoved;
+    private Instant removedAt;
 }

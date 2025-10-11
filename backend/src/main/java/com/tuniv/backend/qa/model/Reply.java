@@ -1,91 +1,64 @@
 package com.tuniv.backend.qa.model;
 
-import java.util.HashSet;
-import java.util.Set;
-
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-
-import jakarta.persistence.CascadeType;
-import jakarta.persistence.DiscriminatorValue;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@DiscriminatorValue("REPLY")
+@Table(name = "replies", indexes = {
+    @Index(name = "idx_reply_topic", columnList = "topic_id, created_at"),
+    @Index(name = "idx_reply_author", columnList = "user_id, created_at"),
+    @Index(name = "idx_reply_parent", columnList = "parent_reply_id, created_at"),
+    @Index(name = "idx_reply_solution", columnList = "is_solution, created_at DESC"),
+    @Index(name = "idx_reply_depth", columnList = "topic_id, depth, created_at")
+})
 @Getter
 @Setter
+@NoArgsConstructor
 public class Reply extends VotablePost {
 
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== REPLY-SPECIFIC FIELDS ==========
+    @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "topic_id", nullable = false)
     private Topic topic;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "parent_reply_id")
-    @JsonBackReference("reply-children")
     private Reply parentReply;
 
-    @OneToMany(mappedBy = "parentReply", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference("reply-children")
-    private Set<Reply> childReplies = new HashSet<>();
+    // ❌ REMOVED: Dangerous childReplies collection
+    // @OneToMany(mappedBy = "parentReply", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    // private Set<Reply> childReplies = new HashSet<>();
 
-    // ✅ NEW: Set topic with automatic count update
-    public void setTopic(Topic topic) {
-        // Remove from old topic if exists and this is a top-level reply
-        if (this.topic != null && this.parentReply == null) {
-            this.topic.decrementReplyCount();
-        }
-        
+    @Column(name = "is_solution", nullable = false)
+    private boolean isSolution = false;
+
+    @Column(name = "depth", nullable = false)
+    private Integer depth = 0;
+
+    // ========== CONSTRUCTORS ==========
+    public Reply(String body, User author, Topic topic, University universityContext) {
+        this.setBody(body);
+        this.setAuthor(author);
         this.topic = topic;
-        
-        // Add to new topic if this is a top-level reply
-        if (topic != null && this.parentReply == null) {
-            topic.incrementReplyCount();
+        this.depth = 0;
+
+        if (universityContext != null) {
+            this.setUniversityContext(universityContext);
         }
     }
 
-    // ✅ NEW: Set parent reply with topic count management
-    public void setParentReply(Reply parentReply) {
-        boolean wasTopLevel = this.parentReply == null;
-        boolean willBeTopLevel = parentReply == null;
-        
-        // Update topic count if top-level status changes
-        if (this.topic != null && wasTopLevel != willBeTopLevel) {
-            if (wasTopLevel) {
-                this.topic.decrementReplyCount(); // Becoming nested reply
-            } else {
-                this.topic.incrementReplyCount(); // Becoming top-level reply
-            }
-        }
-        
-        this.parentReply = parentReply;
-        
-        // Update child relationship if needed
-        if (parentReply != null && !parentReply.getChildReplies().contains(this)) {
-            parentReply.getChildReplies().add(this);
-        }
-    }
-
-    // ✅ NEW: Convenience method to add child reply
-    public void addChildReply(Reply childReply) {
-        this.childReplies.add(childReply);
-        childReply.setParentReply(this);
-    }
-
-    // ✅ NEW: Convenience method to remove child reply
-    public void removeChildReply(Reply childReply) {
-        this.childReplies.remove(childReply);
-        childReply.setParentReply(null);
-    }
-
-    // ✅ NEW: Check if this reply is a top-level reply
-    public boolean isTopLevel() {
-        return this.parentReply == null;
+    @Override
+    public String getPostType() {
+        return "REPLY";
     }
 }

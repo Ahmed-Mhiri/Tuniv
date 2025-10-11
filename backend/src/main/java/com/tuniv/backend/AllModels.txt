@@ -1,0 +1,3948 @@
+﻿//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\ChatPermissions.java
+package com.tuniv.backend.authorization.model;
+
+public enum ChatPermissions {
+    // Message permissions
+    SEND_MESSAGES("send_messages", "Send messages in conversation"),
+    DELETE_OWN_MESSAGES("delete_own_messages", "Delete own messages"),
+    DELETE_ANY_MESSAGE("delete_any_message", "Delete any message"),
+    EDIT_OWN_MESSAGES("edit_own_messages", "Edit own messages"),
+    EDIT_ANY_MESSAGE("edit_any_message", "Edit any message"),
+    PIN_MESSAGES("pin_messages", "Pin messages"),
+
+    // Participant management
+    ADD_PARTICIPANTS("add_participants", "Add new participants"),
+    REMOVE_PARTICIPANTS("remove_participants", "Remove participants"),
+    MANAGE_ROLES("manage_roles", "Manage participant roles"),
+
+    // Conversation management
+    EDIT_CONVERSATION_INFO("edit_conversation_info", "Edit conversation title and settings"),
+    ARCHIVE_CONVERSATION("archive_conversation", "Archive conversation"),
+    DELETE_CONVERSATION("delete_conversation", "Delete conversation"),
+
+    // Moderation
+    MUTE_PARTICIPANTS("mute_participants", "Mute participants temporarily"),
+    BAN_PARTICIPANTS("ban_participants", "Ban participants from conversation");
+
+    private final String name;
+    private final String description;
+
+    ChatPermissions(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\CommunityPermissions.java
+package com.tuniv.backend.authorization.model;
+
+public enum CommunityPermissions {
+    COMMUNITY_SETTINGS_EDIT("community.settings.edit", "Edit community settings"),
+    COMMUNITY_ROLE_MANAGE("community.role.manage", "Manage community roles"),
+    COMMUNITY_MEMBER_INVITE("community.member.invite", "Invite members"),
+    COMMUNITY_MEMBER_KICK("community.member.kick", "Remove members"),
+    COMMUNITY_MEMBER_BAN("community.member.ban", "Ban members"),
+    COMMUNITY_TOPIC_PIN("community.topic.pin", "Pin topics"),
+    COMMUNITY_TOPIC_LOCK("community.topic.lock", "Lock topics"),
+    COMMUNITY_REPORT_MANAGE("community.report.manage", "Manage community reports");
+
+    private final String name;
+    private final String description;
+
+    CommunityPermissions(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\ContentPermissions.java
+package com.tuniv.backend.authorization.model;
+
+public enum ContentPermissions {
+    POST_TOPIC_CREATE("post.topic.create", "Create topics"),
+    POST_REPLY_CREATE("post.reply.create", "Create replies"),
+    POST_EDIT_OWN("post.edit.own", "Edit own posts"),
+    POST_EDIT_ANY("post.edit.any", "Edit any posts"),
+    POST_DELETE_OWN("post.delete.own", "Delete own posts"),
+    POST_DELETE_ANY("post.delete.any", "Delete any posts"),
+    POST_VOTE_CAST("post.vote.cast", "Cast votes"),
+    MESSAGE_SEND("message.send", "Send messages"),
+    MESSAGE_DELETE_OWN("message.delete.own", "Delete own messages"),
+    MESSAGE_DELETE_ANY("message.delete.any", "Delete any messages"),
+    MESSAGE_REACT("message.react", "React to messages");
+
+    private final String name;
+    private final String description;
+
+    ContentPermissions(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\Permission.java
+package com.tuniv.backend.authorization.model;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "permissions")
+@Getter
+@Setter
+@NoArgsConstructor
+public class Permission {
+
+    @Id
+    private Integer id;
+
+    @NotBlank
+    @Column(name = "name", unique = true, nullable = false, length = 100)
+    private String name;
+
+    @NotBlank
+    @Column(name = "description", nullable = false, length = 500)
+    private String description;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "permission_scope", nullable = false)
+    private PermissionScope scope = PermissionScope.UNIVERSITY;
+
+    public enum PermissionScope {
+    UNIVERSITY,
+    COMMUNITY,
+    PLATFORM,
+    CHAT  // âœ… ADDED: New scope for chat permissions
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\PlatformPermissions.java
+package com.tuniv.backend.authorization.model;
+
+public enum PlatformPermissions {
+    PLATFORM_UNIVERSITY_CREATE("platform.university.create", "Create new universities"),
+    PLATFORM_UNIVERSITY_MANAGE("platform.university.manage", "Manage universities"),
+    PLATFORM_USER_IMPERSONATE("platform.user.impersonate", "Impersonate users"),
+    PLATFORM_SETTINGS_MANAGE("platform.settings.manage", "Manage platform settings"),
+    PLATFORM_ANALYTICS_VIEW("platform.analytics.view", "View platform analytics");
+
+    private final String name;
+    private final String description;
+
+    PlatformPermissions(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\UniversityPermissions.java
+package com.tuniv.backend.authorization.model;
+
+public enum UniversityPermissions {
+    UNIVERSITY_SETTINGS_EDIT("university.settings.edit", "Edit university settings"),
+    UNIVERSITY_ROLE_MANAGE("university.role.manage", "Manage university roles"),
+    UNIVERSITY_USER_MANAGE("university.user.manage", "Manage university users"),
+    UNIVERSITY_USER_SUSPEND("university.user.suspend", "Suspend university users"),
+    UNIVERSITY_USER_VERIFY("university.user.verify", "Verify university users"),
+    UNIVERSITY_COMMUNITY_MANAGE("university.community.manage", "Manage communities"),
+    UNIVERSITY_MODULE_MANAGE("university.module.manage", "Manage modules"),
+    UNIVERSITY_ANNOUNCEMENT_CREATE("university.announcement.create", "Create announcements"),
+    UNIVERSITY_REPORT_MANAGE("university.report.manage", "Manage university reports");
+
+    private final String name;
+    private final String description;
+
+    UniversityPermissions(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Conversation.java
+package com.tuniv.backend.chat.model;
+
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "conversations", indexes = {
+    @Index(name = "idx_conversation_updated", columnList = "updated_at DESC"),
+    @Index(name = "idx_conversation_university", columnList = "university_context_id"),
+    @Index(name = "idx_conversation_created", columnList = "created_at DESC"),
+    @Index(name = "idx_conversation_last_message", columnList = "last_message_sent_at DESC"),
+    @Index(name = "idx_conversation_active", columnList = "is_active, last_message_sent_at DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_active = true") // âœ… ADD: Global filter for active conversations
+
+public class Conversation extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer conversationId;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== BASIC INFO ==========
+    @Size(max = 255)
+    @Column(name = "title", length = 255)
+    private String title;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "conversation_type", nullable = false)
+    private ConversationType conversationType = ConversationType.DIRECT;
+
+    // ========== CONTEXT ==========
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_context_id")
+    private University universityContext;
+
+    // ========== DENORMALIZED LAST MESSAGE INFO ==========
+    @Size(max = 1000)
+    @Column(name = "last_message_body", length = 1000)
+    private String lastMessageBody;
+
+    @Column(name = "last_message_sent_at")
+    private Instant lastMessageSentAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "last_message_author_id")
+    private User lastMessageAuthor;
+
+    // ========== STATISTICS ==========
+    @Column(name = "message_count", nullable = false)
+    private Integer messageCount = 0;
+
+    @Column(name = "participant_count", nullable = false)
+    private Integer participantCount = 0;
+
+    // ========== STATUS FLAGS ==========
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    @Column(name = "is_archived", nullable = false)
+    private boolean isArchived = false;
+    
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationParticipant.java
+package com.tuniv.backend.chat.model;
+
+import java.io.Serializable;
+import java.time.Instant;
+import java.util.Objects;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "conversation_participants", indexes = {
+    @Index(name = "idx_conv_part_user", columnList = "user_id"),
+    @Index(name = "idx_conv_part_conversation", columnList = "conversation_id"),
+    @Index(name = "idx_conv_part_last_read", columnList = "last_read_timestamp"),
+    @Index(name = "idx_conv_part_unread", columnList = "unread_count, last_read_timestamp"),
+    @Index(name = "idx_conv_part_active", columnList = "is_active, joined_at")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_active = true") // âœ… ADD: Global filter for active participants
+public class ConversationParticipant extends Auditable {
+
+    @EmbeddedId
+    private ConversationParticipantId id;
+
+    // ========== CORE RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("userId")
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+
+    // Inside ConversationParticipant.java
+    @Size(max = 50)
+    @Column(name = "nickname", length = 50)
+    private String nickname;
+
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("conversationId")
+    @JoinColumn(name = "conversation_id", nullable = false)
+    private Conversation conversation;
+
+    // ========== READ STATUS ==========
+    @Column(name = "last_read_timestamp")
+    private Instant lastReadTimestamp;
+
+    @Column(name = "unread_count", nullable = false)
+    private Integer unreadCount = 0;
+
+    // ========== PARTICIPANT STATUS ==========
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    @Column(name = "notifications_enabled", nullable = false)
+    private boolean notificationsEnabled = true;
+
+    @Column(name = "is_muted", nullable = false)
+    private boolean isMuted = false;
+
+    @Column(name = "muted_until")
+    private Instant mutedUntil;
+
+    // ========== METADATA ==========
+    @Column(name = "joined_at", nullable = false, updatable = false)
+    private Instant joinedAt = Instant.now();
+
+    @Column(name = "last_active_at")
+    private Instant lastActiveAt;
+
+    @Column(name = "message_count", nullable = false)
+    private Integer messageCount = 0;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "role_id", nullable = false)
+    private ConversationRole role;
+
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ConversationParticipant that = (ConversationParticipant) o;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    // ========== EMBEDDED ID CLASS ==========
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ConversationParticipantId implements Serializable {
+        
+        @Column(name = "user_id")
+        private Integer userId;
+
+        @Column(name = "conversation_id")
+        private Integer conversationId;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            ConversationParticipantId that = (ConversationParticipantId) o;
+            return Objects.equals(userId, that.userId) && Objects.equals(conversationId, that.conversationId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(userId, conversationId);
+        }
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationRole.java
+package com.tuniv.backend.chat.model;
+
+import java.util.HashSet;
+import java.util.Set;
+
+import com.tuniv.backend.authorization.model.Permission;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "conversation_roles", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"name", "conversation_id"})
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class ConversationRole {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @NotBlank
+    @Column(name = "name", nullable = false, length = 50)
+    private String name;
+
+    @NotBlank
+    @Column(name = "display_name", nullable = false, length = 100)
+    private String displayName;
+
+    // âœ… Link to conversation (NULL for system roles)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conversation_id")
+    private Conversation conversation;
+
+    @Column(name = "is_system_role", nullable = false)
+    private boolean isSystemRole = false;
+
+    @Column(name = "is_default", nullable = false)
+    private boolean isDefault = false;
+
+    // âœ… Permissions for chat actions
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "conversation_role_permissions",
+        joinColumns = @JoinColumn(name = "role_id"),
+        inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
+    private Set<Permission> permissions = new HashSet<>();
+
+    @Column(name = "member_count", nullable = false)
+    private Integer memberCount = 0;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationType.java
+package com.tuniv.backend.chat.model;
+
+// ========== ENUMS ==========
+    public enum ConversationType {
+        DIRECT,         // One-on-one conversation
+        GROUP,          // Group conversation  
+        UNIVERSITY,     // University-wide announcement
+        MODULE,         // Module-specific discussion
+        COMMUNITY       // Community discussion
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\DefaultConversationRoles.java
+package com.tuniv.backend.chat.model;
+
+public enum DefaultConversationRoles {
+    CONVERSATION_ADMIN("conversation_admin", "Conversation Admin", true),
+    CONVERSATION_MODERATOR("conversation_moderator", "Conversation Moderator", true),
+    CONVERSATION_MEMBER("conversation_member", "Conversation Member", true);
+
+    private final String name;
+    private final String displayName;
+    private final boolean isSystemRole;
+
+    DefaultConversationRoles(String name, String displayName, boolean isSystemRole) {
+        this.name = name;
+        this.displayName = displayName;
+        this.isSystemRole = isSystemRole;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public boolean isSystemRole() {
+        return isSystemRole;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Message.java
+package com.tuniv.backend.chat.model;
+
+import java.time.Instant;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.qa.model.Post;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "messages", indexes = {
+    @Index(name = "idx_message_conversation_sentat", columnList = "conversation_id, sent_at DESC"),
+    @Index(name = "idx_message_author", columnList = "user_id"),
+    @Index(name = "idx_message_reply_to", columnList = "reply_to_message_id"),
+    @Index(name = "idx_message_type", columnList = "message_type"),
+    @Index(name = "idx_message_status", columnList = "is_deleted, sent_at DESC"),
+    @Index(name = "idx_message_university_context", columnList = "university_context_id"), // âœ… KEEP THIS ONE
+    @Index(name = "idx_message_author_conversation", columnList = "user_id, conversation_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_deleted = false")
+public class Message extends Post {
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== MESSAGE-SPECIFIC FIELDS ==========
+    @NotNull
+    @Column(name = "sent_at", nullable = false)
+    private Instant sentAt = Instant.now();
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "conversation_id", nullable = false)
+    private Conversation conversation;
+
+    // ========== MESSAGE TYPE & CONTENT ==========
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_type", nullable = false)
+    private MessageType messageType = MessageType.TEXT;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reply_to_message_id")
+    private Message replyToMessage;
+
+    /// Inside Message.java
+    @Column(name = "edited_at")
+    private Instant editedAt;
+
+    // Inside Message.java
+    @Column(name = "is_pinned", nullable = false)
+    private boolean isPinned = false;
+    // ========== MESSAGE METADATA ==========
+    @Column(name = "client_message_id")
+    private String clientMessageId;
+
+    @Override
+    public String getPostType() {
+        return "MESSAGE";
+    }
+
+    // ========== CONSTRUCTORS ==========
+    public Message(String body, User author, Conversation conversation) {
+        this.setBody(body);
+        this.setAuthor(author);
+        this.conversation = conversation;
+        this.sentAt = Instant.now();
+
+        if (conversation.getUniversityContext() != null) {
+            this.setUniversityContext(conversation.getUniversityContext());
+        }
+    }
+
+    public Message(String body, User author, Conversation conversation, Message replyTo) {
+        this(body, author, conversation);
+        this.replyToMessage = replyTo;
+    }
+
+    public Message(String body, User author, Conversation conversation, MessageType messageType) {
+        this(body, author, conversation);
+        this.messageType = messageType;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MessageStatus.java
+package com.tuniv.backend.chat.model;
+
+public enum MessageStatus {
+        SENT,       // Message sent but not delivered
+        DELIVERED,  // Message delivered to recipients
+        READ,       // Message read by recipients
+        DELETED     // Message deleted
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MessageType.java
+package com.tuniv.backend.chat.model;
+
+public enum MessageType {
+    TEXT,
+    IMAGE,
+    FILE,
+    SYSTEM,     // <-- This is the key value
+    ANNOUNCEMENT,
+    POLL,
+    EVENT,
+    EMOJI
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Reaction.java
+package com.tuniv.backend.chat.model;
+
+import java.time.Instant;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "reactions", indexes = {
+    @Index(name = "idx_reaction_message_user", columnList = "message_id, user_id", unique = true),
+    @Index(name = "idx_reaction_message", columnList = "message_id, created_at"),
+    @Index(name = "idx_reaction_user", columnList = "user_id, created_at"),
+    @Index(name = "idx_reaction_emoji", columnList = "emoji, created_at"),
+    @Index(name = "idx_reaction_university", columnList = "university_context_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_removed = false") // âœ… ADD: Global filter for non-removed reactions
+public class Reaction extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== CORE RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "message_id", nullable = false)
+    private Message message;
+
+    // ========== REACTION DATA ==========
+    @NotBlank
+    @Column(name = "emoji", nullable = false, length = 10)
+    private String emoji;
+
+    @Column(name = "skin_tone")
+    private Integer skinTone; // For emoji skin tone variations (1-5)
+
+    @Size(max = 100)
+    @Column(name = "custom_text", length = 100)
+    private String customText; // For text-based reactions
+
+    // ========== CONTEXT & METADATA ==========
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_context_id")
+    private University universityContext;
+
+    @Column(name = "is_removed", nullable = false)
+    private boolean isRemoved = false;
+
+    @Column(name = "removed_at")
+    private Instant removedAt;
+
+    @Column(name = "removal_reason")
+    private String removalReason;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\Community.java
+package com.tuniv.backend.community.model;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.follow.model.Followable;
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.university.model.University;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "communities", indexes = {
+    @Index(name = "idx_community_name", columnList = "name"),
+    @Index(name = "idx_community_university", columnList = "university_id"), // âœ… ADDED: University relationship
+    @Index(name = "idx_community_member_count", columnList = "member_count DESC"),
+    @Index(name = "idx_community_topic_count", columnList = "topic_count DESC"),
+    @Index(name = "idx_community_created", columnList = "created_at DESC"),
+    @Index(name = "idx_community_active", columnList = "is_active, member_count DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_active = true")
+public class Community extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer communityId;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== BASIC INFO ==========
+    @NotBlank(message = "Community name cannot be empty")
+    @Size(max = 100, message = "Community name cannot exceed 100 characters")
+    @Column(name = "name", nullable = false, unique = true, length = 100)
+    private String name;
+
+    @Size(max = 2000)
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "banner_url")
+    private String bannerUrl;
+
+    @Column(name = "icon_url")
+    private String iconUrl;
+
+    // ========== UNIVERSITY CONTEXT ==========
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_id") // âœ… ADDED: Link to university
+    private University university;
+
+    // ========== CONFIGURATION ==========
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "join_policy", nullable = false)
+    private CommunityJoinPolicy joinPolicy = CommunityJoinPolicy.OPEN;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "posting_policy", nullable = false)
+    private CommunityPostingPolicy postingPolicy = CommunityPostingPolicy.MEMBERS;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false)
+    private CommunityVisibility visibility = CommunityVisibility.PUBLIC;
+
+    @Column(name = "allow_external_members", nullable = false)
+    private boolean allowExternalMembers = true;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    @Column(name = "is_verified", nullable = false)
+    private boolean isVerified = false;
+
+    // ========== STATISTICS ==========
+    @Column(name = "member_count", nullable = false)
+    private int memberCount = 0;
+
+    @Column(name = "topic_count", nullable = false)
+    private int topicCount = 0;
+
+    @Column(name = "follower_count", nullable = false)
+    private int followerCount = 0;
+
+    @Column(name = "daily_active_members")
+    private Integer dailyActiveMembers = 0;
+
+    @Column(name = "weekly_growth_rate")
+    private Double weeklyGrowthRate = 0.0;
+
+    // ========== FOLLOWABLE ==========
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false, orphanRemoval = true)
+    @JoinColumn(name = "followable_id", nullable = false, unique = true)
+    private Followable followable;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityJoinPolicy.java
+package com.tuniv.backend.community.model;
+
+    // ========== ENUMS ==========
+    public enum CommunityJoinPolicy {
+        OPEN,           // Anyone can join
+        APPROVAL,       // Requires moderator approval
+        RESTRICTED,     // Invitation only
+        UNIVERSITY_ONLY // Only university members
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityMembership.java
+package com.tuniv.backend.community.model;
+
+import java.io.Serializable;
+import java.time.Instant;
+import java.util.Objects;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "community_memberships", indexes = {
+    @Index(name = "idx_community_membership_user", columnList = "user_id"),
+    @Index(name = "idx_community_membership_community", columnList = "community_id"),
+    @Index(name = "idx_community_membership_role", columnList = "role_id"),
+    @Index(name = "idx_community_membership_active", columnList = "is_active, joined_at DESC"),
+    @Index(name = "idx_community_membership_user_community", columnList = "user_id, community_id", unique = true)
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_active = true")
+public class CommunityMembership extends Auditable {
+
+    @EmbeddedId
+    private CommunityMembershipId id;
+
+    // ========== CORE RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("userId")
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("communityId")
+    @JoinColumn(name = "community_id", nullable = false)
+    private Community community;
+
+    // ========== ROLE RELATIONSHIP ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "role_id", nullable = false)
+    private CommunityRole role;
+
+    // ========== STATUS FLAGS ==========
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    @Column(name = "notifications_enabled", nullable = false)
+    private boolean notificationsEnabled = true;
+
+    @Column(name = "is_banned", nullable = false)
+    private boolean isBanned = false;
+
+    // ========== METADATA ==========
+    @Column(name = "joined_at", nullable = false, updatable = false)
+    private Instant joinedAt = Instant.now();
+
+    @Column(name = "last_visited_at")
+    private Instant lastVisitedAt;
+
+    @Column(name = "visit_count", nullable = false)
+    private Integer visitCount = 0;
+
+    @Column(name = "contribution_score", nullable = false)
+    private Integer contributionScore = 0;
+
+    @Column(name = "display_order")
+    private Integer displayOrder = 0;
+
+    // ========== MODERATION FIELDS ==========
+    @Column(name = "banned_at")
+    private Instant bannedAt;
+
+    @Column(name = "ban_reason")
+    private String banReason;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "banned_by_user_id")
+    private User bannedBy;
+
+    @Column(name = "mute_until")
+    private Instant muteUntil;
+
+    @Column(name = "mute_reason")
+    private String muteReason;
+
+    // ========== CONSTRUCTORS ==========
+    public CommunityMembership(User user, Community community, CommunityRole role) {
+        this.id = new CommunityMembershipId(user.getUserId(), community.getCommunityId());
+        this.user = user;
+        this.community = community;
+        this.role = role;
+    }
+
+    // ========== EQUALS & HASHCODE ==========
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CommunityMembership that = (CommunityMembership) o;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    // ========== EMBEDDED ID CLASS ==========
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CommunityMembershipId implements Serializable {
+        @Column(name = "user_id")
+        private Integer userId;
+
+        @Column(name = "community_id")
+        private Integer communityId;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            CommunityMembershipId that = (CommunityMembershipId) o;
+            return Objects.equals(userId, that.userId) && Objects.equals(communityId, that.communityId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(userId, communityId);
+        }
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityPostingPolicy.java
+package com.tuniv.backend.community.model;
+
+
+    public enum CommunityPostingPolicy {
+        MEMBERS,        // Only community members
+        ANY_VERIFIED,   // Any verified student
+        UNIVERSITY_MEMBERS, // Only university members
+        MODERATORS_ONLY // Only moderators
+    }
+
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityRole.java
+package com.tuniv.backend.community.model;
+
+import java.util.HashSet;
+import java.util.Set;
+
+import com.tuniv.backend.authorization.model.Permission;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "community_roles", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"name", "community_id"}) // âœ… Prevents duplicate role names within the same community
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class CommunityRole {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @NotBlank
+    @Column(name = "name", nullable = false, length = 50)
+    private String name;
+
+    @NotBlank
+    @Column(name = "display_name", nullable = false, length = 100)
+    private String displayName;
+
+    // âœ… ADDED: Link to a community. Will be NULL for system roles.
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "community_id")
+    private Community community;
+
+    @Column(name = "is_system_role", nullable = false)
+    private boolean isSystemRole = false;
+
+    @Column(name = "is_default", nullable = false)
+    private boolean isDefault = false;
+
+    // âœ… FIXED: Changed from EAGER to LAZY to prevent performance issues
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "community_role_permissions",
+        joinColumns = @JoinColumn(name = "role_id"),
+        inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
+    private Set<Permission> permissions = new HashSet<>();
+
+    @Column(name = "member_count", nullable = false)
+    private Integer memberCount = 0;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityVisibility.java
+package com.tuniv.backend.community.model;
+
+
+ public enum CommunityVisibility {
+        PUBLIC,         // Visible to all
+        UNIVERSITY,     // Only visible to university members
+        MEMBERS_ONLY,   // Only visible to members
+        PRIVATE         // Hidden from listings
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\DefaultCommunityRoles.java
+package com.tuniv.backend.community.model;
+
+public enum DefaultCommunityRoles {
+    COMMUNITY_OWNER("community_owner", "Community Owner", true),
+    COMMUNITY_ADMIN("community_admin", "Community Admin", true),
+    COMMUNITY_MODERATOR("community_moderator", "Community Moderator", true),
+    COMMUNITY_MEMBER("community_member", "Community Member", true);
+
+    private final String name;
+    private final String displayName;
+    private final boolean isSystemRole;
+
+    DefaultCommunityRoles(String name, String displayName, boolean isSystemRole) {
+        this.name = name;
+        this.displayName = displayName;
+        this.isSystemRole = isSystemRole;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public boolean isSystemRole() {
+        return isSystemRole;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\filestorage\model\FileStorage.java
+package com.tuniv.backend.filestorage.model;
+
+import org.springframework.web.multipart.MultipartFile;
+
+public interface FileStorage {
+    String storeFile(MultipartFile file, String subDirectory);
+    void deleteFile(String fileUrl);
+
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\FeedItemType.java
+package com.tuniv.backend.follow.model;
+
+public enum FeedItemType {
+    USER_CREATED_TOPIC,
+    USER_REPLIED_TO_TOPIC,
+    USER_JOINED_COMMUNITY,
+    COMMUNITY_NEW_TOPIC,
+    UNIVERSITY_NEW_ANNOUNCEMENT
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\Follow.java
+package com.tuniv.backend.follow.model;
+
+import java.util.Objects;
+
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "follows", 
+    indexes = {
+        @Index(name = "idx_follows_user_followable", columnList = "user_id, followable_id", unique = true),
+        @Index(name = "idx_follows_followable", columnList = "followable_id"),
+        @Index(name = "idx_follows_user_created", columnList = "user_id, created_at"),
+        @Index(name = "idx_follows_mutual", columnList = "is_mutual, created_at")
+    }
+)
+@Getter
+@Setter
+@NoArgsConstructor
+public class Follow extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer followId;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== FOLLOWER RELATIONSHIP ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User follower;
+
+    // ========== TARGET (Now using Followable) ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "followable_id", nullable = false)
+    private Followable target;
+
+    // ========== SETTINGS ==========
+    @Column(name = "notifications_enabled", nullable = false)
+    private boolean notificationsEnabled = true;
+
+    @Column(name = "is_mutual", nullable = false)
+    private boolean isMutual = false;
+
+    // ========== CONSTRUCTORS ==========
+    public Follow(User follower, Followable target) {
+        this.follower = follower;
+        this.target = target;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\Followable.java
+package com.tuniv.backend.follow.model;
+
+import com.tuniv.backend.shared.model.Auditable;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "followables")
+@Getter
+@Setter
+@NoArgsConstructor
+public class Followable extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id; // âœ… CHANGED to Long for scalability
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "entity_type", nullable = false, length = 50)
+    private FollowableType entityType;
+
+    // âœ… Optional: Denormalized counter for performance
+    @Column(name = "follower_count", nullable = false)
+    private Integer followerCount = 0;
+
+    public Followable(FollowableType entityType) {
+        this.entityType = entityType;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\FollowableType.java
+package com.tuniv.backend.follow.model;
+
+public enum FollowableType {
+    USER,
+    COMMUNITY,
+    TAG,
+    UNIVERSITY,
+    MODULE
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\ModerationLog.java
+package com.tuniv.backend.moderation.model;
+
+import java.time.Instant;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import com.tuniv.backend.qa.model.Post;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.Setter;
+
+@Entity
+@Table(name = "moderation_logs")
+@Getter
+@Setter
+public class ModerationLog {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer logId;
+    
+    // The moderator who took the action
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "moderator_id", nullable = false)
+    private User moderator;
+    
+    @Column(nullable = false)
+    private String action;
+
+    @Column(columnDefinition = "TEXT")
+    private String justification;
+
+    // âœ… IMPROVED: Proper JPA relationships instead of raw IDs
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_post_id")
+    private Post targetPost;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_user_id")
+    private User targetUser;
+
+    @CreationTimestamp
+    private Instant createdAt;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\Report.java
+package com.tuniv.backend.moderation.model;
+
+import java.time.Instant;
+
+import org.hibernate.annotations.Any;
+import org.hibernate.annotations.AnyDiscriminator;
+import org.hibernate.annotations.AnyDiscriminatorValue;
+
+import com.tuniv.backend.chat.model.Message;
+import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.qa.model.Post;
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import static jakarta.persistence.DiscriminatorType.STRING;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "reports", indexes = {
+        @Index(name = "idx_report_target", columnList = "target_type, target_id"),
+        @Index(name = "idx_report_status", columnList = "status"),
+        @Index(name = "idx_report_created", columnList = "created_at DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class Report extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer reportId;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "reporter_user_id", nullable = false)
+    private User reporter;
+
+    // ========== POLYMORPHIC TARGET (Correct Hibernate 6 Syntax) ==========
+
+    /**
+     * This field stores the discriminator string (e.g., "POST", "USER").
+     * The @AnyDiscriminator annotation defines the column type.
+     * The @AnyDiscriminatorValue annotations map a string to an entity class.
+     */
+    @AnyDiscriminator(STRING)
+    @AnyDiscriminatorValue(discriminator = "POST", entity = Post.class)
+    @AnyDiscriminatorValue(discriminator = "USER", entity = User.class)
+    @AnyDiscriminatorValue(discriminator = "COMMUNITY", entity = Community.class)
+    @AnyDiscriminatorValue(discriminator = "MESSAGE", entity = Message.class)
+    @Column(name = "target_type", length = 50, nullable = false)
+    private String targetType;
+
+    /**
+     * This field holds the actual entity (e.g., a Post object) and is
+     * linked via the foreign key in the @JoinColumn.
+     */
+    @Any
+    @JoinColumn(name = "target_id", nullable = false)
+    private Object target;
+
+    @NotBlank
+    @Size(max = 100)
+    @Column(name = "reason", nullable = false, length = 100)
+    private String reason;
+
+    @Size(max = 1000)
+    @Column(name = "details", length = 1000)
+    private String details;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private ReportStatus status = ReportStatus.PENDING;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resolved_by_user_id")
+    private User resolvedBy;
+
+    @Column(name = "resolution_notes", length = 500)
+    private String resolutionNotes;
+
+    @Column(name = "resolved_at")
+    private Instant resolvedAt;
+
+    /**
+     * Custom constructor for creating a new report.
+     *
+     * @param reporter The user filing the report.
+     * @param target   The entity being reported (e.g., Post, User).
+     * @param reason   The primary reason for the report.
+     */
+    public Report(User reporter, Object target, String reason) {
+        this.reporter = reporter;
+        this.target = target;
+        this.reason = reason;
+        this.status = ReportStatus.PENDING;
+    }
+
+    /**
+     * Helper method to dynamically get the ID from the target object,
+     * which is useful for DTOs or serialization.
+     *
+     * @return The primary key of the target entity.
+     */
+    public Integer getTargetId() {
+        if (target instanceof Post) return ((Post) target).getId();
+        if (target instanceof User) return ((User) target).getUserId();
+        if (target instanceof Community) return ((Community) target).getCommunityId();
+        if (target instanceof Message) return ((Message) target).getId();
+        return null;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\ReportStatus.java
+package com.tuniv.backend.moderation.model;
+
+public enum ReportStatus {
+        PENDING,
+        UNDER_REVIEW,
+        RESOLVED,
+        DISMISSED
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\Notification.java
+package com.tuniv.backend.notification.model;
+
+import jakarta.persistence.*;
+
+import org.hibernate.annotations.CreationTimestamp;
+
+import com.tuniv.backend.user.model.User;
+
+import java.time.LocalDateTime;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.*;
+
+import java.time.Instant;
+import java.util.Objects;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.shared.model.Auditable;
+
+@Entity
+@Table(name = "notifications", indexes = {
+    @Index(name = "idx_notification_recipient", columnList = "recipient_id, created_at DESC"),
+    @Index(name = "idx_notification_read_status", columnList = "is_read, created_at"),
+    @Index(name = "idx_notification_type", columnList = "type, created_at DESC"),
+    @Index(name = "idx_notification_actor", columnList = "actor_id, created_at"),
+    @Index(name = "idx_notification_expiry", columnList = "expires_at"),
+    @Index(name = "idx_notification_source", columnList = "source_entity_type, source_entity_id"), // âœ… ADDED
+    @Index(name = "idx_notification_priority", columnList = "priority, created_at DESC") // âœ… ADDED
+
+})
+@Getter
+@Setter
+@ToString(exclude = {"recipient", "actor"}) // Avoid lazy loading issues in logs
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Where(clause = "is_dismissed = false") // âœ… ADD: Global filter for non-dismissed notifications
+public class Notification extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer notificationId;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== RECIPIENT & ACTOR ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "recipient_id", nullable = false)
+    private User recipient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "actor_id")
+    private User actor;
+
+    // ========== NOTIFICATION CONTENT ==========
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "type", nullable = false, length = 50)
+    private NotificationType type;
+
+    @NotBlank
+    @Size(max = 255)
+    @Column(name = "title", nullable = false, length = 255)
+    private String title;
+
+    @Size(max = 1000)
+    @Column(name = "message", length = 1000)
+    private String message;
+
+    @Column(name = "link", length = 500)
+    private String link; // Frontend route, e.g., "/questions/123#answer-456"
+
+    // ========== STATUS & DELIVERY ==========
+    @Column(name = "is_read", nullable = false)
+    private boolean isRead = false;
+
+    @Column(name = "is_delivered", nullable = false)
+    private boolean isDelivered = false;
+
+    @Column(name = "is_dismissed", nullable = false)
+    private boolean isDismissed = false;
+
+    @Column(name = "priority", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private NotificationPriority priority = NotificationPriority.NORMAL;
+
+    // ========== TIMESTAMPS ==========
+    @Column(name = "read_at")
+    private Instant readAt;
+
+    @Column(name = "delivered_at")
+    private Instant deliveredAt;
+
+    @Column(name = "dismissed_at")
+    private Instant dismissedAt;
+
+    @Column(name = "expires_at")
+    private Instant expiresAt;
+
+    // ========== METADATA ==========
+    @Column(name = "source_entity_type", length = 50)
+    private String sourceEntityType; // e.g., "QUESTION", "ANSWER", "MESSAGE"
+
+    @Column(name = "source_entity_id")
+    private Integer sourceEntityId;
+
+    @Column(name = "action_required", nullable = false)
+    private boolean actionRequired = false;
+
+    @Column(name = "action_label", length = 50)
+    private String actionLabel;
+
+    @Column(name = "action_link", length = 500)
+    private String actionLink;
+
+    @Column(name = "image_url", length = 500)
+    private String imageUrl;
+    // ========== EQUALS & HASHCODE ==========
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Notification that = (Notification) o;
+        return notificationId != null && Objects.equals(notificationId, that.notificationId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(notificationId);
+    }
+
+    
+
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\NotificationPriority.java
+package com.tuniv.backend.notification.model;
+
+
+    public enum NotificationPriority {
+        LOW,
+        NORMAL,
+        HIGH,
+        URGENT
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\NotificationType.java
+package com.tuniv.backend.notification.model;
+
+// ========== ENUMS ==========
+    public enum NotificationType {
+        // Content Interactions
+        NEW_ANSWER,
+        ANSWER_MARKED_AS_SOLUTION,
+        NEW_COMMENT_ON_ANSWER,
+        NEW_REPLY_TO_COMMENT,
+        NEW_VOTE_ON_QUESTION,
+        NEW_VOTE_ON_ANSWER,
+        NEW_VOTE_ON_COMMENT,
+
+        // Social & Chat
+        NEW_QUESTION_IN_UNI,
+        NEW_CHAT_MESSAGE,
+        NEW_REACTION_ON_CHAT_MESSAGE,
+        NEW_FOLLOWER,
+
+        // Content from followed entities
+        NEW_QUESTION_FROM_FOLLOWED_USER,
+        NEW_QUESTION_IN_FOLLOWED_COMMUNITY,
+        NEW_QUESTION_IN_FOLLOWED_MODULE,
+        NEW_QUESTION_WITH_FOLLOWED_TAG,
+
+        // System & Welcome
+        WELCOME_TO_UNIVERSITY,
+        SYSTEM_ANNOUNCEMENT,
+        VERIFICATION_COMPLETE,
+
+        // Moderation
+        CONTENT_REPORTED,
+        CONTENT_APPROVED,
+        CONTENT_REJECTED,
+
+        // Solution updates
+        ANSWER_UNMARKED_AS_SOLUTION
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Attachment.java
+package com.tuniv.backend.qa.model;
+
+import java.time.Instant;
+import java.util.Objects;
+import java.util.Set;
+
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+
+@Entity
+@Table(name = "attachments", indexes = {
+    @Index(name = "idx_attachment_post", columnList = "post_id"),
+    @Index(name = "idx_attachment_type", columnList = "file_type"),
+    @Index(name = "idx_attachment_uploaded", columnList = "uploaded_at DESC"),
+    @Index(name = "idx_attachment_user", columnList = "uploaded_by_user_id"),
+    @Index(name = "idx_attachment_mimetype", columnList = "mime_type"),
+    @Index(name = "idx_attachment_public", columnList = "is_public, uploaded_at DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class Attachment extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "attachment_id")
+    private Integer attachmentId;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== FILE INFORMATION ==========
+    @NotBlank
+    @Size(max = 255)
+    @Column(name = "file_name", nullable = false, length = 255)
+    private String fileName;
+
+    @NotBlank
+    @Column(name = "file_url", nullable = false, length = 1000)
+    private String fileUrl;
+
+    @NotBlank
+    @Size(max = 50)
+    @Column(name = "file_type", nullable = false, length = 50)
+    private String fileType;
+
+    @NotNull
+    @Column(name = "file_size", nullable = false)
+    private Long fileSize;
+
+    @NotBlank
+    @Size(max = 100)
+    @Column(name = "mime_type", nullable = false, length = 100)
+    private String mimeType;
+
+    // ========== UPLOAD METADATA ==========
+    @Column(name = "uploaded_at", nullable = false)
+    private Instant uploadedAt = Instant.now(); // âœ… Standardized to Instant
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "uploaded_by_user_id")
+    private User uploadedBy;
+
+    @Column(name = "upload_session_id", length = 100)
+    private String uploadSessionId;
+
+    // ========== VISIBILITY & ACCESS ==========
+    @Column(name = "is_public", nullable = false)
+    private boolean isPublic = true;
+
+    @Column(name = "access_token", length = 100)
+    private String accessToken; // For private file access
+
+    @Column(name = "access_token_expiry")
+    private Instant accessTokenExpiry;
+
+    // ========== CONTENT DESCRIPTION ==========
+    @Size(max = 500)
+    @Column(name = "description", length = 500)
+    private String description;
+
+    @Column(name = "alt_text", length = 255)
+    private String altText; // For accessibility
+
+    @Column(name = "caption", length = 500)
+    private String caption;
+
+    // ========== MEDIA METADATA ==========
+    @Column(name = "width")
+    private Integer width; // For images/videos in pixels
+
+    @Column(name = "height")
+    private Integer height; // For images/videos in pixels
+
+    @Column(name = "duration")
+    private Integer duration; // For videos/audio in seconds
+
+    @Column(name = "frame_rate")
+    private Double frameRate; // For videos
+
+    @Column(name = "bitrate")
+    private Long bitrate; // For audio/video in kbps
+
+    // ========== THUMBNAILS & PREVIEWS ==========
+    @Column(name = "thumbnail_url", length = 1000)
+    private String thumbnailUrl;
+
+    @Column(name = "preview_url", length = 1000)
+    private String previewUrl;
+
+    @Column(name = "compressed_url", length = 1000)
+    private String compressedUrl;
+
+    // ========== SECURITY & SCANNING ==========
+    @Column(name = "is_scanned", nullable = false)
+    private boolean isScanned = false;
+
+    @Column(name = "scan_status", length = 50)
+    private String scanStatus; // CLEAN, INFECTED, PENDING, FAILED
+
+    @Column(name = "scan_date")
+    private Instant scanDate;
+
+    @Column(name = "virus_signature", length = 100)
+    private String virusSignature;
+
+    // ========== RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\ContentVisibility.java
+package com.tuniv.backend.qa.model;
+
+
+// ========== ENUMS ==========
+    public enum ContentVisibility {
+        PUBLIC,         // Anyone can view
+        UNIVERSITY,     // Only university members
+        MODULE,         // Only module members
+        COMMUNITY,      // Only community members
+        FOLLOWERS,      // Only followers
+        PRIVATE         // Only specific users
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Post.java
+package com.tuniv.backend.qa.model;
+
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+import org.hibernate.annotations.Where;
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.shared.model.SoftDeletable;
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "posts", indexes = {
+    @Index(name = "idx_posts_author_created", columnList = "user_id, created_at"),
+    @Index(name = "idx_posts_university_context", columnList = "university_context_id"),
+    @Index(name = "idx_posts_visibility", columnList = "visibility"),
+    @Index(name = "idx_posts_created_at", columnList = "created_at DESC"),
+    @Index(name = "idx_posts_deleted", columnList = "is_deleted, created_at")
+})
+@Inheritance(strategy = InheritanceType.JOINED)
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_deleted = false")
+public abstract class Post extends Auditable implements SoftDeletable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== CORE CONTENT ==========
+    @NotBlank(message = "Post body cannot be empty")
+    @Size(max = 10000, message = "Post body cannot exceed 10000 characters")
+    @Column(name = "body", columnDefinition = "TEXT")
+    private String body;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User author;
+
+    // ========== CONTEXT & VISIBILITY ==========
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_context_id")
+    private University universityContext;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "visibility", nullable = false)
+    private ContentVisibility visibility = ContentVisibility.PUBLIC;
+
+    // ========== EDIT TRACKING ==========
+    @Column(name = "is_edited", nullable = false)
+    private boolean isEdited = false;
+
+    @Column(name = "edited_at")
+    private Instant editedAt;
+
+    @Column(name = "edit_count", nullable = false)
+    private Integer editCount = 0;
+
+    @Column(name = "edit_history", columnDefinition = "TEXT")
+    private String editHistory;
+
+    // ========== SOFT DELETE FIELDS ==========
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deletion_reason")
+    private String deletionReason;
+
+    // âŒ REMOVED: Dangerous attachments collection
+    // @OneToMany(mappedBy = "post", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    // private Set<Attachment> attachments = new HashSet<>();
+
+    public abstract String getPostType();
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\PostEditHistory.java
+package com.tuniv.backend.qa.model;
+
+import java.time.Instant;
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.user.model.User;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "post_edit_history", indexes = {
+    @Index(name = "idx_edit_history_post", columnList = "post_id, created_at DESC"),
+    @Index(name = "idx_edit_history_author", columnList = "edited_by_user_id"),
+    @Index(name = "idx_edit_history_version", columnList = "post_id, version_number")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class PostEditHistory extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    // ========== CORE RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "edited_by_user_id")
+    private User editedBy;
+
+    // ========== EDIT CONTENT ==========
+    @Column(name = "previous_body", columnDefinition = "TEXT")
+    private String previousBody;
+
+    @Column(name = "edit_reason", length = 500)
+    private String editReason;
+
+    @Column(name = "version_number", nullable = false)
+    private Integer versionNumber = 1;
+
+    @Column(name = "edited_at", nullable = false)
+    private Instant editedAt = Instant.now();
+
+    // ========== METADATA ==========
+    @Column(name = "change_summary", length = 1000)
+    private String changeSummary;
+
+    @Column(name = "word_count_change")
+    private Integer wordCountChange;
+
+    // ========== CONSTRUCTORS ==========
+    public PostEditHistory(Post post, String previousBody, User editedBy, String editReason) {
+        this.post = post;
+        this.previousBody = previousBody;
+        this.editedBy = editedBy;
+        this.editReason = editReason;
+        this.editedAt = Instant.now();
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Reply.java
+package com.tuniv.backend.qa.model;
+
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "replies", indexes = {
+    @Index(name = "idx_reply_topic", columnList = "topic_id, created_at"),
+    @Index(name = "idx_reply_author", columnList = "user_id, created_at"),
+    @Index(name = "idx_reply_parent", columnList = "parent_reply_id, created_at"),
+    @Index(name = "idx_reply_solution", columnList = "is_solution, created_at DESC"),
+    @Index(name = "idx_reply_depth", columnList = "topic_id, depth, created_at")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class Reply extends VotablePost {
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== REPLY-SPECIFIC FIELDS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "topic_id", nullable = false)
+    private Topic topic;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_reply_id")
+    private Reply parentReply;
+
+    // âŒ REMOVED: Dangerous childReplies collection
+    // @OneToMany(mappedBy = "parentReply", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    // private Set<Reply> childReplies = new HashSet<>();
+
+    @Column(name = "is_solution", nullable = false)
+    private boolean isSolution = false;
+
+    @Column(name = "depth", nullable = false)
+    private Integer depth = 0;
+
+    // ========== CONSTRUCTORS ==========
+    public Reply(String body, User author, Topic topic, University universityContext) {
+        this.setBody(body);
+        this.setAuthor(author);
+        this.topic = topic;
+        this.depth = 0;
+
+        if (universityContext != null) {
+            this.setUniversityContext(universityContext);
+        }
+    }
+
+    @Override
+    public String getPostType() {
+        return "REPLY";
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Tag.java
+package com.tuniv.backend.qa.model;
+
+
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.follow.model.Followable;
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.university.model.University;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "tags", indexes = {
+    @Index(name = "idx_tag_name", columnList = "name"),
+    @Index(name = "idx_tag_usage", columnList = "usage_count DESC"),
+    @Index(name = "idx_tag_created", columnList = "created_at DESC"),
+    @Index(name = "idx_tag_university", columnList = "university_id"),
+    @Index(name = "idx_tag_official", columnList = "is_official, usage_count DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_active = true")
+public class Tag extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "tag_id")
+    private Integer id;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== BASIC INFO ==========
+    @NotBlank
+    @Size(min = 2, max = 50)
+    @Column(name = "name", nullable = false, unique = true, length = 50)
+    private String name;
+
+    @Size(max = 500)
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Size(min = 7, max = 7)
+    @Column(name = "color", length = 7)
+    private String color;
+
+    // ========== STATUS FLAGS ==========
+    @Column(name = "is_official", nullable = false)
+    private boolean isOfficial = false;
+
+    @Column(name = "is_verified", nullable = false)
+    private boolean isVerified = false;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    // ========== STATISTICS ==========
+    @NotNull
+    @Column(name = "usage_count", nullable = false)
+    private Integer usageCount = 0;
+
+    @NotNull
+    @Column(name = "follower_count", nullable = false)
+    private Integer followerCount = 0;
+
+    @Column(name = "weekly_usage_count")
+    private Integer weeklyUsageCount = 0;
+
+    @Column(name = "last_used_at")
+    private Instant lastUsedAt;
+
+    // ========== CONTEXT ==========
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_id")
+    private University university;
+
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false, orphanRemoval = true)
+    @JoinColumn(name = "followable_id", nullable = false, unique = true)
+    private Followable followable;
+    
+
+    // âŒ REMOVED: Collection - use repository queries instead
+    // - Set<Topic> topics (replaced by TopicTag entity)
+
+    // ========== CONSTRUCTORS ==========
+    public Tag(String name, String description) {
+        this.name = normalizeTagName(name);
+        this.description = description;
+    }
+
+    public Tag(String name, String description, University university) {
+        this(name, description);
+        this.university = university;
+    }
+
+    public Tag(String name, String description, String color, boolean isOfficial) {
+        this(name, description);
+        this.color = color;
+        this.isOfficial = isOfficial;
+    }
+
+    private String normalizeTagName(String name) {
+        if (name == null) return null;
+        return name.trim().toLowerCase().replaceAll("\\s+", "-");
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Topic.java
+package com.tuniv.backend.qa.model;
+import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.university.model.Module;
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.university.model.UniversityMembership;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "topics", indexes = {
+    @Index(name = "idx_topic_title", columnList = "title"),
+    @Index(name = "idx_topic_community", columnList = "community_id, created_at DESC"),
+    @Index(name = "idx_topic_module", columnList = "module_id, created_at DESC"),
+    @Index(name = "idx_topic_author", columnList = "user_id, created_at DESC"),
+    @Index(name = "idx_topic_last_activity", columnList = "last_activity_at DESC"),
+    @Index(name = "idx_topic_pinned", columnList = "is_pinned, last_activity_at DESC"),
+    @Index(name = "idx_topic_solved", columnList = "is_solved, created_at DESC"),
+    @Index(name = "idx_topic_score", columnList = "score DESC, created_at DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class Topic extends VotablePost {
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== TOPIC-SPECIFIC FIELDS ==========
+    @NotBlank(message = "Topic title cannot be empty")
+    @Size(max = 255, message = "Topic title cannot exceed 255 characters")
+    @Column(name = "title", nullable = false, length = 255)
+    private String title;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "topic_type", nullable = false)
+    private TopicType topicType;
+
+    // ========== SOLUTION TRACKING ==========
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "accepted_solution_id")
+    private Reply acceptedSolution;
+
+    @Column(name = "is_solved", nullable = false)
+    private boolean isSolved = false;
+
+    @Column(name = "solution_awarded_at")
+    private Instant solutionAwardedAt;
+
+    // ========== MODERATION FIELDS ==========
+    @Column(name = "is_locked", nullable = false)
+    private boolean isLocked = false;
+
+    @Column(name = "is_pinned", nullable = false)
+    private boolean isPinned = false;
+
+    @Column(name = "pinned_until")
+    private Instant pinnedUntil;
+
+    @Column(name = "locked_reason")
+    private String lockedReason;
+
+    // ========== ENGAGEMENT STATISTICS ==========
+    @Column(name = "reply_count", nullable = false)
+    private int replyCount = 0;
+
+    @Column(name = "view_count", nullable = false)
+    private int viewCount = 0;
+
+    @Column(name = "share_count", nullable = false)
+    private int shareCount = 0;
+
+    @Column(name = "bookmark_count", nullable = false)
+    private int bookmarkCount = 0;
+
+    @Column(name = "participating_universities_count", nullable = false)
+    private int participatingUniversitiesCount = 1;
+
+    @Column(name = "last_activity_at", nullable = false)
+    private Instant lastActivityAt;
+
+    // ========== RELATIONSHIPS ==========
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "community_id")
+    private Community community;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "module_id")
+    private Module module;
+
+    // âŒ REMOVED: Collections - use repository queries instead
+    // - Set<Reply> replies
+    // - Set<Tag> tags (replaced by TopicTag entity)
+
+    @ElementCollection
+    @CollectionTable(
+        name = "topic_participating_universities",
+        joinColumns = @JoinColumn(name = "topic_id")
+    )
+    @Column(name = "university_id")
+    private Set<Integer> participatingUniversityIds = new HashSet<>();
+
+    // ========== CONSTRUCTORS ==========
+    
+    /**
+     * Clean constructor without reaching through objects
+     * All dependencies must be explicitly provided
+     */
+    public Topic(String title, String body, User author, TopicType topicType, University universityContext) {
+        this.setBody(body);
+        this.setAuthor(author);
+        this.title = title;
+        this.topicType = topicType;
+        this.lastActivityAt = Instant.now();
+        
+        // Set university context explicitly (no more reaching through author)
+        if (universityContext != null) {
+            this.setUniversityContext(universityContext);
+            this.participatingUniversityIds.add(universityContext.getUniversityId());
+        }
+    }
+
+    /**
+     * Constructor for community topics
+     */
+    public Topic(String title, String body, User author, TopicType topicType, 
+                 University universityContext, Community community) {
+        this(title, body, author, topicType, universityContext);
+        this.community = community;
+    }
+
+    /**
+     * Constructor for module topics  
+     */
+    public Topic(String title, String body, User author, TopicType topicType,
+                 University universityContext, Module module) {
+        this(title, body, author, topicType, universityContext);
+        this.module = module;
+    }
+
+    @Override
+    public String getPostType() {
+        return "TOPIC";
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\TopicTag.java
+package com.tuniv.backend.qa.model;
+import java.io.Serializable;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.university.model.Module;
+import com.tuniv.backend.university.model.UniversityMembership;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "topic_tags")
+@Getter
+@Setter
+@NoArgsConstructor
+public class TopicTag extends Auditable {
+
+    @EmbeddedId
+    private TopicTagId id;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("topicId")
+    @JoinColumn(name = "topic_id", nullable = false)
+    private Topic topic;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("tagId")
+    @JoinColumn(name = "tag_id", nullable = false)
+    private Tag tag;
+
+    // âœ… IMPROVED: Proper JPA relationship instead of raw ID
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "added_by_user_id")
+    private User addedBy;
+
+    // Constructor
+    public TopicTag(Topic topic, Tag tag, User addedBy) {
+        this.id = new TopicTagId(topic.getId(), tag.getId());
+        this.topic = topic;
+        this.tag = tag;
+        this.addedBy = addedBy; // Now directly set the User object
+    }
+
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class TopicTagId implements Serializable {
+        @Column(name = "topic_id")
+        private Integer topicId;
+
+        @Column(name = "tag_id")
+        private Integer tagId;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            TopicTagId that = (TopicTagId) o;
+            return Objects.equals(topicId, that.topicId) && Objects.equals(tagId, that.tagId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(topicId, tagId);
+        }
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\TopicType.java
+package com.tuniv.backend.qa.model;
+
+public enum TopicType {
+    QUESTION,       // A topic that seeks a solution or answer
+    DISCUSSION,     // A topic for general discussion and conversation
+    ANNOUNCEMENT,   // Official announcements from moderators or admins
+    POLL,           // Poll topics for gathering opinions and votes
+    EVENT,          // Event discussions and coordination
+    TUTORIAL,       // Educational tutorials and guides
+    SHOWCASE,       // Project showcases and demonstrations
+    SUPPORT         // Technical support and help topics
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\VotablePost.java
+package com.tuniv.backend.qa.model;
+
+import java.time.Instant;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.MappedSuperclass;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@MappedSuperclass
+@Getter
+@Setter
+@NoArgsConstructor
+public abstract class VotablePost extends Post {
+
+    // ========== VOTING STATISTICS ==========
+    @Column(name = "score", nullable = false)
+    private Integer score = 0;
+
+    @Column(name = "upvote_count", nullable = false)
+    private Integer upvoteCount = 0;
+
+    @Column(name = "downvote_count", nullable = false)
+    private Integer downvoteCount = 0;
+
+    @Column(name = "vote_ratio")
+    private Double voteRatio = 0.0;
+
+    // ========== ENGAGEMENT METRICS ==========
+    @Column(name = "university_engagement_score")
+    private Double universityEngagementScore = 0.0;
+
+    @Column(name = "hot_score")
+    private Double hotScore = 0.0;
+
+    // âœ… NEW: Optimization for background scoring jobs
+    @Column(name = "last_score_recalculation_at")
+    private Instant lastScoreRecalculationAt;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Vote.java
+package com.tuniv.backend.qa.model;
+
+
+import java.time.Instant;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "votes", indexes = {
+    @Index(name = "idx_vote_user_post", columnList = "user_id, post_id", unique = true),
+    @Index(name = "idx_vote_post", columnList = "post_id, value"),
+    @Index(name = "idx_vote_created", columnList = "created_at DESC"),
+    @Index(name = "idx_vote_user_created", columnList = "user_id, created_at DESC"),
+    @Index(name = "idx_vote_university", columnList = "university_context_id"),
+    @Index(name = "idx_vote_post_user_value", columnList = "post_id, user_id, value") // âœ… ADDED
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_retracted = false") // âœ… ADD: Global filter for non-retracted votes
+
+public class Vote extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== CORE RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "post_id", nullable = false)
+    private VotablePost post;
+
+    // ========== VOTE DATA ==========
+    @Column(name = "value", nullable = false)
+    private short value; // +1 for upvote, -1 for downvote
+
+    @Column(name = "weight", nullable = false)
+    private Integer weight = 1;
+
+    @Column(name = "is_retracted", nullable = false)
+    private boolean isRetracted = false;
+
+    @Column(name = "retracted_at")
+    private Instant retractedAt;
+
+    @Column(name = "retraction_reason")
+    private String retractionReason;
+
+    // ========== CONTEXT & METADATA ==========
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_context_id")
+    private University universityContext;
+
+    @Column(name = "vote_strength")
+    private Double voteStrength = 1.0; // For future algorithmic weighting
+
+}
+
+
+
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\Auditable.java
+package com.tuniv.backend.shared.model;
+
+import java.time.Instant;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.EntityListeners;
+import jakarta.persistence.MappedSuperclass;
+
+/**
+ * Abstract base class for entities that require tracking of creation and modification timestamps.
+ * Automatically populates these fields via Spring Data JPA's auditing mechanism.
+ */
+@MappedSuperclass
+@EntityListeners(AuditingEntityListener.class)
+public abstract class Auditable {
+
+    @CreatedDate
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @LastModifiedDate
+    @Column(name = "updated_at")
+    private Instant updatedAt;
+
+    // Getters and Setters
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\ContainerType.java
+package com.tuniv.backend.shared.model;
+
+public enum ContainerType {
+    MODULE, 
+    COMMUNITY 
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\JoinRequest.java
+package com.tuniv.backend.shared.model;
+
+import java.time.Instant;
+
+import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "join_requests")
+@Getter
+@Setter
+@NoArgsConstructor
+public class JoinRequest extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_id")
+    private University university;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "community_id")
+    private Community community;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private JoinRequestStatus status = JoinRequestStatus.PENDING;
+
+    @Column(name = "message", length = 1000)
+    private String message;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "processed_by_user_id")
+    private User processedBy;
+
+    @Column(name = "processed_at")
+    private Instant processedAt;
+
+    @Column(name = "response_message", length = 1000)
+    private String responseMessage;
+
+    public enum JoinRequestStatus {
+        PENDING,
+        APPROVED,
+        REJECTED,
+        CANCELLED
+    }
+
+    public boolean isForUniversity() {
+        return university != null;
+    }
+
+    public boolean isForCommunity() {
+        return community != null;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\SoftDeletable.java
+package com.tuniv.backend.shared.model;
+
+import java.time.Instant;
+
+/**
+ * Interface defining the contract for entities that support soft deletion.
+ * Entities implementing this interface should not be physically deleted but marked as deleted.
+ */
+public interface SoftDeletable {
+
+    String DELETED_CLAUSE = "is_deleted = false";
+
+    void setDeleted(boolean deleted);
+    boolean isDeleted();
+
+    void setDeletedAt(Instant deletedAt);
+    Instant getDeletedAt();
+
+    void setDeletionReason(String reason);
+    String getDeletionReason();
+
+    /**
+     * Performs a soft delete by setting the deleted flag and timestamp.
+     * @param reason The reason for deletion (optional).
+     */
+    default void softDelete(String reason) {
+        setDeleted(true);
+        setDeletedAt(Instant.now());
+        setDeletionReason(reason);
+    }
+
+    /**
+     * Restores a soft-deleted entity by clearing the deletion markers.
+     */
+    default void restore() {
+        setDeleted(false);
+        setDeletedAt(null);
+        setDeletionReason(null);
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\MembershipType.java
+package com.tuniv.backend.university.model;
+
+public enum MembershipType {
+    PRIMARY,      // Email-verified at this university
+    ASSOCIATE,    // Joined as external member
+    ALUMNI,       // Graduated
+    FACULTY,      // Staff/Professor
+    EXCHANGE      // Exchange student
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\Module.java
+package com.tuniv.backend.university.model;
+
+import org.hibernate.annotations.Where;
+import com.tuniv.backend.follow.model.Followable;
+import com.tuniv.backend.shared.model.Auditable;
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "modules", indexes = {
+    @Index(name = "idx_module_name", columnList = "name"),
+    @Index(name = "idx_module_university", columnList = "university_id"),
+    @Index(name = "idx_module_topic_count", columnList = "topic_count DESC"),
+    @Index(name = "idx_module_code", columnList = "code"),
+    @Index(name = "idx_module_active", columnList = "is_active, topic_count DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_active = true")
+public class Module extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer moduleId;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== BASIC INFO ==========
+    @NotBlank
+    @Size(max = 100)
+    @Column(name = "name", nullable = false, length = 100)
+    private String name;
+
+    @Size(max = 1000)
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Size(max = 20)
+    @Column(name = "code", length = 20)
+    private String code;
+
+    // ========== STATISTICS ==========
+    @Column(name = "topic_count", nullable = false)
+    private int topicCount = 0;
+
+    @Column(name = "follower_count", nullable = false)
+    private int followerCount = 0;
+
+    @Column(name = "active_participants")
+    private Integer activeParticipants = 0;
+
+    // ========== ACCESS CONTROL ==========
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "posting_policy", nullable = false)
+    private ModulePostingPolicy postingPolicy = ModulePostingPolicy.UNIVERSITY_MEMBERS;
+
+    @Column(name = "allow_external_posting", nullable = false)
+    private boolean allowExternalPosting = true;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    // ========== RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "university_id", nullable = false)
+    private University university;
+
+    // âŒ REMOVED: Dangerous topics collection
+    // @OneToMany(mappedBy = "module", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    // private Set<Topic> topics = new HashSet<>();
+
+    // ========== FOLLOWABLE ==========
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false, orphanRemoval = true)
+    @JoinColumn(name = "followable_id", nullable = false, unique = true)
+    private Followable followable;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\ModulePostingPolicy.java
+package com.tuniv.backend.university.model;
+
+// ========== ENUMS ==========
+    public enum ModulePostingPolicy {
+        UNIVERSITY_MEMBERS,  // Only university members can post
+        MODULE_MEMBERS,      // Only enrolled module members
+        ANY_VERIFIED,        // Any verified student
+        RESTRICTED           // Specific users only
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\University.java
+package com.tuniv.backend.university.model;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.follow.model.Followable;
+import com.tuniv.backend.shared.model.Auditable;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "universities", indexes = {
+    @Index(name = "idx_university_name", columnList = "name"),
+    @Index(name = "idx_university_domain", columnList = "email_domain"),
+    @Index(name = "idx_university_member_count", columnList = "member_count DESC"),
+    @Index(name = "idx_university_created", columnList = "created_at DESC"),
+    @Index(name = "idx_university_active", columnList = "is_active, member_count DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_active = true")
+public class University extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer universityId;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== BASIC INFO ==========
+    @NotBlank(message = "University name cannot be empty")
+    @Size(max = 100, message = "University name cannot exceed 100 characters")
+    @Column(name = "name", nullable = false, unique = true, length = 100)
+    private String name;
+
+    @NotBlank
+    @Email
+    @Column(name = "email_domain", nullable = false, unique = true)
+    private String emailDomain;
+
+    @Size(max = 2000)
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "logo_url")
+    private String logoUrl;
+
+    @Column(name = "website_url")
+    private String websiteUrl;
+
+    @Size(max = 100)
+    @Column(name = "location", length = 100)
+    private String location;
+
+    // ========== CONFIGURATION ==========
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "join_policy", nullable = false)
+    private UniversityJoinPolicy joinPolicy = UniversityJoinPolicy.REQUEST;
+
+    @Column(name = "allow_cross_posting", nullable = false)
+    private boolean allowCrossPosting = true;
+
+    @Column(name = "allow_external_communities", nullable = false)
+    private boolean allowExternalCommunities = true;
+
+    @Column(name = "requires_verification_for_posting", nullable = false)
+    private boolean requiresVerificationForPosting = true;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    // ========== STATISTICS ==========
+    @Column(name = "topic_count", nullable = false)
+    private int topicCount = 0;
+
+    @Column(name = "member_count", nullable = false)
+    private int memberCount = 0;
+
+    @Column(name = "community_count", nullable = false)
+    private int communityCount = 0;
+
+    @Column(name = "module_count", nullable = false)
+    private int moduleCount = 0;
+
+    @Column(name = "daily_active_members")
+    private Integer dailyActiveMembers = 0;
+
+    @Column(name = "weekly_new_members")
+    private Integer weeklyNewMembers = 0;
+
+      // âœ… ADD: Relationship to Followable
+    @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false, orphanRemoval = true)
+    @JoinColumn(name = "followable_id", nullable = false, unique = true)
+    private Followable followable;
+    
+    // ========== CONSTRUCTORS ==========
+    public University(String name, String emailDomain) {
+        this.name = name;
+        this.emailDomain = emailDomain;
+        this.isActive = true;
+    }
+
+    public University(String name, String emailDomain, String location) {
+        this(name, emailDomain);
+        this.location = location;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityJoinPolicy.java
+package com.tuniv.backend.university.model;
+
+ public enum UniversityJoinPolicy {
+        OPEN,           // Any verified student can join automatically
+        REQUEST,        // Requires approval (default)
+        DOMAIN_LOCKED,  // Only students with matching email domain
+        CLOSED          // Invitation only
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityMembership.java
+package com.tuniv.backend.university.model;
+
+import java.io.Serializable;
+import java.time.Instant;
+import java.util.Objects;
+
+import com.tuniv.backend.shared.model.Auditable;
+import com.tuniv.backend.user.model.User;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Embeddable;
+import jakarta.persistence.EmbeddedId;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "university_memberships", indexes = {
+    @Index(name = "idx_membership_user", columnList = "user_id"),
+    @Index(name = "idx_membership_university", columnList = "university_id"),
+    @Index(name = "idx_membership_status", columnList = "status"),
+    @Index(name = "idx_membership_primary", columnList = "is_primary"),
+    @Index(name = "idx_membership_role", columnList = "role_id"),
+    @Index(name = "idx_membership_verified", columnList = "status, is_primary DESC"),
+    @Index(name = "idx_membership_user_university", columnList = "user_id, university_id", unique = true)
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class UniversityMembership extends Auditable {
+
+    @EmbeddedId
+    private UniversityMembershipId id;
+
+    // ========== CORE RELATIONSHIPS ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("userId")
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("universityId")
+    @JoinColumn(name = "university_id", nullable = false)
+    private University university;
+
+    // ========== ROLE RELATIONSHIP ==========
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "role_id", nullable = false)
+    private UniversityRole role;
+
+    // ========== STATUS & VERIFICATION ==========
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private VerificationStatus status = VerificationStatus.PENDING;
+
+    @Column(name = "is_primary", nullable = false)
+    private boolean isPrimary = false;
+
+    @Column(name = "is_active", nullable = false)
+    private boolean isActive = true;
+
+    // ========== VERIFICATION DETAILS ==========
+    @Column(name = "verified_email")
+    private String verifiedEmail;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "verification_method")
+    private VerificationMethod verificationMethod;
+
+    @Column(name = "verification_date")
+    private Instant verificationDate;
+
+    @Column(name = "verification_token")
+    private String verificationToken;
+
+    @Column(name = "verification_token_expiry")
+    private Instant verificationTokenExpiry;
+
+    // ========== ACADEMIC INFO ==========
+    @Column(name = "student_id")
+    private String studentId;
+
+    @Column(name = "major")
+    private String major;
+
+    @Column(name = "faculty")
+    private String faculty;
+
+    @Column(name = "enrollment_year")
+    private Integer enrollmentYear;
+
+    @Column(name = "graduation_year")
+    private Integer graduationYear;
+
+    @Column(name = "expected_graduation")
+    private Integer expectedGraduation;
+
+    // ========== STATISTICS ==========
+    @Column(name = "topic_count", nullable = false)
+    private Integer topicCount = 0;
+
+    @Column(name = "reply_count", nullable = false)
+    private Integer replyCount = 0;
+
+    @Column(name = "helpful_votes", nullable = false)
+    private Integer helpfulVotes = 0;
+
+    @Column(name = "solution_count", nullable = false)
+    private Integer solutionCount = 0;
+
+    @Column(name = "badge_display_order")
+    private Integer badgeDisplayOrder = 0;
+
+    // ========== CONSTRUCTORS ==========
+    public UniversityMembership(User user, University university, UniversityRole role) {
+        this.id = new UniversityMembershipId(user.getUserId(), university.getUniversityId());
+        this.user = user;
+        this.university = university;
+        this.role = role;
+    }
+
+    // ========== EQUALS & HASHCODE ==========
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        UniversityMembership that = (UniversityMembership) o;
+        return id != null && Objects.equals(id, that.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);
+    }
+
+    // ========== EMBEDDED ID CLASS ==========
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UniversityMembershipId implements Serializable {
+        @Column(name = "user_id")
+        private Integer userId;
+
+        @Column(name = "university_id")
+        private Integer universityId;
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            UniversityMembershipId that = (UniversityMembershipId) o;
+            return Objects.equals(userId, that.userId) && Objects.equals(universityId, that.universityId);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(userId, universityId);
+        }
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityRole.java
+package com.tuniv.backend.university.model;
+
+import java.util.HashSet;
+import java.util.Set;
+
+import com.tuniv.backend.authorization.model.Permission;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "university_roles")
+@Getter
+@Setter
+@NoArgsConstructor
+public class UniversityRole {
+
+    @Id
+    private Integer id;
+
+    @NotBlank
+    @Column(name = "name", nullable = false, unique = true, length = 50)
+    private String name;
+
+    @NotBlank
+    @Column(name = "display_name", nullable = false, length = 100)
+    private String displayName;
+
+    @NotNull
+    @Column(name = "hierarchy_level", nullable = false)
+    private Integer hierarchyLevel;
+
+    @Column(name = "is_system_role", nullable = false)
+    private boolean isSystemRole = false;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "university_role_permissions",
+        joinColumns = @JoinColumn(name = "role_id"),
+        inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
+    private Set<Permission> permissions = new HashSet<>();
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\VerificationMethod.java
+package com.tuniv.backend.university.model;
+
+    public enum VerificationMethod {
+        EMAIL_DOMAIN,    // Standard university email verification
+        MANUAL_APPROVAL, // Admin manual verification
+        STUDENT_ID,      // Student ID verification
+        INVITATION       // Invited by university admin
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\VerificationStatus.java
+package com.tuniv.backend.university.model;
+
+ // ========== ENUMS ==========
+    public enum VerificationStatus {
+        PENDING,
+        VERIFIED,
+        REJECTED,
+        EXPIRED,
+        SUSPENDED
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\EmailDigestFrequency.java
+package com.tuniv.backend.user.model;
+
+
+    public enum EmailDigestFrequency {
+        NEVER,
+        DAILY,
+        WEEKLY,
+        MONTHLY
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\MessagePermissions.java
+package com.tuniv.backend.user.model;
+
+
+    public enum MessagePermissions {
+        ANYONE,         // Anyone can message
+        FOLLOWERS,      // Only followers can message
+        UNIVERSITY,     // Only university members
+        NONE           // No messages allowed
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ProfileVisibility.java
+package com.tuniv.backend.user.model;
+
+
+    public enum ProfileVisibility {
+        PUBLIC,         // Anyone can view
+        UNIVERSITY,     // Only university members
+        FOLLOWERS,      // Only followers
+        PRIVATE         // Only self
+    }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ReputationActionType.java
+package com.tuniv.backend.user.model;
+
+public enum ReputationActionType {
+        TOPIC_CREATED,
+        REPLY_CREATED,
+        RECEIVED_UPVOTE,
+        SOLUTION_AWARDED,
+        SOLUTION_RECEIVED
+ }
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ReputationLog.java
+package com.tuniv.backend.user.model;
+
+import com.tuniv.backend.shared.model.Auditable;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import jakarta.validation.constraints.NotNull;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "reputation_logs", indexes = {
+    @Index(name = "idx_reputation_log_user", columnList = "user_id, created_at DESC"),
+    @Index(name = "idx_reputation_log_source", columnList = "source_entity_type, source_entity_id")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class ReputationLog extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotNull
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "action_type", nullable = false)
+    private ReputationActionType actionType;
+
+    @NotNull
+    @Column(name = "point_change", nullable = false)
+    private Integer pointChange;
+
+    // Optional: To link back to the source of the change
+    @Column(name = "source_entity_type")
+    private String sourceEntityType; // e.g., "REPLY", "VOTE"
+
+    @Column(name = "source_entity_id")
+    private Integer sourceEntityId;
+
+    // New field to track the user's total reputation after this change
+    @Column(name = "resulting_reputation")
+    private Integer resultingReputation;
+
+    public ReputationLog(User user, ReputationActionType actionType, Integer pointChange) {
+    this.user = user;
+    this.actionType = actionType;
+    this.pointChange = pointChange;
+}
+
+    public ReputationLog(User user, ReputationActionType actionType, Integer pointChange, 
+                        String sourceEntityType, Integer sourceEntityId) {
+        this(user, actionType, pointChange);
+        this.sourceEntityType = sourceEntityType;
+        this.sourceEntityId = sourceEntityId;
+    }
+
+
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\User.java
+package com.tuniv.backend.user.model;
+
+import java.time.Instant;
+
+import org.hibernate.annotations.Where;
+
+import com.tuniv.backend.shared.model.Auditable;
+
+import jakarta.persistence.CascadeType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "users", indexes = {
+    @Index(name = "idx_user_reputation", columnList = "reputation_score DESC"),
+    @Index(name = "idx_user_username", columnList = "username"),
+    @Index(name = "idx_user_email", columnList = "email"),
+    @Index(name = "idx_user_created", columnList = "created_at DESC")
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@Where(clause = "is_deleted = false")
+public class User extends Auditable {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "user_id")
+    private Integer userId;
+
+    // ========== OPTIMISTIC LOCKING ==========
+    @Version
+    private Long version;
+
+    // ========== CORE PROFILE DATA ==========
+    @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "Username can only contain letters, numbers and underscores")
+    @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
+    @Column(name = "username", unique = true, length = 50) // âœ… MODIFIED: nullable = false removed
+    private String username;
+
+    @NotNull
+    @Email(message = "Email should be valid")
+    @Column(name = "email", unique = true) // âœ… MODIFIED: nullable = false removed
+    private String email;
+
+    @Size(min = 8, message = "Password must be at least 8 characters")
+    @Column(name = "password", nullable = false)
+    private String password;
+
+    @Column(name = "profile_photo_url")
+    private String profilePhotoUrl;
+
+    @Size(max = 500)
+    @Column(name = "bio", columnDefinition = "TEXT")
+    private String bio;
+
+    @Size(max = 100)
+    @Column(name = "major", length = 100)
+    private String major;
+
+    @Size(max = 100)
+    @Column(name = "location", length = 100)
+    private String location;
+
+    @Column(name = "date_of_birth")
+    private Instant dateOfBirth;
+
+    // ========== REPUTATION & SCORES ==========
+    @Column(name = "reputation_score", nullable = false)
+    private Integer reputationScore = 0;
+
+    @Column(name = "contribution_score", nullable = false)
+    private Integer contributionScore = 0;
+
+    // ========== ENHANCED DENORMALIZED COUNTERS ==========
+    @Column(name = "topic_count", nullable = false)
+    private int topicCount = 0;
+
+    @Column(name = "reply_count", nullable = false)
+    private int replyCount = 0;
+
+    @Column(name = "solutions_count", nullable = false)
+    private int solutionsCount = 0;
+
+    @Column(name = "helpful_votes_received_count", nullable = false)
+    private int helpfulVotesReceivedCount = 0;
+
+    @Column(name = "follower_count", nullable = false)
+    private int followerCount = 0;
+
+    @Column(name = "following_count", nullable = false)
+    private int followingCount = 0;
+
+    // ========== AUTHENTICATION & VERIFICATION ==========
+    @Column(name = "is_platform_admin", nullable = false)
+    private boolean isPlatformAdmin = false;
+
+    @Column(name = "is_moderator", nullable = false)
+    private boolean isModerator = false;
+
+    @Column(name = "is_2fa_enabled", nullable = false)
+    private boolean is2faEnabled = false;
+
+    @Column(name = "two_factor_auth_secret")
+    private String twoFactorAuthSecret;
+
+    @Column(name = "verification_token")
+    private String verificationToken;
+
+    @Column(name = "is_email_verified", nullable = false)
+    private boolean isEmailVerified = false;
+
+    @Column(name = "is_enabled", nullable = false)
+    private boolean isEnabled = true;
+
+    @Column(name = "reset_password_token")
+    private String resetPasswordToken;
+
+    @Column(name = "reset_password_token_expiry")
+    private Instant resetPasswordTokenExpiry;
+
+    @Column(name = "last_login_at")
+    private Instant lastLoginAt;
+
+    @Column(name = "last_activity_at")
+    private Instant lastActivityAt;
+
+    // ========== PRIVACY SETTINGS ==========
+    @Enumerated(EnumType.STRING)
+    @Column(name = "profile_visibility", nullable = false)
+    private ProfileVisibility profileVisibility = ProfileVisibility.PUBLIC;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_permissions", nullable = false)
+    private MessagePermissions messagePermissions = MessagePermissions.ANYONE;
+
+    @Column(name = "show_university_badges", nullable = false)
+    private boolean showUniversityBadges = true;
+
+    @Column(name = "show_online_status", nullable = false)
+    private boolean showOnlineStatus = true;
+
+    @Column(name = "allow_search_engine_indexing", nullable = false)
+    private boolean allowSearchEngineIndexing = true;
+
+    // ========== SOFT DELETE ENHANCEMENTS ==========
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
+    @Column(name = "deletion_reason")
+    private String deletionReason;
+
+    @Column(name = "original_username")
+    private String originalUsername;
+
+    @Column(name = "original_email")
+    private String originalEmail;
+    
+    // ========== RELATIONSHIPS ==========
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    private UserSettings settings;
+
+    // ========== CONSTRUCTORS ==========
+    public User(String username, String email, String password) {
+        this.username = username;
+        this.email = email;
+        this.password = password;
+        this.isEnabled = false;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\UserSettings.java
+package com.tuniv.backend.user.model;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.MapsId;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "user_settings")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class UserSettings {
+
+    @Id
+    @Column(name = "user_id")
+    private Integer userId;
+
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @MapsId // Uses the userId field as both the PK and FK
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    // ========== NOTIFICATION PREFERENCES ==========
+    @Column(name = "email_notifications_enabled", nullable = false)
+    private boolean emailNotificationsEnabled = true;
+
+    @Column(name = "push_notifications_enabled", nullable = false)
+    private boolean pushNotificationsEnabled = true;
+
+    // Notification triggers
+    @Column(name = "notify_on_new_message", nullable = false)
+    private boolean notifyOnNewMessage = true;
+
+    @Column(name = "notify_on_new_reply", nullable = false)
+    private boolean notifyOnNewReply = true;
+
+    @Column(name = "notify_on_new_follower", nullable = false)
+    private boolean notifyOnNewFollower = true;
+
+    @Column(name = "notify_on_mention", nullable = false)
+    private boolean notifyOnMention = true;
+
+    @Column(name = "notify_on_reaction", nullable = false)
+    private boolean notifyOnReaction = true;
+
+    @Column(name = "notify_on_followed_content", nullable = false)
+    private boolean notifyOnFollowedContent = true;
+
+    // ========== PRIVACY SETTINGS ==========
+    @Column(name = "show_online_status", nullable = false)
+    private boolean showOnlineStatus = true;
+
+    @Column(name = "allow_search_engine_indexing", nullable = false)
+    private boolean allowSearchEngineIndexing = true;
+
+    @Column(name = "show_activity_status", nullable = false)
+    private boolean showActivityStatus = true;
+
+    @Column(name = "profile_visibility", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private ProfileVisibility profileVisibility = ProfileVisibility.PUBLIC;
+
+    @Column(name = "message_permissions", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private MessagePermissions messagePermissions = MessagePermissions.ANYONE;
+
+    // ========== CONTENT & DISPLAY PREFERENCES ==========
+    @Column(name = "content_language", nullable = false, length = 10)
+    private String contentLanguage = "en";
+
+    @Column(name = "timezone", nullable = false, length = 50)
+    private String timezone = "UTC";
+
+    @Column(name = "theme", nullable = false, length = 20)
+    private String theme = "light";
+
+    @Column(name = "compact_mode_enabled", nullable = false)
+    private boolean compactModeEnabled = false;
+
+    // ========== EMAIL DIGEST PREFERENCES ==========
+    @Column(name = "email_digest_frequency", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private EmailDigestFrequency emailDigestFrequency = EmailDigestFrequency.WEEKLY;
+
+    @Column(name = "receive_promotional_emails", nullable = false)
+    private boolean receivePromotionalEmails = false;
+
+    @Column(name = "receive_system_announcements", nullable = false)
+    private boolean receiveSystemAnnouncements = true;
+
+    // ========== CONTENT FILTERING ==========
+    @Column(name = "safe_content_mode", nullable = false)
+    private boolean safeContentMode = true;
+
+    @Column(name = "hide_explicit_content", nullable = false)
+    private boolean hideExplicitContent = true;
+
+    @Column(name = "collapse_long_posts", nullable = false)
+    private boolean collapseLongPosts = false;
+
+    // Custom constructor
+    public UserSettings(User user) {
+        this.user = user;
+        this.userId = user.getUserId();
+    }
+    
+
+
+}
+
+
+

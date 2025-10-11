@@ -1,110 +1,83 @@
 package com.tuniv.backend.community.repository;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-
+import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.qa.model.TopicType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.tuniv.backend.community.dto.CommunityTopicStatsDto;
-import com.tuniv.backend.community.model.Community;
-import com.tuniv.backend.qa.model.TopicType;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CommunityRepository extends JpaRepository<Community, Integer> {
 
-    // Search communities by name (case-insensitive) with optional university filter
-    @Query("SELECT c FROM Community c WHERE " +
-           "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
-           "(:universityId IS NULL OR c.university.universityId = :universityId)")
-    Page<Community> findAllWithFilters(
-        @Param("search") String search,
-        @Param("universityId") Integer universityId,
-        Pageable pageable
-    );
+    // ✅ This query is performant as it uses denormalized counters.
+    Page<Community> findByNameContainingIgnoreCase(String search, Pageable pageable);
+    
+    // ✅ ADDED: A simple, direct lookup by name.
+    Optional<Community> findByNameIgnoreCase(String name);
 
-    // Get top communities by member count
-    @Query("SELECT c FROM Community c ORDER BY c.memberCount DESC")
-    List<Community> findTopCommunities(Pageable pageable);
+    // ✅ These queries correctly use denormalized counts for efficient sorting.
+    List<Community> findByOrderByMemberCountDesc(Pageable pageable);
+    List<Community> findByOrderByTopicCountDesc(Pageable pageable);
 
-    // Get communities joined by a specific user
-    @Query("SELECT c FROM Community c JOIN c.members m WHERE m.user.userId = :userId")
+    /**
+     * ✨ IMPROVED: The `members` collection was removed from the Community entity.
+     * This query now correctly joins through the `CommunityMembership` entity to find
+     * all communities a specific user has joined.
+     */
+    @Query("SELECT c FROM Community c JOIN CommunityMembership cm ON c.communityId = cm.community.communityId WHERE cm.user.userId = :userId")
     List<Community> findCommunitiesByUserId(@Param("userId") Integer userId);
 
-    // Get global communities (no university)
+    // ✅ This is a standard and correct query.
     List<Community> findByUniversityIsNull();
 
-    // ✅ UPDATED: Count all TOPICS in a community (replaces countQuestionsByCommunityId)
+    // ✅ These count queries are correct and should be used by services to get stats.
     @Query("SELECT COUNT(t) FROM Topic t WHERE t.community.communityId = :communityId")
     long countTopicsByCommunityId(@Param("communityId") Integer communityId);
 
-    // ✅ NEW: Count topics by type in a community
     @Query("SELECT COUNT(t) FROM Topic t WHERE t.community.communityId = :communityId AND t.topicType = :topicType")
-    long countTopicsByCommunityIdAndType(
-        @Param("communityId") Integer communityId,
-        @Param("topicType") TopicType topicType
-    );
+    long countTopicsByCommunityIdAndType(@Param("communityId") Integer communityId, @Param("topicType") TopicType topicType);
 
-    // ✅ NEW: Count solved topics in a community
     @Query("SELECT COUNT(t) FROM Topic t WHERE t.community.communityId = :communityId AND t.isSolved = true")
     long countSolvedTopicsByCommunityId(@Param("communityId") Integer communityId);
 
-    // ✅ NEW: Find communities with topics for statistics
-    @Query("SELECT c FROM Community c LEFT JOIN FETCH c.topics WHERE c.communityId = :communityId")
-    Optional<Community> findWithTopicsById(@Param("communityId") Integer communityId);
+    /**
+     * ❌ DANGEROUS - REWRITTEN: The original method tried to fetch a community with all its topics,
+     * which is an anti-pattern that causes severe performance issues.
+     * ✨ This method now simply finds the community. Your service layer should then call the
+     * `TopicRepository` to get a PAGINATED list of topics for this community.
+     */
+    @Override
+    Optional<Community> findById(Integer communityId);
 
-    // ✅ NEW: Find top communities by topic count
-    @Query("SELECT c FROM Community c ORDER BY c.topicCount DESC, c.memberCount DESC")
-    List<Community> findTopCommunitiesByTopicCount(Pageable pageable);
+    // ✅ Correctly uses the denormalized `topicCount`.
+    List<Community> findByUniversity_UniversityIdOrderByTopicCountDesc(@Param("universityId") Integer universityId);
 
-    // ✅ NEW: Find communities by university with topic counts
-    @Query("SELECT c FROM Community c WHERE c.university.universityId = :universityId ORDER BY c.topicCount DESC")
-    List<Community> findByUniversityIdOrderByTopicCountDesc(@Param("universityId") Integer universityId);
-
-    // ✅ NEW: Find active communities (with recent topics)
+    // ✅ This is a good, performant query using a subselect.
     @Query("SELECT c FROM Community c WHERE c.communityId IN " +
            "(SELECT t.community.communityId FROM Topic t WHERE t.createdAt >= :sinceDate) " +
            "ORDER BY c.topicCount DESC")
     List<Community> findActiveCommunitiesSince(@Param("sinceDate") Instant sinceDate, Pageable pageable);
 
-    // ✅ NEW: Check if community exists and is accessible
-    @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM Community c WHERE c.communityId = :communityId")
-    boolean existsAndAccessible(@Param("communityId") Integer communityId);
+    // ✅ This is another performant query using denormalized `memberCount`.
+    List<Community> findByMemberCountGreaterThanEqualOrderByMemberCountDesc(@Param("minMembers") Integer minMembers, Pageable pageable);
 
-    // ✅ NEW: Find communities with minimum member count
-    @Query("SELECT c FROM Community c WHERE c.memberCount >= :minMembers ORDER BY c.memberCount DESC")
-    List<Community> findPopularCommunities(@Param("minMembers") Integer minMembers, Pageable pageable);
+    /**
+     * 💡 NOTE: The logic from the original `getCommunityTopicStats` DTO query has been removed.
+     * That query was invalid because it joined `c.topics`.
+     * The CORRECT PATTERN is to fetch the Community object from this repository, and then use the
+     * dedicated count methods above (`countTopicsBy...`, `countSolvedTopicsBy...`) to
+     * assemble your DTO in the service layer. This is more modular and performant.
+     */
 
-    // ✅ NEW: Search communities with topic count filtering
-    @Query("SELECT c FROM Community c WHERE " +
-           "(:search IS NULL OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
-           "(:minTopics IS NULL OR c.topicCount >= :minTopics) AND " +
-           "(:minMembers IS NULL OR c.memberCount >= :minMembers)")
-    Page<Community> findAllWithAdvancedFilters(
-        @Param("search") String search,
-        @Param("minTopics") Integer minTopics,
-        @Param("minMembers") Integer minMembers,
-        Pageable pageable
-    );
-
-    // ✅ NEW: Get community topic statistics
-    @Query("SELECT new com.tuniv.backend.community.dto.CommunityTopicStatsDto(" +
-           "c.communityId, c.name, " +
-           "COUNT(t), " +
-           "SUM(CASE WHEN t.isSolved = true THEN 1 ELSE 0 END), " +
-           "SUM(CASE WHEN t.topicType = 'QUESTION' THEN 1 ELSE 0 END), " +
-           "SUM(CASE WHEN t.topicType = 'POST' THEN 1 ELSE 0 END)" +
-           ") FROM Community c LEFT JOIN c.topics t " +
-           "WHERE c.communityId = :communityId " +
-           "GROUP BY c.communityId, c.name")
-    Optional<CommunityTopicStatsDto> getCommunityTopicStats(@Param("communityId") Integer communityId);
-
-    // ✅ NEW: Find trending communities (communities with recent activity)
+    // ✅ This is a good, performant query using a subselect with HAVING.
     @Query("SELECT c FROM Community c WHERE c.communityId IN (" +
            "SELECT t.community.communityId FROM Topic t " +
            "WHERE t.createdAt >= :startDate " +
@@ -116,4 +89,23 @@ public interface CommunityRepository extends JpaRepository<Community, Integer> {
         @Param("minRecentTopics") Long minRecentTopics,
         Pageable pageable
     );
+
+    // === Denormalized Counter Management ===
+    // ✅ ADDED: These methods are ESSENTIAL for keeping the Community entity's stats in sync.
+
+    @Modifying
+    @Query("UPDATE Community c SET c.memberCount = c.memberCount + 1 WHERE c.communityId = :communityId")
+    void incrementMemberCount(@Param("communityId") Integer communityId);
+
+    @Modifying
+    @Query("UPDATE Community c SET c.memberCount = c.memberCount - 1 WHERE c.communityId = :communityId AND c.memberCount > 0")
+    void decrementMemberCount(@Param("communityId") Integer communityId);
+
+    @Modifying
+    @Query("UPDATE Community c SET c.topicCount = c.topicCount + 1 WHERE c.communityId = :communityId")
+    void incrementTopicCount(@Param("communityId") Integer communityId);
+
+    @Modifying
+    @Query("UPDATE Community c SET c.topicCount = c.topicCount - 1 WHERE c.communityId = :communityId AND c.topicCount > 0")
+    void decrementTopicCount(@Param("communityId") Integer communityId);
 }

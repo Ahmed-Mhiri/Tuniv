@@ -1,19 +1,5 @@
 package com.tuniv.backend.auth.service;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.UUID;
-
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken; // <-- IMPORT ADDED
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.password.PasswordEncoder; // <-- IMPORT ADDED
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.tuniv.backend.auth.dto.ForgotPasswordRequest;
 import com.tuniv.backend.auth.dto.JwtResponse;
 import com.tuniv.backend.auth.dto.LoginRequest;
@@ -23,130 +9,216 @@ import com.tuniv.backend.auth.mapper.AuthMapper;
 import com.tuniv.backend.config.security.jwt.JwtUtil;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.notification.service.AuthEmailService;
+import com.tuniv.backend.university.model.UniversityMembership;
+import com.tuniv.backend.university.repository.UniversityMembershipRepository; // ✅ ADDED IMPORT
 import com.tuniv.backend.user.model.User;
-import com.tuniv.backend.user.repository.UserRepository; // <-- Make sure package is correct
+import com.tuniv.backend.user.model.UserSettings; // ✅ ADDED IMPORT
+import com.tuniv.backend.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant; // ✅ CHANGED
+import java.time.temporal.ChronoUnit; // ✅ ADDED
+import java.util.Optional;
+import java.util.UUID;
+
+import com.tuniv.backend.auth.validation.PasswordValidator;
+import com.tuniv.backend.shared.exception.auth.AccountLockedException;
+import com.tuniv.backend.shared.exception.auth.AccountNotVerifiedException;
+import com.tuniv.backend.shared.exception.auth.EmailAlreadyExistsException;
+import com.tuniv.backend.shared.exception.auth.InvalidTwoFactorCodeException;
+import com.tuniv.backend.shared.exception.auth.InvalidVerificationTokenException;
+import com.tuniv.backend.shared.exception.auth.UsernameAlreadyExistsException;
+
+import lombok.extern.slf4j.Slf4j;
+
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     private final AuthEmailService notificationService;
     private final AuthenticationManager authenticationManager;
     private final UserRepository userRepository;
+    private final UniversityMembershipRepository universityMembershipRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final TwoFactorAuthService twoFactorAuthService;
+    private final AuthMapper authMapper;
+    private final LoginAttemptService loginAttemptService;
+    private final PasswordValidator passwordValidator;
 
-     public JwtResponse login(LoginRequest loginRequest) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(loginRequest.username(), loginRequest.password()));
-
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-
-        if (!userDetails.isEnabled()) {
-            throw new BadCredentialsException("User account is not yet verified. Please check your email.");
+    @Transactional(readOnly = true)
+    public JwtResponse login(LoginRequest loginRequest) {
+        final String username = loginRequest.username();
+        
+        // Check rate limiting
+        if (loginAttemptService.isBlocked(username)) {
+            int remainingTime = 15; // minutes
+            throw new AccountLockedException(
+                "Account temporarily locked due to too many failed attempts. " +
+                "Please try again in " + remainingTime + " minutes."
+            );
         }
 
-        User user = userRepository.findById(userDetails.getId())
-                .orElseThrow(() -> new UsernameNotFoundException("User not found after authentication"));
+        try {
+            log.info("Attempting login for user: {}", username);
+            
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(username, loginRequest.password()));
 
-        if (user.is2faEnabled()) {
-            if (loginRequest.code() == null || loginRequest.code().isEmpty()) {
-                return AuthMapper.toJwtResponse(null,  userDetails, 0L, 0L, 0L, true);
+            UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+            User user = userDetails.getUser(); // ✅ No additional database call
+
+            if (!user.isEmailVerified()) {
+                throw new AccountNotVerifiedException("User account is not yet verified. Please check your email.");
             }
 
-            // --- TEMPORARY DEBUG LOGS FOR 2FA ---
-            System.out.println("--- 2FA DEBUG ---");
-            String code = loginRequest.code();
-            boolean isValid = twoFactorAuthService.isOtpValid(user.getTwoFactorAuthSecret(), code);
-            System.out.println("Received Code: " + code);
-            System.out.println("Is Code Valid?: " + isValid);
-            System.out.println("-----------------");
-            // --- END DEBUG LOGS ---
-
-            if (!isValid) {
-                throw new BadCredentialsException("Invalid 2FA code");
+            if (!user.isEnabled()) {
+                throw new AccountLockedException("User account is disabled. Please contact support.");
             }
+
+            // Handle 2FA Challenge
+            if (user.is2faEnabled()) {
+                if (loginRequest.code() == null || loginRequest.code().isEmpty()) {
+                    log.info("2FA required for user: {}", username);
+                    return authMapper.toJwtResponse(null, user, Optional.empty(), true);
+                }
+                if (!twoFactorAuthService.isOtpValid(user.getTwoFactorAuthSecret(), loginRequest.code())) {
+                    throw new InvalidTwoFactorCodeException("Invalid 2FA code");
+                }
+            }
+
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = jwtUtil.generateJwtToken(authentication);
+
+            // Fetch primary university membership
+            Optional<UniversityMembership> primaryMembership =
+                    universityMembershipRepository.findByUserIdAndIsPrimaryTrue(user.getUserId());
+
+            loginAttemptService.loginSuccess(username);
+            log.info("User {} logged in successfully", username);
+
+            return authMapper.toJwtResponse(jwt, user, primaryMembership, false);
+
+        } catch (BadCredentialsException e) {
+            loginAttemptService.loginFailed(username);
+            int remainingAttempts = loginAttemptService.getRemainingAttempts(username);
+            log.warn("Failed login attempt for user: {}. Remaining attempts: {}", username, remainingAttempts);
+            throw new BadCredentialsException("Invalid username or password. Remaining attempts: " + remainingAttempts);
         }
-
-        SecurityContextHolder.getContext().setAuthentication(authentication);
-        String jwt = jwtUtil.generateJwtToken(authentication);
-
-        return AuthMapper.toJwtResponse(jwt,  userDetails, 0L, 0L, 0L, false);
     }
-
 
     @Transactional
     public void register(RegisterRequest registerRequest) {
+        log.info("Processing registration for user: {}", registerRequest.username());
+        
         if (userRepository.existsByUsername(registerRequest.username())) {
-            throw new IllegalArgumentException("Error: Username is already taken!");
+            throw new UsernameAlreadyExistsException("Error: Username is already taken!");
         }
         if (userRepository.existsByEmail(registerRequest.email())) {
-            throw new IllegalArgumentException("Error: Email is already in use!");
+            throw new EmailAlreadyExistsException("Error: Email is already in use!");
         }
 
-        User user = new User();
-        user.setUsername(registerRequest.username());
-        user.setEmail(registerRequest.email());
-        user.setPassword(passwordEncoder.encode(registerRequest.password()));
-        user.setReputationScore(0);
-        user.set2faEnabled(false);
-        user.setEnabled(false); // User is disabled until they verify their email
+        // Validate password strength
+        passwordValidator.validate(registerRequest.password());
+
+        User user = new User(
+                registerRequest.username(),
+                registerRequest.email(),
+                passwordEncoder.encode(registerRequest.password())
+        );
+
+        // Create and associate default user settings
+        UserSettings settings = new UserSettings(user);
+        user.setSettings(settings);
 
         String token = UUID.randomUUID().toString();
         user.setVerificationToken(token);
 
         userRepository.save(user);
+        log.info("New user registered successfully: {}", user.getUsername());
 
-        // Send the verification email
         notificationService.sendVerificationEmail(user.getEmail(), token);
     }
 
     @Transactional
     public void verifyUser(String token) {
+        log.info("Verifying user with token: {}", token);
+        
         User user = userRepository.findByVerificationToken(token)
-            .orElseThrow(() -> new IllegalArgumentException("Invalid verification token."));
+                .orElseThrow(() -> new InvalidVerificationTokenException("Invalid verification token."));
 
+        user.setEmailVerified(true);
         user.setEnabled(true);
-        user.setVerificationToken(null); // Invalidate the token after use
+        user.setVerificationToken(null);
         userRepository.save(user);
+        
+        log.info("User {} verified successfully", user.getUsername());
     }
-    
-    // --- 2FA SETUP METHODS ---
 
     @Transactional
     public String generate2faSetup(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-        
-        // Generate and save a new secret for the user
+
         String secret = twoFactorAuthService.generateNewSecret();
         user.setTwoFactorAuthSecret(secret);
         userRepository.save(user);
 
-        // Return a Data URI for the QR code image
+        log.info("Generated 2FA secret for user: {}", username);
+        
         return twoFactorAuthService.generateQrCodeImageUri(secret, user.getEmail());
     }
 
     @Transactional
-    public void enable2fa(String username, String code) {
-        User user = userRepository.findByUsername(username)
+public void enable2fa(String username, String code) {
+    User user = userRepository.findByUsername(username)
             .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
 
-        // Verify the code against the secret stored temporarily
-        if (!twoFactorAuthService.isOtpValid(user.getTwoFactorAuthSecret(), code)) {
-            throw new IllegalArgumentException("Verification code is incorrect.");
-        }
-
-        // If the code is correct, permanently enable 2FA
-        user.set2faEnabled(true);
-        userRepository.save(user);
+    // Use the detailed validation for better error reporting
+    TwoFactorAuthService.ValidationResult validationResult = 
+        twoFactorAuthService.validateOtpWithDetails(user.getTwoFactorAuthSecret(), code);
+    
+    if (!validationResult.isValid()) {
+        log.warn("2FA enablement failed for user: {}. Reason: {}", username, validationResult.getMessage());
+        throw new InvalidTwoFactorCodeException("Verification code is incorrect: " + validationResult.getMessage());
     }
+
+    user.set2faEnabled(true);
+    userRepository.save(user);
     
-    // --- PASSWORD RESET METHODS ---
-    
+    log.info("2FA enabled successfully for user: {} (time bucket: {}, offset: {})", 
+             username, validationResult.getMatchedBucket(), validationResult.getTimeOffset());
+}
+    @Transactional
+    public AuthMapper.UserProfileDto disable2fa(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
+
+        user.set2faEnabled(false);
+        user.setTwoFactorAuthSecret(null);
+        User savedUser = userRepository.save(user);
+
+        // Fetch primary university membership
+        Optional<UniversityMembership> primaryMembership =
+                universityMembershipRepository.findByUserIdAndIsPrimaryTrue(savedUser.getUserId());
+
+        log.info("2FA disabled for user: {}", username);
+        
+        return authMapper.toUserProfileDto(savedUser, primaryMembership);
+    }
+
     @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
         User user = userRepository.findByEmail(request.email())
@@ -154,10 +226,12 @@ public class AuthService {
 
         String token = UUID.randomUUID().toString();
         user.setResetPasswordToken(token);
-        user.setResetPasswordTokenExpiry(OffsetDateTime.now(ZoneOffset.UTC).plusHours(1)); // Token valid 1 hour
+        user.setResetPasswordTokenExpiry(Instant.now().plus(1, ChronoUnit.HOURS));
 
         userRepository.save(user);
-
+        
+        log.info("Password reset token generated for user: {}", user.getUsername());
+        
         notificationService.sendPasswordResetEmail(user.getEmail(), token);
     }
 
@@ -166,31 +240,29 @@ public class AuthService {
         User user = userRepository.findByResetPasswordToken(request.token())
                 .orElseThrow(() -> new IllegalArgumentException("Error: Invalid token."));
 
-        if (user.getResetPasswordTokenExpiry().isBefore(OffsetDateTime.now(ZoneOffset.UTC))) {
-    throw new IllegalArgumentException("Error: Token has expired.");
-}
+        if (user.getResetPasswordTokenExpiry() == null || user.getResetPasswordTokenExpiry().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("Error: Token has expired.");
+        }
+
+        // Validate new password strength
+        passwordValidator.validate(request.newPassword());
 
         user.setPassword(passwordEncoder.encode(request.newPassword()));
-        user.setResetPasswordToken(null); // Invalidate the token
+        user.setResetPasswordToken(null);
         user.setResetPasswordTokenExpiry(null);
 
         userRepository.save(user);
-    }
-     @Transactional
-    public JwtResponse disable2fa(String username) { // <-- FIX: Return type is JwtResponse
-        User user = userRepository.findByUsername(username)
-            .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-            
-        user.set2faEnabled(false);
-        user.setTwoFactorAuthSecret(null);
-        userRepository.save(user);
-
-        // Re-create UserDetails to reflect the change
-        UserDetailsImpl userDetails = new UserDetailsImpl(user);
         
-        // Return the updated state in a JwtResponse object
-        // The token can be null because the frontend only needs the updated flags.
-        return AuthMapper.toJwtResponse(null,  userDetails, 0L, 0L, 0L, false);
+        log.info("Password reset successfully for user: {}", user.getUsername());
     }
-    
+
+    @Transactional
+    public void cleanupExpiredTokens() {
+        Instant now = Instant.now();
+        int deletedCount = userRepository.deleteExpiredVerificationTokens(now);
+        int resetCount = userRepository.deleteExpiredPasswordResetTokens(now);
+        
+        log.info("Cleaned up {} expired verification tokens and {} expired password reset tokens", 
+                 deletedCount, resetCount);
+    }
 }

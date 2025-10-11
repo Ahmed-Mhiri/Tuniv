@@ -8,10 +8,12 @@ public record ReplyResponseDto(
     String body,
     UserDto author,
     Instant createdAt,
+    Instant editedAt, // ✅ ADDED
     int score,
-    String currentUserVote, // "UPVOTE", "DOWNVOTE", or null
+    String currentUserVote,
     Integer topicId,
     Integer parentReplyId,
+    boolean isSolution, // ✅ ADDED
     List<AttachmentDto> attachments,
     List<ReplyResponseDto> childReplies
 ) {}

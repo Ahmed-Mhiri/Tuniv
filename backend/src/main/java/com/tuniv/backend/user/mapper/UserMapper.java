@@ -1,83 +1,82 @@
 package com.tuniv.backend.user.mapper;
 
-import org.springframework.stereotype.Component;
-
-import com.tuniv.backend.university.model.VerificationStatus;
+import com.tuniv.backend.auth.dto.VerificationInfo;
+import com.tuniv.backend.university.model.UniversityMembership;
 import com.tuniv.backend.user.dto.LeaderboardUserDto;
 import com.tuniv.backend.user.dto.UserProfileDto;
 import com.tuniv.backend.user.dto.UserSummaryDto;
-import com.tuniv.backend.user.dto.VerificationInfo;
 import com.tuniv.backend.user.model.User;
+import org.springframework.stereotype.Component;
+
+import java.util.Optional;
 
 @Component
 public class UserMapper {
 
     /**
-     * Private constructor to prevent instantiation of this utility class.
+     * Maps a User entity to a lightweight summary DTO.
      */
-    private UserMapper() {}
-
-    /**
-     * Maps a User entity to a lightweight summary DTO, used for lists and brief mentions.
-     */
-    public static UserSummaryDto toUserSummaryDto(User user) {
+    public UserSummaryDto toUserSummaryDto(User user) {
         if (user == null) {
             return null;
         }
-
         return new UserSummaryDto(
-            user.getUserId(),
-            user.getUsername(),
-            user.getProfilePhotoUrl(),
-            user.getReputationScore()
+                user.getUserId(),
+                user.getUsername(),
+                user.getProfilePhotoUrl(),
+                user.getReputationScore()
         );
     }
 
     /**
-     * Maps a User entity to a detailed profile DTO, including stats and verification status.
+     * ✅ UPDATED: Maps a User entity and their optional primary membership to a detailed profile DTO.
+     * This method now leverages the denormalized counts directly from the User object for efficiency.
+     *
+     * @param user              The User entity to map.
+     * @param primaryMembership An Optional containing the user's primary university membership.
+     * @return A detailed UserProfileDto.
      */
-    public static UserProfileDto toUserProfileDto(User user, long questionsCount, long answersCount, long followersCount) {
+    public UserProfileDto toUserProfileDto(User user, Optional<UniversityMembership> primaryMembership) {
         if (user == null) {
             return null;
         }
-    
-        // Find the first verified membership for the user to display their primary affiliation.
-        VerificationInfo verificationInfo = user.getMemberships().stream()
-                .filter(m -> m.getStatus() == VerificationStatus.VERIFIED)
-                .findFirst()
-                .map(verifiedMembership -> new VerificationInfo(
-                    verifiedMembership.getUniversity().getName(), 
-                    verifiedMembership.getRole()
-                ))
-                .orElse(null); // It will be null if the user is not verified at any university.
+
+        // Map the optional membership to a VerificationInfo DTO
+        VerificationInfo verificationInfo = primaryMembership
+        .map(membership -> new VerificationInfo(
+                membership.getUniversity().getName(),
+                membership.getStatus(), // ✅ ADD THIS
+                membership.getRole()
+        ))
+        .orElse(null);
+
 
         return new UserProfileDto(
-            user.getUserId(),
-            user.getUsername(),
-            user.getProfilePhotoUrl(),
-            user.getBio(),
-            user.getMajor(),
-            user.getReputationScore(),
-            questionsCount,
-            answersCount,
-            followersCount,
-            verificationInfo // This will be null for unverified users.
+                user.getUserId(),
+                user.getUsername(),
+                user.getProfilePhotoUrl(),
+                user.getBio(),
+                user.getMajor(),
+                user.getReputationScore(),
+                user.getTopicCount(),      // ✅ Use denormalized count
+                user.getReplyCount(),      // ✅ Use denormalized count
+                user.getFollowerCount(),   // ✅ Use denormalized count
+                verificationInfo
         );
     }
 
     /**
      * Maps a User entity to a specialized DTO for the leaderboard.
      */
-    public static LeaderboardUserDto toLeaderboardUserDto(User user) {
+    public LeaderboardUserDto toLeaderboardUserDto(User user) {
         if (user == null) {
             return null;
         }
-
         return new LeaderboardUserDto(
-            user.getUserId(),
-            user.getUsername(),
-            user.getReputationScore(),
-            user.getProfilePhotoUrl()
+                user.getUserId(),
+                user.getUsername(),
+                user.getReputationScore(),
+                user.getProfilePhotoUrl()
         );
     }
 }

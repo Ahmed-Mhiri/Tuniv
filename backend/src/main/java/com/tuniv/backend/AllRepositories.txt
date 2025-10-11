@@ -1,0 +1,1543 @@
+﻿//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\repository\ConversationParticipantRepository.java
+package com.tuniv.backend.chat.repository;
+
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.tuniv.backend.chat.model.ConversationParticipant;
+
+@Repository
+public interface ConversationParticipantRepository extends JpaRepository<ConversationParticipant, ConversationParticipant.ConversationParticipantId> {
+
+    /**
+     * âœ¨ IMPROVED: Finds a participant using the standard composite key naming convention.
+     */
+    Optional<ConversationParticipant> findById_UserIdAndId_ConversationId(Integer userId, Integer conversationId);
+
+    /**
+     * âœ… ADDED: Finds all participants in a given conversation. Essential for fetching member lists.
+     */
+    List<ConversationParticipant> findById_ConversationId(Integer conversationId);
+
+    /**
+     * âœ… ADDED: Atomically increments the unread message count for all participants in a conversation
+     * except for the message author.
+     */
+    @Modifying
+    @Query("""
+        UPDATE ConversationParticipant cp
+        SET cp.unreadCount = cp.unreadCount + 1
+        WHERE cp.id.conversationId = :conversationId AND cp.id.userId <> :authorId
+    """)
+    void incrementUnreadCountForParticipants(
+        @Param("conversationId") Integer conversationId,
+        @Param("authorId") Integer authorId
+    );
+
+    /**
+     * âœ… ADDED: Resets the unread message count for a specific user in a conversation.
+     * This should be called when a user reads the messages.
+     */
+    @Modifying
+    @Query("""
+        UPDATE ConversationParticipant cp
+        SET cp.unreadCount = 0, cp.lastReadTimestamp = CURRENT_TIMESTAMP
+        WHERE cp.id.userId = :userId AND cp.id.conversationId = :conversationId
+    """)
+    void resetUnreadCount(
+        @Param("userId") Integer userId,
+        @Param("conversationId") Integer conversationId
+    );
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\repository\ConversationRepository.java
+package com.tuniv.backend.chat.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.chat.model.Conversation;
+
+@Repository
+public interface ConversationRepository extends JpaRepository<Conversation, Integer> {
+
+    /**
+     * âœ¨ IMPROVED: The `participants` collection was removed from Conversation.
+     * This query now correctly joins Conversation with ConversationParticipant directly.
+     */
+    @Query("""
+        SELECT c FROM Conversation c
+        JOIN ConversationParticipant cp ON c.conversationId = cp.conversation.conversationId
+        WHERE cp.user.userId = :userId
+        ORDER BY COALESCE(c.lastMessageSentAt, c.createdAt) DESC
+    """)
+    List<Conversation> findConversationsByUserId(@Param("userId") Integer userId);
+
+    /**
+     * âœ¨ IMPROVED & RENAMED: This query no longer fetches participants, as that must be done
+     * in a separate call to the ConversationParticipantRepository.
+     * It now uses an EntityGraph to efficiently fetch the denormalized last message author.
+     */
+    @EntityGraph(attributePaths = {"lastMessageAuthor"})
+    Optional<Conversation> findWithLastMessageAuthorById(Integer conversationId);
+
+    /**
+     * âœ¨ IMPROVED: Rewritten from native SQL to a much cleaner and more performant JPQL query.
+     * It now leverages the denormalized `participantCount` for a huge speed boost.
+     */
+    @Query("""
+        SELECT c FROM Conversation c
+        WHERE c.conversationType = :type
+        AND c.participantCount = 2
+        AND EXISTS (
+            SELECT 1 FROM ConversationParticipant cp
+            WHERE cp.conversation.conversationId = c.conversationId AND cp.user.userId = :userId1
+        )
+        AND EXISTS (
+            SELECT 1 FROM ConversationParticipant cp
+            WHERE cp.conversation.conversationId = c.conversationId AND cp.user.userId = :userId2
+        )
+    """)
+    Optional<Conversation> findDirectConversationBetweenUsers(
+        @Param("userId1") Integer userId1,
+        @Param("userId2") Integer userId2,
+        @Param("type") ConversationType type
+    );
+
+    // âœ… ADDED: Methods to manage denormalized counters
+    @Modifying
+    @Query("UPDATE Conversation c SET c.messageCount = c.messageCount + 1 WHERE c.conversationId = :conversationId")
+    void incrementMessageCount(@Param("conversationId") Integer conversationId);
+
+    @Modifying
+    @Query("UPDATE Conversation c SET c.participantCount = c.participantCount + :amount WHERE c.conversationId = :conversationId")
+    void updateParticipantCount(@Param("conversationId") Integer conversationId, @Param("amount") int amount);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\repository\MessageRepository.java
+package com.tuniv.backend.chat.repository;
+
+import com.tuniv.backend.chat.model.Message;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.time.Instant;
+import java.util.Optional;
+
+@Repository
+public interface MessageRepository extends JpaRepository<Message, Integer> {
+
+    /**
+     * âœ¨ IMPROVED: The `attachments` collection was removed from the Message/Post entity.
+     * This query now fetches messages with their authors. Attachments must be fetched separately
+     * from the AttachmentRepository if needed.
+     */
+    @EntityGraph(attributePaths = {"author", "replyToMessage", "replyToMessage.author"})
+    Page<Message> findByConversation_ConversationIdOrderBySentAtDesc(Integer conversationId, Pageable pageable);
+
+    /**
+     * Finds the most recent message in a conversation.
+     */
+    Optional<Message> findTopByConversation_ConversationIdOrderBySentAtDesc(Integer conversationId);
+
+    /**
+     * Counts messages sent after a certain timestamp, excluding a specific user.
+     * This is useful for calculating initial unread counts for a user.
+     */
+    long countByConversation_ConversationIdAndAuthor_UserIdNotAndSentAtAfter(
+        Integer conversationId,
+        Integer userId,
+        Instant timestamp
+    );
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\repository\ReactionRepository.java
+package com.tuniv.backend.chat.repository;
+
+import com.tuniv.backend.chat.model.Reaction;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface ReactionRepository extends JpaRepository<Reaction, Integer> {
+
+    /**
+     * ðŸ’¡ LOGIC CORRECTION: Reactions are on Messages, not generic Posts.
+     * The query path is updated from `Post_Id` to `Message_Id`.
+     */
+    Optional<Reaction> findByUser_UserIdAndMessage_IdAndEmoji(Integer userId, Integer messageId, String emoji);
+
+    /**
+     * ðŸ’¡ LOGIC CORRECTION: Finds all reactions for a given Message.
+     */
+    List<Reaction> findByMessage_Id(Integer messageId);
+
+    /**
+     * ðŸ’¡ LOGIC CORRECTION: Finds all reactions for a given list of Message IDs.
+     */
+    List<Reaction> findByMessage_IdIn(List<Integer> messageIds);
+    
+    /**
+     * âœ… ADDED: An efficient query to get reaction summaries for a message.
+     * Returns a list of Object arrays, where each is [String emoji, Long count].
+     * This is much faster than fetching all reaction entities.
+     */
+    @Query("SELECT r.emoji, COUNT(r) FROM Reaction r WHERE r.message.id = :messageId GROUP BY r.emoji")
+    List<Object[]> getReactionSummary(@Param("messageId") Integer messageId);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\repository\CommunityMembershipRepository.java
+package com.tuniv.backend.community.repository;
+
+
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.community.model.CommunityMembership;
+
+@Repository
+public interface CommunityMembershipRepository extends JpaRepository<CommunityMembership, CommunityMembership.CommunityMembershipId> {
+    
+    /**
+     * Finds a specific membership entry using its composite key parts.
+     */
+    Optional<CommunityMembership> findById_UserIdAndId_CommunityId(Integer userId, Integer communityId);
+
+    /**
+     * Checks if a user is a member of a specific community.
+     * This is more efficient than fetching the entire membership object.
+     */
+    boolean existsById_UserIdAndId_CommunityId(Integer userId, Integer communityId);
+
+    /**
+     * Finds all community memberships for a given user, pre-fetching community details.
+     */
+    @EntityGraph(attributePaths = {"community"})
+    List<CommunityMembership> findById_UserId(Integer userId);
+
+    /**
+     * âœ… ADDED: Finds all members of a given community, pre-fetching user details.
+     * This is essential for displaying a community's member list.
+     */
+    @EntityGraph(attributePaths = {"user"})
+    List<CommunityMembership> findById_CommunityId(Integer communityId);
+
+    /**
+     * âœ… ADDED: A paginated version for displaying large member lists efficiently.
+     */
+    @EntityGraph(attributePaths = {"user"})
+    Page<CommunityMembership> findById_CommunityId(Integer communityId, Pageable pageable);
+
+    /**
+     * âœ… ADDED: Finds all members in a community who have a specific role (e.g., all moderators).
+     */
+    @EntityGraph(attributePaths = {"user"})
+    List<CommunityMembership> findById_CommunityIdAndRole(Integer communityId, CommunityRole role);
+
+    /**
+     * âœ… ADDED: Finds all banned members in a community, for moderation purposes.
+     */
+    @EntityGraph(attributePaths = {"user"})
+    List<CommunityMembership> findById_CommunityIdAndIsBannedTrue(Integer communityId);
+
+    /**
+     * âœ… ADDED: Atomically updates the contribution score for a member.
+     * Crucial for maintaining denormalized user stats within the community.
+     */
+    @Modifying
+    @Query("""
+        UPDATE CommunityMembership cm 
+        SET cm.contributionScore = cm.contributionScore + :amount 
+        WHERE cm.id.userId = :userId AND cm.id.communityId = :communityId
+    """)
+    void updateContributionScore(
+        @Param("userId") Integer userId, 
+        @Param("communityId") Integer communityId, 
+        @Param("amount") int amount
+    );
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\repository\CommunityRepository.java
+package com.tuniv.backend.community.repository;
+
+import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.qa.model.TopicType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface CommunityRepository extends JpaRepository<Community, Integer> {
+
+    // âœ… This query is performant as it uses denormalized counters.
+    Page<Community> findByNameContainingIgnoreCase(String search, Pageable pageable);
+    
+    // âœ… ADDED: A simple, direct lookup by name.
+    Optional<Community> findByNameIgnoreCase(String name);
+
+    // âœ… These queries correctly use denormalized counts for efficient sorting.
+    List<Community> findByOrderByMemberCountDesc(Pageable pageable);
+    List<Community> findByOrderByTopicCountDesc(Pageable pageable);
+
+    /**
+     * âœ¨ IMPROVED: The `members` collection was removed from the Community entity.
+     * This query now correctly joins through the `CommunityMembership` entity to find
+     * all communities a specific user has joined.
+     */
+    @Query("SELECT c FROM Community c JOIN CommunityMembership cm ON c.communityId = cm.community.communityId WHERE cm.user.userId = :userId")
+    List<Community> findCommunitiesByUserId(@Param("userId") Integer userId);
+
+    // âœ… This is a standard and correct query.
+    List<Community> findByUniversityIsNull();
+
+    // âœ… These count queries are correct and should be used by services to get stats.
+    @Query("SELECT COUNT(t) FROM Topic t WHERE t.community.communityId = :communityId")
+    long countTopicsByCommunityId(@Param("communityId") Integer communityId);
+
+    @Query("SELECT COUNT(t) FROM Topic t WHERE t.community.communityId = :communityId AND t.topicType = :topicType")
+    long countTopicsByCommunityIdAndType(@Param("communityId") Integer communityId, @Param("topicType") TopicType topicType);
+
+    @Query("SELECT COUNT(t) FROM Topic t WHERE t.community.communityId = :communityId AND t.isSolved = true")
+    long countSolvedTopicsByCommunityId(@Param("communityId") Integer communityId);
+
+    /**
+     * âŒ DANGEROUS - REWRITTEN: The original method tried to fetch a community with all its topics,
+     * which is an anti-pattern that causes severe performance issues.
+     * âœ¨ This method now simply finds the community. Your service layer should then call the
+     * `TopicRepository` to get a PAGINATED list of topics for this community.
+     */
+    @Override
+    Optional<Community> findById(Integer communityId);
+
+    // âœ… Correctly uses the denormalized `topicCount`.
+    List<Community> findByUniversity_UniversityIdOrderByTopicCountDesc(@Param("universityId") Integer universityId);
+
+    // âœ… This is a good, performant query using a subselect.
+    @Query("SELECT c FROM Community c WHERE c.communityId IN " +
+           "(SELECT t.community.communityId FROM Topic t WHERE t.createdAt >= :sinceDate) " +
+           "ORDER BY c.topicCount DESC")
+    List<Community> findActiveCommunitiesSince(@Param("sinceDate") Instant sinceDate, Pageable pageable);
+
+    // âœ… This is another performant query using denormalized `memberCount`.
+    List<Community> findByMemberCountGreaterThanEqualOrderByMemberCountDesc(@Param("minMembers") Integer minMembers, Pageable pageable);
+
+    /**
+     * ðŸ’¡ NOTE: The logic from the original `getCommunityTopicStats` DTO query has been removed.
+     * That query was invalid because it joined `c.topics`.
+     * The CORRECT PATTERN is to fetch the Community object from this repository, and then use the
+     * dedicated count methods above (`countTopicsBy...`, `countSolvedTopicsBy...`) to
+     * assemble your DTO in the service layer. This is more modular and performant.
+     */
+
+    // âœ… This is a good, performant query using a subselect with HAVING.
+    @Query("SELECT c FROM Community c WHERE c.communityId IN (" +
+           "SELECT t.community.communityId FROM Topic t " +
+           "WHERE t.createdAt >= :startDate " +
+           "GROUP BY t.community.communityId " +
+           "HAVING COUNT(t) >= :minRecentTopics" +
+           ") ORDER BY c.topicCount DESC")
+    List<Community> findTrendingCommunities(
+        @Param("startDate") Instant startDate,
+        @Param("minRecentTopics") Long minRecentTopics,
+        Pageable pageable
+    );
+
+    // === Denormalized Counter Management ===
+    // âœ… ADDED: These methods are ESSENTIAL for keeping the Community entity's stats in sync.
+
+    @Modifying
+    @Query("UPDATE Community c SET c.memberCount = c.memberCount + 1 WHERE c.communityId = :communityId")
+    void incrementMemberCount(@Param("communityId") Integer communityId);
+
+    @Modifying
+    @Query("UPDATE Community c SET c.memberCount = c.memberCount - 1 WHERE c.communityId = :communityId AND c.memberCount > 0")
+    void decrementMemberCount(@Param("communityId") Integer communityId);
+
+    @Modifying
+    @Query("UPDATE Community c SET c.topicCount = c.topicCount + 1 WHERE c.communityId = :communityId")
+    void incrementTopicCount(@Param("communityId") Integer communityId);
+
+    @Modifying
+    @Query("UPDATE Community c SET c.topicCount = c.topicCount - 1 WHERE c.communityId = :communityId AND c.topicCount > 0")
+    void decrementTopicCount(@Param("communityId") Integer communityId);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\repository\FollowRepository.java
+package com.tuniv.backend.follow.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.follow.model.Follow;
+import com.tuniv.backend.follow.model.FollowableType;
+
+@Repository
+public interface FollowRepository extends JpaRepository<Follow, Integer> {
+
+    // Find all things a user follows
+    List<Follow> findAllByUser_UserId(Integer userId);
+
+    // Find followers for a specific target
+    List<Follow> findByTargetTypeAndTargetId(FollowableType targetType, Integer targetId);
+
+    // Find specific follow relationship
+    Optional<Follow> findByUser_UserIdAndTargetTypeAndTargetId(Integer userId, FollowableType targetType, Integer targetId);
+
+    // Count how many followers a specific target has
+    long countByTargetTypeAndTargetId(FollowableType targetType, Integer targetId);
+    
+    // Check if a user already follows a specific target
+    boolean existsByUser_UserIdAndTargetTypeAndTargetId(Integer userId, FollowableType targetType, Integer targetId);
+
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\repository\NotificationRepository.java
+package com.tuniv.backend.notification.repository;
+
+import java.util.List;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.tuniv.backend.notification.model.Notification;
+
+@Repository
+public interface NotificationRepository extends JpaRepository<Notification, Integer> {
+
+    // Spring Data JPA will automatically create a method implementation for this
+    // It will find all notifications for a specific recipient, ordered by creation date descending
+    List<Notification> findByRecipientUserIdOrderByCreatedAtDesc(Integer userId);
+    // âœ… ADD THIS METHOD
+    List<Notification> findAllByRecipientUserIdAndIsReadIsFalse(Integer userId);
+
+     @Transactional
+    void deleteByNotificationIdAndRecipient_UserId(Integer notificationId, Integer userId);
+
+    /**
+     * Deletes all notifications for a specific user.
+     *
+     * BEFORE (Incorrect): void deleteAllByUserUserId(Integer userId);
+     * AFTER  (Correct):  Now matches the 'recipient' field in the Notification entity.
+     */
+    @Transactional
+    void deleteAllByRecipient_UserId(Integer userId);
+
+    @Modifying
+    @Query("UPDATE Notification n SET n.isRead = true WHERE n.recipient.userId = :userId AND n.isRead = false")
+    void markAllAsReadForUser(Integer userId);
+
+    
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\repository\AttachmentRepository.java
+package com.tuniv.backend.qa.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.qa.model.Attachment;
+@Repository
+public interface AttachmentRepository extends JpaRepository<Attachment, Integer> {
+
+    // âœ… Great methods for finding attachments for one or more posts.
+    @EntityGraph(attributePaths = {"post"})
+    List<Attachment> findByPostIdIn(List<Integer> postIds);
+
+    @EntityGraph(attributePaths = {"post"})
+    Page<Attachment> findByPostId(Integer postId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"post"})
+    Page<Attachment> findByPostIdIn(List<Integer> postIds, Pageable pageable);
+
+    // âœ… Standard count method.
+    long countByPostId(Integer postId);
+    
+    // âœ… Efficient batch operation for getting attachment counts for multiple posts.
+    @Query("SELECT a.post.id, COUNT(a) FROM Attachment a WHERE a.post.id IN :postIds GROUP BY a.post.id")
+    List<Object[]> countAttachmentsByPostIds(@Param("postIds") List<Integer> postIds);
+
+    // âœ… Useful methods for filtering by file type.
+    @EntityGraph(attributePaths = {"post"})
+    List<Attachment> findByFileType(String fileType);
+
+    @EntityGraph(attributePaths = {"post"})
+    List<Attachment> findByFileTypeIn(List<String> fileTypes);
+    
+    @EntityGraph(attributePaths = {"post"})
+    List<Attachment> findByPostIdAndFileType(Integer postId, String fileType);
+
+    @EntityGraph(attributePaths = {"post"})
+    @Query("SELECT a FROM Attachment a WHERE a.post.id = :postId AND a.fileType IN :fileTypes")
+    List<Attachment> findByPostIdAndFileTypeIn(@Param("postId") Integer postId, @Param("fileTypes") List<String> fileTypes);
+
+    // âœ… Great for admin/moderation tasks to monitor storage.
+    @EntityGraph(attributePaths = {"post"})
+    @Query("SELECT a FROM Attachment a WHERE a.fileSize > :minSize")
+    List<Attachment> findLargeAttachments(@Param("minSize") Long minSize);
+    
+    // âœ… Good for a "recently uploaded" feed.
+    @EntityGraph(attributePaths = {"post"})
+    List<Attachment> findTop10ByOrderByUploadedAtDesc();
+
+    // âœ… Efficient bulk delete operations.
+    @Modifying
+    @Query("DELETE FROM Attachment a WHERE a.post.id = :postId")
+    void deleteByPostId(@Param("postId") Integer postId);
+    
+    @Modifying
+    @Query("DELETE FROM Attachment a WHERE a.post.id IN :postIds")
+    void deleteByPostIdIn(@Param("postIds") List<Integer> postIds);
+
+    // âœ… Excellent use of EntityGraph to fetch related data efficiently.
+    @EntityGraph(attributePaths = {"post", "post.author"})
+    Optional<Attachment> findWithPostAndAuthorById(Integer attachmentId);
+    
+    // âœ… Great analytics queries.
+    @Query("SELECT a.fileType, COUNT(a) FROM Attachment a GROUP BY a.fileType")
+    List<Object[]> countAttachmentsByFileType();
+
+    @Query("SELECT COALESCE(SUM(a.fileSize), 0) FROM Attachment a")
+    Long getTotalStorageUsed();
+
+    @Query("SELECT COALESCE(SUM(a.fileSize), 0) FROM Attachment a WHERE a.post.author.userId = :userId")
+    Long getStorageUsedByPostAuthor(@Param("userId") Integer userId);
+
+    /**
+     * âœ… ADDED: Finds attachments uploaded by a specific user.
+     * This is distinct from the author of the post.
+     */
+    @EntityGraph(attributePaths = {"post"})
+    Page<Attachment> findByUploadedBy_UserId(Integer userId, Pageable pageable);
+
+    /**
+     * âœ… NOTE: In a correctly operating application, these "orphaned attachment" methods
+     * should never find or delete anything. The `post` field on the Attachment entity is
+     * non-nullable, so the database schema prevents attachments from existing without a post.
+     * They are kept here as a failsafe for data cleanup in case of manual database errors.
+     */
+    @Query("SELECT a FROM Attachment a WHERE a.post IS NULL")
+    List<Attachment> findOrphanedAttachments();
+
+    @Modifying
+    @Query("DELETE FROM Attachment a WHERE a.post IS NULL")
+    void deleteOrphanedAttachments();
+    
+    // âœ… Standard paginated find method.
+    @EntityGraph(attributePaths = {"post"})
+    Page<Attachment> findAllByOrderByUploadedAtDesc(Pageable pageable);
+
+    /**
+     * âœ… NOTE: `LIKE '%query%'` searches can be slow on very large tables.
+     * For high-performance searching, consider a database full-text search index.
+     */
+    @EntityGraph(attributePaths = {"post"})
+    @Query("SELECT a FROM Attachment a WHERE LOWER(a.fileName) LIKE LOWER(CONCAT('%', :filename, '%'))")
+    Page<Attachment> findByFileNameContainingIgnoreCase(@Param("filename") String filename, Pageable pageable);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\repository\ReplyRepository.java
+package com.tuniv.backend.qa.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.qa.model.Reply;
+import com.tuniv.backend.qa.model.TopicType;
+
+@Repository
+public interface ReplyRepository extends JpaRepository<Reply, Integer> {
+
+    // âœ… Efficient count, but prefer the denormalized `replyCount` on the User entity for display.
+    long countByAuthor_UserId(Integer userId);
+
+    // âœ… Good query for fetching nested replies (comments on answers).
+    @EntityGraph(attributePaths = {"author"})
+    Page<Reply> findByTopicIdAndParentReplyIsNotNull(Integer topicId, Pageable pageable);
+
+    // âœ… Good general-purpose paginated fetch.
+    @EntityGraph(attributePaths = {"author", "topic"})
+    Page<Reply> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    // âœ… Standard query for finding a user's replies.
+    List<Reply> findByAuthor_UserIdOrderByCreatedAtDesc(Integer userId);
+
+    // âŒ REMOVED ATTRIBUTE: `attachments` no longer exists on the Post entity.
+    @EntityGraph(attributePaths = {"author"})
+    List<Reply> findByTopicIdAndParentReplyIsNull(@Param("topicId") Integer topicId);
+
+    // âœ… Good, efficient fetch methods.
+    @EntityGraph(attributePaths = {"author"})
+    Optional<Reply> findWithAuthorById(@Param("replyId") Integer replyId);
+
+    @EntityGraph(attributePaths = {"topic"})
+    Optional<Reply> findWithTopicById(@Param("replyId") Integer replyId);
+
+    @EntityGraph(attributePaths = {"author", "topic", "topic.author"})
+    Optional<Reply> findWithDetailsById(@Param("replyId") Integer replyId);
+
+    // âœ… Excellent performance pattern for getting just a foreign key.
+    @Query("SELECT r.topic.id FROM Reply r WHERE r.id = :replyId")
+    Optional<Integer> findTopicIdById(@Param("replyId") Integer replyId);
+
+    // âœ… Defines an "answer" as a top-level reply to a QUESTION.
+    @Query("SELECT COUNT(r) FROM Reply r WHERE r.author.userId = :userId AND r.topic.topicType = com.tuniv.backend.qa.model.TopicType.QUESTION AND r.parentReply IS NULL")
+    long countAnswersByUser(@Param("userId") Integer userId);
+
+    // ðŸ’¡ LOGIC CORRECTION: Defines a "comment" as a nested reply OR a top-level reply on a non-question topic.
+    @Query("SELECT COUNT(r) FROM Reply r WHERE r.author.userId = :userId AND (r.topic.topicType <> com.tuniv.backend.qa.model.TopicType.QUESTION OR r.parentReply IS NOT NULL)")
+    long countCommentsByUser(@Param("userId") Integer userId);
+
+    // âœ… Gets a paginated list of a user's answers.
+    @EntityGraph(attributePaths = {"author", "topic"})
+    Page<Reply> findByAuthorUserIdAndTopicTopicTypeAndParentReplyIsNull(
+        @Param("userId") Integer userId,
+        TopicType topicType, // Pass TopicType.QUESTION here from the service
+        Pageable pageable
+    );
+    
+    // ðŸ’¡ LOGIC CORRECTION: Added a WHERE clause to properly define "answers".
+    @EntityGraph(attributePaths = {"author", "topic"})
+    @Query("SELECT r FROM Reply r WHERE r.author.userId = :userId AND r.topic.topicType = com.tuniv.backend.qa.model.TopicType.QUESTION AND r.parentReply IS NULL")
+    List<Reply> findAnswersByUser(@Param("userId") Integer userId);
+    
+    // ðŸ’¡ LOGIC CORRECTION: Corrected query to properly define "comments".
+    @EntityGraph(attributePaths = {"author", "topic"})
+    @Query("SELECT r FROM Reply r WHERE r.author.userId = :userId AND (r.topic.topicType <> com.tuniv.backend.qa.model.TopicType.QUESTION OR r.parentReply IS NOT NULL) ORDER BY r.createdAt DESC")
+    List<Reply> findCommentsByUser(@Param("userId") Integer userId);
+    
+    // âœ… Defines an "answer" as a top-level reply on a QUESTION topic.
+    @EntityGraph(attributePaths = {"author"})
+    @Query("SELECT r FROM Reply r WHERE r.topic.id = :topicId AND r.parentReply IS NULL AND r.topic.topicType = com.tuniv.backend.qa.model.TopicType.QUESTION")
+    List<Reply> findAnswersByTopicId(@Param("topicId") Integer topicId);
+
+    // âœ… Defines a "comment" as a nested reply on a QUESTION topic.
+    @EntityGraph(attributePaths = {"author"})
+    @Query("SELECT r FROM Reply r WHERE r.topic.id = :topicId AND r.parentReply IS NOT NULL")
+    List<Reply> findCommentsByTopicId(@Param("topicId") Integer topicId);
+
+    // âœ… Perfect for fetching threaded replies.
+    @EntityGraph(attributePaths = {"author"})
+    List<Reply> findByParentReplyIdOrderByCreatedAtAsc(Integer parentReplyId);
+
+    @EntityGraph(attributePaths = {"author"})
+    List<Reply> findByIdIn(List<Integer> replyIds);
+
+    /**
+     * âœ¨ MASSIVELY IMPROVED: The old query was invalid and inefficient.
+     * This now leverages the denormalized score, upvoteCount, and downvoteCount fields
+     * directly on the Reply entity, which is extremely fast and avoids any joins to the Vote table.
+     * The method returns a List of Object arrays, where each array is [Integer id, Integer score, Integer upvoteCount, Integer downvoteCount].
+     */
+    @Query("SELECT r.id, r.score, r.upvoteCount, r.downvoteCount FROM Reply r WHERE r.id IN :replyIds")
+    List<Object[]> findVoteStatsByReplyIds(@Param("replyIds") List<Integer> replyIds);
+    
+    // âŒ REMOVED ATTRIBUTE: `attachments` no longer exists on the Post entity.
+    @EntityGraph(attributePaths = {"author"})
+    Page<Reply> findByTopicIdAndParentReplyIsNull(Integer topicId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<Reply> findByTopicIdAndParentReplyIsNullOrderByCreatedAtAsc(Integer topicId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<Reply> findByParentReplyIdOrderByCreatedAtAsc(Integer parentReplyId, Pageable pageable);
+
+    // âœ… Good queries for data validation or recalculation jobs.
+    @Query("SELECT COUNT(r) FROM Reply r WHERE r.topic.id = :topicId AND r.parentReply IS NULL")
+    long countTopLevelRepliesByTopicId(@Param("topicId") Integer topicId);
+    
+    @Query("SELECT COUNT(r) FROM Reply r WHERE r.topic.id = :topicId")
+    long countAllRepliesByTopicId(@Param("topicId") Integer topicId);
+
+    // âœ… Good queries for dashboards or "latest activity" feeds.
+    @EntityGraph(attributePaths = {"author", "topic"})
+    List<Reply> findTop10ByOrderByCreatedAtDesc();
+
+    @EntityGraph(attributePaths = {"author", "topic"})
+    List<Reply> findTop10ByOrderByScoreDesc();
+
+    @EntityGraph(attributePaths = {"author"})
+    List<Reply> findByTopicIdIn(List<Integer> topicIds);
+    
+    // âœ… Efficient bulk delete operations. Use with care as they bypass JPA lifecycle callbacks.
+    @Modifying
+    @Query("DELETE FROM Reply r WHERE r.topic.id = :topicId")
+    void deleteByTopicId(@Param("topicId") Integer topicId);
+
+    @Modifying
+    @Query("DELETE FROM Reply r WHERE r.parentReply.id = :parentReplyId")
+    void deleteByParentReplyId(@Param("parentReplyId") Integer parentReplyId);
+
+    // âœ… Good, specific queries for checking user interactions.
+    @Query("SELECT CASE WHEN COUNT(r) > 0 THEN true ELSE false END FROM Reply r WHERE r.topic.id = :topicId AND r.author.userId = :userId")
+    boolean existsByTopicIdAndAuthorUserId(@Param("topicId") Integer topicId, @Param("userId") Integer userId);
+
+    @EntityGraph(attributePaths = {"author"})
+    Optional<Reply> findByTopicIdAndAuthorUserId(@Param("topicId") Integer topicId, @Param("userId") Integer userId);
+
+    // âœ… Correct logic for finding replies that have been accepted as solutions.
+    @EntityGraph(attributePaths = {"author", "topic"})
+    @Query("SELECT r FROM Reply r WHERE r.topic.acceptedSolution.id = r.id AND r.author.userId = :userId")
+    List<Reply> findAcceptedSolutionsByUser(@Param("userId") Integer userId);
+    
+    @Query("SELECT COUNT(r) FROM Reply r WHERE r.topic.acceptedSolution.id = r.id AND r.author.userId = :userId")
+    long countAcceptedSolutionsByUser(@Param("userId") Integer userId);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\repository\TagRepository.java
+package com.tuniv.backend.qa.repository;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.qa.model.Tag;
+@Repository
+public interface TagRepository extends JpaRepository<Tag, Integer> {
+    
+    /**
+     * Finds a tag by its unique name (case-insensitive).
+     */
+    Optional<Tag> findByNameIgnoreCase(String name);
+
+    /**
+     * Efficiently finds all existing tags from a given list of names (case-insensitive).
+     */
+    List<Tag> findByNameIgnoreCaseIn(Collection<String> names);
+
+    /**
+     * âœ… ADD: Finds the most popular tags based on their denormalized usage count.
+     * This is very fast due to the index on the `usage_count` column.
+     *
+     * @param pageable Defines how many tags to fetch (e.g., PageRequest.of(0, 10) for the top 10).
+     * @return A list of the most used tags.
+     */
+    List<Tag> findByOrderByUsageCountDesc(Pageable pageable);
+
+    /**
+     * âœ… ADD: Implements a search functionality for tags, ideal for autocomplete features.
+     *
+     * @param name The partial name of the tag to search for.
+     * @param pageable Pagination information.
+     * @return A paginated list of matching tags.
+     */
+    Page<Tag> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    /**
+     * âœ… ADD: Atomically increments the usage count and updates the last used timestamp for a given tag.
+     * This is the correct way to maintain denormalized data.
+     */
+    @Modifying
+    @Query("UPDATE Tag t SET t.usageCount = t.usageCount + 1, t.lastUsedAt = CURRENT_TIMESTAMP WHERE t.id = :tagId")
+    void incrementUsageCount(@Param("tagId") Integer tagId);
+    
+    /**
+     * âœ… ADD: Atomically decrements the usage count for a given tag.
+     */
+    @Modifying
+    @Query("UPDATE Tag t SET t.usageCount = t.usageCount - 1 WHERE t.id = :tagId AND t.usageCount > 0")
+    void decrementUsageCount(@Param("tagId") Integer tagId);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\repository\TopicRepository.java
+package com.tuniv.backend.qa.repository;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.community.model.Community;
+import com.tuniv.backend.qa.dto.TopicSummaryDto;
+import com.tuniv.backend.qa.model.Topic;
+
+@Repository
+public interface TopicRepository extends JpaRepository<Topic, Integer>, JpaSpecificationExecutor<Topic> {
+
+    // âœ… This is efficient, but for display, prefer the denormalized `topicCount` on the User entity.
+    long countByAuthor_UserId(Integer userId);
+
+    /**
+     * âŒ DANGEROUS - REWRITTEN: The original method tried to fetch entire collections of replies and attachments,
+     * which causes massive performance issues (Cartesian Products) and is no longer possible with the new schema.
+     * âœ¨ This rewritten version safely fetches the topic with its essential, single-entity relationships.
+     * Replies should ALWAYS be fetched in a separate, paginated query from the ReplyRepository.
+     */
+    @EntityGraph(attributePaths = {"author", "acceptedSolution", "acceptedSolution.author", "community", "module"})
+    Optional<Topic> findById(Integer topicId);
+    
+    // âœ… This method is well-defined and efficient for fetching core details. No changes needed.
+    @EntityGraph(attributePaths = {"author", "acceptedSolution"})
+    Optional<Topic> findWithDetailsById(Integer topicId);
+
+    /**
+     * âœ¨ IMPROVED: The `tags` collection was removed. This query now correctly joins through the `TopicTag`
+     * entity to find topics associated with the given tag IDs.
+     */
+    @Query("SELECT DISTINCT t FROM Topic t JOIN TopicTag tt ON t.id = tt.topic.id WHERE tt.tag.id IN :tagIds")
+    List<Topic> findTopicsByTagIds(@Param("tagIds") List<Integer> tagIds);
+
+    // âœ… This is a standard and useful query. No changes needed.
+    List<Topic> findByAuthor_UserIdOrderByCreatedAtDesc(Integer userId);
+
+    // âœ… This query is correct and efficient. No changes needed.
+    @Query("SELECT t FROM Topic t WHERE t.acceptedSolution.author.userId = :userId")
+    List<Topic> findByAcceptedSolution_Author_UserId(@Param("userId") Integer userId);
+
+    /**
+     * âš ï¸ PERFORMANCE WARNING: A query with multiple optional 'OR' clauses can be slow on large datasets
+     * because the database struggles to use indexes effectively for all conditions.
+     * For a truly scalable feed, consider a dedicated search engine like Elasticsearch.
+     * âœ¨ IMPROVED: The tag filtering logic is updated to use the new `TopicTag` join table.
+     */
+    @Query(value = """
+        SELECT NEW com.tuniv.backend.qa.dto.TopicSummaryDto(
+            t.id, t.title, t.topicType, t.author.userId, t.author.username, t.createdAt, t.score,
+            t.replyCount,
+            (SELECT v.value FROM Vote v WHERE v.post.id = t.id AND v.user.userId = :currentUserId),
+            t.isSolved,
+            COALESCE(m.moduleId, c.communityId),
+            COALESCE(m.name, c.name)
+        )
+        FROM Topic t
+        LEFT JOIN t.module m
+        LEFT JOIN t.community c
+        WHERE
+            (:userIds IS NULL OR t.author.userId IN :userIds) OR
+            (:communityIds IS NULL OR c.communityId IN :communityIds) OR
+            (:moduleIds IS NULL OR m.moduleId IN :moduleIds) OR
+            (:tagIds IS NULL OR EXISTS (
+                SELECT 1 FROM TopicTag tt WHERE tt.topic.id = t.id AND tt.tag.id IN :tagIds
+            ))
+        ORDER BY t.createdAt DESC
+    """, countQuery = """
+        SELECT COUNT(t)
+        FROM Topic t
+        LEFT JOIN t.module m
+        LEFT JOIN t.community c
+        WHERE
+            (:userIds IS NULL OR t.author.userId IN :userIds) OR
+            (:communityIds IS NULL OR c.communityId IN :communityIds) OR
+            (:moduleIds IS NULL OR m.moduleId IN :moduleIds) OR
+            (:tagIds IS NULL OR EXISTS (
+                SELECT 1 FROM TopicTag tt WHERE tt.topic.id = t.id AND tt.tag.id IN :tagIds
+            ))
+    """)
+    Page<TopicSummaryDto> findPersonalizedFeed(
+        @Param("userIds") List<Integer> userIds,
+        @Param("communityIds") List<Integer> communityIds,
+        @Param("tagIds") List<Integer> tagIds,
+        @Param("moduleIds") List<Integer> moduleIds,
+        @Param("currentUserId") Integer currentUserId,
+        Pageable pageable
+    );
+
+    // âœ¨ IMPROVED: The LEFT JOIN to votes was inefficient for a simple list.
+    // Replaced with a more performant scalar subquery to get the current user's vote status.
+    @Query(value = """
+        SELECT NEW com.tuniv.backend.qa.dto.TopicSummaryDto(
+            t.id, t.title, t.topicType, t.author.userId, t.author.username, t.createdAt, t.score,
+            t.replyCount,
+            (SELECT v.value FROM Vote v WHERE v.post.id = t.id AND v.user.userId = :currentUserId),
+            t.isSolved,
+            m.moduleId, m.name
+        )
+        FROM Topic t
+        JOIN t.module m
+        WHERE m.moduleId = :moduleId
+        ORDER BY t.createdAt DESC
+    """, countQuery = "SELECT COUNT(t) FROM Topic t WHERE t.module.moduleId = :moduleId")
+    Page<TopicSummaryDto> findTopicSummariesByModuleId(
+        @Param("moduleId") Integer moduleId,
+        @Param("currentUserId") Integer currentUserId,
+        Pageable pageable
+    );
+    
+    // âœ¨ IMPROVED: Replaced LEFT JOIN with a scalar subquery for vote status.
+    @Query(value = """
+        SELECT NEW com.tuniv.backend.qa.dto.TopicSummaryDto(
+            t.id, t.title, t.topicType, t.author.userId, t.author.username, t.createdAt, t.score,
+            t.replyCount,
+            (SELECT v.value FROM Vote v WHERE v.post.id = t.id AND v.user.userId = :currentUserId),
+            t.isSolved,
+            c.communityId, c.name
+        )
+        FROM Topic t
+        JOIN t.community c
+        WHERE c.communityId = :communityId
+        ORDER BY t.createdAt DESC
+    """, countQuery = "SELECT COUNT(t) FROM Topic t WHERE t.community.communityId = :communityId")
+    Page<TopicSummaryDto> findTopicSummariesByCommunityId(
+        @Param("communityId") Integer communityId,
+        @Param("currentUserId") Integer currentUserId,
+        Pageable pageable
+    );
+
+    // âœ¨ IMPROVED: Corrected join to use `TopicTag` and used a scalar subquery for vote status.
+    @Query(value = """
+        SELECT NEW com.tuniv.backend.qa.dto.TopicSummaryDto(
+            t.id, t.title, t.topicType, t.author.userId, t.author.username, t.createdAt, t.score,
+            t.replyCount,
+            (SELECT v.value FROM Vote v WHERE v.post.id = t.id AND v.user.userId = :currentUserId),
+            t.isSolved,
+            COALESCE(m.moduleId, c.communityId),
+            COALESCE(m.name, c.name)
+        )
+        FROM Topic t
+        JOIN TopicTag tt ON t.id = tt.topic.id
+        JOIN tt.tag tag ON tag.id = tt.tag.id
+        LEFT JOIN t.module m
+        LEFT JOIN t.community c
+        WHERE tag.name = :tagName
+        ORDER BY t.score DESC, t.createdAt DESC
+    """, countQuery = "SELECT COUNT(t) FROM Topic t JOIN TopicTag tt ON t.id = tt.topic.id JOIN tt.tag tag ON tag.id = tt.tag.id WHERE tag.name = :tagName")
+    Page<TopicSummaryDto> findTopicSummariesByTag(
+        @Param("tagName") String tagName,
+        @Param("currentUserId") Integer currentUserId,
+        Pageable pageable
+    );
+
+    // All remaining DTO queries are also improved with the scalar subquery for vote status for consistency and performance.
+    
+    @Query(value = """
+        SELECT NEW com.tuniv.backend.qa.dto.TopicSummaryDto(
+            t.id, t.title, t.topicType, t.author.userId, t.author.username, t.createdAt, t.score,
+            t.replyCount,
+            (SELECT v.value FROM Vote v WHERE v.post.id = t.id AND v.user.userId = :currentUserId),
+            t.isSolved,
+            COALESCE(m.moduleId, c.communityId),
+            COALESCE(m.name, c.name)
+        )
+        FROM Topic t
+        LEFT JOIN t.module m
+        LEFT JOIN t.community c
+        ORDER BY t.score DESC, t.createdAt DESC
+    """, countQuery = "SELECT COUNT(t) FROM Topic t")
+    Page<TopicSummaryDto> findPopularTopicSummaries(
+        @Param("currentUserId") Integer currentUserId,
+        Pageable pageable
+    );
+
+    @Query(value = """
+        SELECT NEW com.tuniv.backend.qa.dto.TopicSummaryDto(
+            t.id, t.title, t.topicType, t.author.userId, t.author.username, t.createdAt, t.score,
+            t.replyCount,
+            (SELECT v.value FROM Vote v WHERE v.post.id = t.id AND v.user.userId = :currentUserId),
+            t.isSolved,
+            m.moduleId, m.name
+        )
+        FROM Topic t
+        JOIN t.module m
+        WHERE m.moduleId IN :moduleIds
+        ORDER BY t.createdAt DESC
+    """, countQuery = "SELECT COUNT(t) FROM Topic t WHERE t.module.moduleId IN :moduleIds")
+    Page<TopicSummaryDto> findTopicSummariesByModuleIdIn(
+        @Param("moduleIds") List<Integer> moduleIds,
+        @Param("currentUserId") Integer currentUserId,
+        Pageable pageable
+    );
+
+    @Query(value = """
+        SELECT NEW com.tuniv.backend.qa.dto.TopicSummaryDto(
+            t.id, t.title, t.topicType, t.author.userId, t.author.username, t.createdAt, t.score,
+            t.replyCount,
+            (SELECT v.value FROM Vote v WHERE v.post.id = t.id AND v.user.userId = :currentUserId),
+            t.isSolved,
+            COALESCE(m.moduleId, c.communityId),
+            COALESCE(m.name, c.name)
+        )
+        FROM Topic t
+        LEFT JOIN t.module m
+        LEFT JOIN t.community c
+        WHERE t.author.userId = :userId AND t.isSolved = true
+        ORDER BY t.createdAt DESC
+    """, countQuery = "SELECT COUNT(t) FROM Topic t WHERE t.author.userId = :userId AND t.isSolved = true")
+    Page<TopicSummaryDto> findSolvedTopicsByUser(
+        @Param("userId") Integer userId,
+        @Param("currentUserId") Integer currentUserId,
+        Pageable pageable
+    );
+
+    @Query(value = """
+        SELECT NEW com.tuniv.backend.qa.dto.TopicSummaryDto(
+            t.id, t.title, t.topicType, t.author.userId, t.author.username, t.createdAt, t.score,
+            t.replyCount,
+            (SELECT v.value FROM Vote v WHERE v.post.id = t.id AND v.user.userId = :currentUserId),
+            t.isSolved,
+            COALESCE(m.moduleId, c.communityId),
+            COALESCE(m.name, c.name)
+        )
+        FROM Topic t
+        LEFT JOIN t.module m
+        LEFT JOIN t.community c
+        WHERE t.acceptedSolution.author.userId = :userId
+        ORDER BY t.createdAt DESC
+    """, countQuery = "SELECT COUNT(t) FROM Topic t WHERE t.acceptedSolution.author.userId = :userId")
+    Page<TopicSummaryDto> findTopicsWithUserSolutions(
+        @Param("userId") Integer userId,
+        @Param("currentUserId") Integer currentUserId,
+        Pageable pageable
+    );
+
+    // âœ… Excellent, efficient query for stats. No changes needed.
+    @Query("SELECT COUNT(t) FROM Topic t WHERE t.community = :community AND t.createdAt >= :sinceDate")
+    Long countByCommunityAndCreatedAfter(@Param("community") Community community, @Param("sinceDate") Instant sinceDate);
+
+    // âœ… Perfect methods for atomically updating denormalized counters. No changes needed.
+    @Modifying
+    @Query("UPDATE Topic t SET t.replyCount = t.replyCount + 1, t.lastActivityAt = CURRENT_TIMESTAMP WHERE t.id = :topicId")
+    void incrementReplyCount(@Param("topicId") Integer topicId);
+
+    @Modifying
+    @Query("UPDATE Topic t SET t.replyCount = t.replyCount - 1 WHERE t.id = :topicId AND t.replyCount > 0")
+    void decrementReplyCount(@Param("topicId") Integer topicId);
+    
+    // âœ… These are great, efficient pagination methods. No changes needed.
+    @EntityGraph(attributePaths = {"author"})
+    Page<Topic> findByCommunityCommunityId(Integer communityId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<Topic> findByModuleModuleId(Integer moduleId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<Topic> findAllByOrderByCreatedAtDesc(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"author"})
+    Page<Topic> findAllByOrderByScoreDesc(Pageable pageable);
+
+    // This method is functionally identical to the built-in `findAllById`. Keeping for compatibility.
+    @Query("SELECT t FROM Topic t WHERE t.id IN :topicIds")
+    List<Topic> findByIds(@Param("topicIds") List<Integer> topicIds);
+    
+    // This is the preferred, standard Spring Data JPA method for this operation.
+    @EntityGraph(attributePaths = {"author"})
+    List<Topic> findByIdIn(List<Integer> topicIds);
+
+    // âœ… Good, specific count queries. No changes needed.
+    @Query("SELECT COUNT(t) FROM Topic t WHERE t.community.communityId = :communityId AND t.isSolved = true")
+    long countSolvedTopicsByCommunityId(@Param("communityId") Integer communityId);
+
+    @Query("SELECT COUNT(t) FROM Topic t WHERE t.module.moduleId = :moduleId AND t.isSolved = true")
+    long countSolvedTopicsByModuleId(@Param("moduleId") Integer moduleId);
+    
+    // âœ… The name is slightly confusing, but it's a valid paginated query with an entity graph. No changes needed.
+    @EntityGraph(attributePaths = {"author", "community", "module"})
+    Page<Topic> findByOrderByCreatedAtDesc(Pageable pageable);
+
+    /**
+     * âš ï¸ PERFORMANCE WARNING: A `LIKE '%query%'` search cannot use a standard database index effectively
+     * and will be slow on large tables. Consider a database-level full-text search index for better performance.
+     */
+    @Query("SELECT t FROM Topic t WHERE LOWER(t.title) LIKE LOWER(CONCAT('%', :query, '%'))")
+    Page<Topic> findByTitleContainingIgnoreCase(@Param("query") String query, Pageable pageable);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\repository\VoteRepository.java
+package com.tuniv.backend.qa.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.qa.dto.VoteInfo;
+import com.tuniv.backend.qa.model.Vote;
+
+
+@Repository
+public interface VoteRepository extends JpaRepository<Vote, Integer> {
+
+    /**
+     * Finds the active vote for a given user on a specific post.
+     * This is the primary method to check if a user has already voted.
+     */
+    Optional<Vote> findByUser_UserIdAndPost_Id(Integer userId, Integer postId);
+
+    /**
+     * Finds a user's entire voting history.
+     */
+    List<Vote> findByUser_UserIdOrderByCreatedAtDesc(Integer userId);
+
+    /**
+     * An efficient DTO projection to get a user's vote status for a list of posts
+     * in a single query. Perfect for hydrating a feed of topics or replies.
+     */
+    @Query("""
+        SELECT new com.tuniv.backend.qa.dto.VoteInfo(v.post.id, v.value)
+        FROM Vote v
+        WHERE v.user.userId = :userId AND v.post.id IN :postIds
+    """)
+    List<VoteInfo> findAllVotesForUserByPostIds(
+        @Param("userId") Integer userId,
+        @Param("postIds") List<Integer> postIds
+    );
+    
+    /**
+     * âœ… ADDED: A native query to find a vote regardless of its retraction status.
+     * This is CRITICAL for the service logic when a user changes their vote (e.g., from upvote to downvote).
+     * The service needs this to find the old vote record to update it, as the default finders
+     * would ignore it due to the @Where(clause = "is_retracted = false") filter.
+     */
+    @Query(value = "SELECT * FROM votes v WHERE v.user_id = :userId AND v.post_id = :postId LIMIT 1", nativeQuery = true)
+    Optional<Vote> findVoteEvenIfRetracted(@Param("userId") Integer userId, @Param("postId") Integer postId);
+
+    /**
+     * âœ… ADDED: Counts the number of votes for a post with a specific value.
+     * Useful for analytics or for data integrity checks against denormalized counters.
+     *
+     * @param postId The ID of the post.
+     * @param value  The vote value (+1 for upvote, -1 for downvote).
+     * @return The total count of votes.
+     */
+    long countByPost_IdAndValue(Integer postId, short value);
+
+    /**
+     * âœ… ADDED: Gets a paginated list of users who voted on a post.
+     * Can be used to show "Users who upvoted this".
+     *
+     * @param postId The ID of the post.
+     * @param value The vote value to filter by.
+     * @param pageable Pagination information.
+     * @return A paginated list of votes.
+     */
+    Page<Vote> findByPost_IdAndValue(Integer postId, short value, Pageable pageable);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\repository\ModuleRepository.java
+package com.tuniv.backend.university.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.university.model.Module;
+
+@Repository
+public interface ModuleRepository extends JpaRepository<Module, Integer> {
+    
+    /**
+     * Finds all modules for a given university, without pagination.
+     */
+    List<Module> findByUniversity_UniversityId(Integer universityId);
+    
+    /**
+     * Finds a paginated list of modules for a given university.
+     */
+    Page<Module> findByUniversity_UniversityId(Integer universityId, Pageable pageable);
+
+    /**
+     * Finds a specific module within a university by its code (case-insensitive).
+     * Useful for direct lookups, e.g., /universities/1/modules/CS101.
+     */
+    Optional<Module> findByUniversity_UniversityIdAndCodeIgnoreCase(Integer universityId, String code);
+
+    /**
+     * âœ… ADDED: Provides search functionality for modules within a specific university.
+     * Ideal for a search bar on a university's module list page.
+     */
+    Page<Module> findByUniversity_UniversityIdAndNameContainingIgnoreCase(Integer universityId, String name, Pageable pageable);
+
+    /**
+     * âœ… ADDED: Finds the most popular modules in a university based on topic count.
+     *
+     * @param universityId The ID of the university.
+     * @param pageable Defines how many modules to fetch (e.g., PageRequest.of(0, 5) for the top 5).
+     * @return A list of the most active modules.
+     */
+    List<Module> findByUniversity_UniversityIdOrderByTopicCountDesc(Integer universityId, Pageable pageable);
+
+    /**
+     * Atomically increments the topic count for a module.
+     * This is crucial for keeping your denormalized statistics accurate.
+     */
+    @Modifying
+    @Query("UPDATE Module m SET m.topicCount = m.topicCount + 1 WHERE m.moduleId = :moduleId")
+    void incrementTopicCount(@Param("moduleId") Integer moduleId);
+
+    /**
+     * âœ… ADDED: Atomically decrements the topic count for a module.
+     * This should be called whenever a topic is deleted from a module.
+     */
+    @Modifying
+    @Query("UPDATE Module m SET m.topicCount = m.topicCount - 1 WHERE m.moduleId = :moduleId AND m.topicCount > 0")
+    void decrementTopicCount(@Param("moduleId") Integer moduleId);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\repository\UniversityMembershipRepository.java
+package com.tuniv.backend.university.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.university.model.UniversityMembership;
+import com.tuniv.backend.university.model.VerificationStatus;
+
+@Repository
+public interface UniversityMembershipRepository 
+    extends JpaRepository<UniversityMembership, UniversityMembership.UniversityMembershipId> {
+
+    /**
+     * Finds a membership by its composite key parts.
+     */
+    Optional<UniversityMembership> findById_UserIdAndId_UniversityId(Integer userId, Integer universityId);
+
+    /**
+     * Finds all university memberships for a specific user.
+     */
+    @EntityGraph(attributePaths = {"university"})
+    List<UniversityMembership> findById_UserId(Integer userId);
+    
+    /**
+     * Finds the primary university membership for a user.
+     */
+    @EntityGraph(attributePaths = {"university"})
+    Optional<UniversityMembership> findById_UserIdAndIsPrimaryTrue(Integer userId);
+
+    /**
+     * Checks for existence using the composite key parts.
+     */
+    boolean existsById_UserIdAndId_UniversityId(Integer userId, Integer universityId);
+
+    /**
+     * Finds a membership using the verification token, for email confirmation.
+     */
+    Optional<UniversityMembership> findByVerificationToken(String token);
+
+    /**
+     * Finds all memberships for a university with a specific status.
+     * Useful for admin tasks like approving pending members.
+     */
+    List<UniversityMembership> findById_UniversityIdAndStatus(Integer universityId, VerificationStatus status);
+
+    /**
+     * âœ… ADDED: A paginated version for admin UIs that may handle many users.
+     */
+    @EntityGraph(attributePaths = {"user"})
+    Page<UniversityMembership> findById_UniversityIdAndStatus(Integer universityId, VerificationStatus status, Pageable pageable);
+
+    /**
+     * âœ… ADDED: An efficient way to count members without fetching the full list.
+     */
+    long countById_UniversityIdAndStatus(Integer universityId, VerificationStatus status);
+    
+    /**
+     * âœ… ADDED: Atomically increments the topic count for a specific membership.
+     * This is crucial for maintaining the denormalized user statistics.
+     */
+    @Modifying
+    @Query("UPDATE UniversityMembership um SET um.topicCount = um.topicCount + 1 WHERE um.id.userId = :userId AND um.id.universityId = :universityId")
+    void incrementTopicCount(@Param("userId") Integer userId, @Param("universityId") Integer universityId);
+    
+    /**
+     * âœ… ADDED: Atomically increments the reply count for a specific membership.
+     */
+    @Modifying
+    @Query("UPDATE UniversityMembership um SET um.replyCount = um.replyCount + 1 WHERE um.id.userId = :userId AND um.id.universityId = :universityId")
+    void incrementReplyCount(@Param("userId") Integer userId, @Param("universityId") Integer universityId);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\repository\UniversityRepository.java
+package com.tuniv.backend.university.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.dto.CommunityDto;
+
+@Repository
+public interface UniversityRepository extends JpaRepository<University, Integer>, JpaSpecificationExecutor<University> {
+
+    /**
+     * Finds the top universities based on the denormalized member count.
+     */
+    @Query("SELECT u FROM University u ORDER BY u.memberCount DESC")
+    List<University> findTopByOrderByMemberCountDesc(Pageable pageable);
+
+    /**
+     * Finds all universities a specific user is a member of.
+     */
+    @Query("SELECT u FROM University u JOIN UniversityMembership um ON u.universityId = um.id.universityId WHERE um.id.userId = :userId")
+    List<University> findUniversitiesByUserId(@Param("userId") Integer userId);
+
+    /**
+     * Finds a university by its unique email domain.
+     */
+    Optional<University> findByEmailDomain(String emailDomain);
+    
+    /**
+     * Finds a university by its unique name (case-insensitive).
+     */
+    Optional<University> findByNameIgnoreCase(String name);
+
+    /**
+     * âœ… ADDED: Provides a paginated search for universities by name.
+     * Ideal for a public-facing university search page.
+     */
+    Page<University> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    /**
+     * âœ… ADDED: Finds the most active universities based on topic count.
+     */
+    @Query("SELECT u FROM University u ORDER BY u.topicCount DESC")
+    List<University> findTopByOrderByTopicCountDesc(Pageable pageable);
+
+    /**
+     * Atomically increments the member count for a university.
+     */
+    @Modifying
+    @Query("UPDATE University u SET u.memberCount = u.memberCount + 1 WHERE u.universityId = :universityId")
+    void incrementMemberCount(@Param("universityId") Integer universityId);
+    
+    /**
+     * âœ… ADDED: Atomically decrements the member count.
+     * Should be called when a user's membership is removed.
+     */
+    @Modifying
+    @Query("UPDATE University u SET u.memberCount = u.memberCount - 1 WHERE u.universityId = :universityId AND u.memberCount > 0")
+    void decrementMemberCount(@Param("universityId") Integer universityId);
+
+    /**
+     * Atomically increments the topic count for a university.
+     */
+    @Modifying
+    @Query("UPDATE University u SET u.topicCount = u.topicCount + 1 WHERE u.universityId = :universityId")
+    void incrementTopicCount(@Param("universityId") Integer universityId);
+
+    /**
+     * âœ… ADDED: Atomically decrements the topic count.
+     * Should be called when a topic within the university is deleted.
+     */
+    @Modifying
+    @Query("UPDATE University u SET u.topicCount = u.topicCount - 1 WHERE u.universityId = :universityId AND u.topicCount > 0")
+    void decrementTopicCount(@Param("universityId") Integer universityId);
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\repository\UserRepository.java
+package com.tuniv.backend.user.repository;
+
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import com.tuniv.backend.user.model.User;
+
+@Repository
+public interface UserRepository extends JpaRepository<User, Integer> {
+
+    // âœ… Basic lookups (case-sensitive)
+    Optional<User> findByUsername(String username);
+    Optional<User> findByEmail(String email);
+
+    // âœ… ADDED: Case-insensitive lookups for better user experience
+    Optional<User> findByUsernameIgnoreCase(String username);
+    Optional<User> findByEmailIgnoreCase(String email);
+
+    // âœ… Basic existence checks
+    Boolean existsByUsername(String username);
+    Boolean existsByEmail(String email);
+
+    // âœ… Token-based lookups for auth flows
+    Optional<User> findByResetPasswordToken(String token);
+    Optional<User> findByVerificationToken(String token);
+    
+    // âœ… ADDED: Paginated search for finding users
+    Page<User> findByUsernameContainingIgnoreCase(String username, Pageable pageable);
+
+    // âœ… Query to find all members of a university
+    @Query("SELECT m.user FROM UniversityMembership m WHERE m.university.universityId = :universityId AND m.user.userId != :excludeUserId")
+    List<User> findAllMembersOfUniversityExcludingUser(
+        @Param("universityId") Integer universityId, 
+        @Param("excludeUserId") Integer excludeUserId
+    );
+
+    // âœ… Leaderboard query
+    List<User> findTop5ByOrderByReputationScoreDesc();
+
+    /**
+     * âœ… ADDED: Administrative tool to find a user even if they are soft-deleted.
+     * This bypasses the global @Where(clause="is_deleted=false") filter.
+     */
+    @Query(value = "SELECT * FROM users u WHERE u.user_id = :userId", nativeQuery = true)
+    Optional<User> findByIdEvenIfDeleted(@Param("userId") Integer userId);
+
+    // === Denormalized Counter Management ===
+    // These methods are ESSENTIAL for keeping the User entity's stats in sync.
+
+    @Modifying
+    @Query("UPDATE User u SET u.reputationScore = u.reputationScore + :amount WHERE u.userId = :userId")
+    void updateReputation(@Param("userId") Integer userId, @Param("amount") int amount);
+    
+    @Modifying
+    @Query("UPDATE User u SET u.topicCount = u.topicCount + 1 WHERE u.userId = :userId")
+    void incrementTopicCount(@Param("userId") Integer userId);
+
+    @Modifying
+    @Query("UPDATE User u SET u.topicCount = u.topicCount - 1 WHERE u.userId = :userId AND u.topicCount > 0")
+    void decrementTopicCount(@Param("userId") Integer userId);
+
+    @Modifying
+    @Query("UPDATE User u SET u.replyCount = u.replyCount + 1 WHERE u.userId = :userId")
+    void incrementReplyCount(@Param("userId") Integer userId);
+
+    @Modifying
+    @Query("UPDATE User u SET u.replyCount = u.replyCount - 1 WHERE u.userId = :userId AND u.replyCount > 0")
+    void decrementReplyCount(@Param("userId") Integer userId);
+
+    @Modifying
+    @Query("UPDATE User u SET u.solutionsCount = u.solutionsCount + 1 WHERE u.userId = :userId")
+    void incrementSolutionsCount(@Param("userId") Integer userId);
+    
+    @Modifying
+    @Query("UPDATE User u SET u.followerCount = u.followerCount + 1 WHERE u.userId = :userId")
+    void incrementFollowerCount(@Param("userId") Integer userId);
+
+    @Modifying
+    @Query("UPDATE User u SET u.followerCount = u.followerCount - 1 WHERE u.userId = :userId AND u.followerCount > 0")
+    void decrementFollowerCount(@Param("userId") Integer userId);
+}
+
+
+

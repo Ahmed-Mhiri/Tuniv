@@ -1,0 +1,1664 @@
+﻿//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\auth\dto\ForgotPasswordRequest.java
+package com.tuniv.backend.auth.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+public record ForgotPasswordRequest(
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email should be valid")
+    String email
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\auth\dto\JwtResponse.java
+package com.tuniv.backend.auth.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class JwtResponse {
+
+    // --- Core Identity & Token ---
+    private String token;
+    private Integer id;
+    private String username;
+    private String email;
+
+    // --- Profile Information ---
+    private String profilePhotoUrl;
+    private String bio;
+    private String major;
+    private int reputationScore;
+    private VerificationInfo verificationInfo; // âœ… NESTED DTO for university status
+
+    // --- Activity Statistics (from User entity) ---
+    private int topicsCount;
+    private int repliesCount;
+    private int followersCount;
+    private int followingCount;
+
+    // --- UI State Counts (placeholders, to be implemented in respective services) ---
+    private long unreadNotificationsCount;
+    private long unreadMessagesCount;
+
+    // --- Security ---
+    private boolean is2faRequired; // Indicates if the user needs to enter a 2FA code now
+    private boolean is2faEnabled;  // Indicates if 2FA is set up on the account
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\auth\dto\LoginRequest.java
+package com.tuniv.backend.auth.dto;
+
+import jakarta.validation.constraints.NotBlank;
+public record LoginRequest(
+    @NotBlank(message = "Username is required")
+    String username,
+
+    @NotBlank(message = "Password is required")
+    String password,
+
+    String code // Optional: For 2FA verification
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\auth\dto\RegisterRequest.java
+package com.tuniv.backend.auth.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+// Using a Java Record for a concise, immutable DTO
+public record RegisterRequest(
+    @NotBlank(message = "Username is required")
+    @Size(min = 3, max = 20, message = "Username must be between 3 and 20 characters")
+    String username,
+
+    @NotBlank(message = "Email is required")
+    @Email(message = "Email should be valid")
+    String email,
+
+    @NotBlank(message = "Password is required")
+    @Size(min = 6, max = 40, message = "Password must be between 6 and 40 characters")
+    String password
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\auth\dto\ResetPasswordRequest.java
+package com.tuniv.backend.auth.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record ResetPasswordRequest(
+    @NotBlank(message = "Token is required")
+    String token,
+
+    @NotBlank(message = "Password is required")
+    @Size(min = 6, max = 40, message = "Password must be between 6 and 40 characters")
+    String newPassword
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\auth\dto\VerificationInfo.java
+package com.tuniv.backend.auth.dto;
+
+import com.tuniv.backend.university.model.UniversityRole;
+
+import com.tuniv.backend.university.model.VerificationStatus;
+
+public record VerificationInfo(
+    String universityName,
+    VerificationStatus status,
+    UniversityRole role
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\ChatMessageDto.java
+package com.tuniv.backend.chat.dto;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.tuniv.backend.chat.model.MessageStatus;
+import com.tuniv.backend.chat.model.MessageType; // IMPORT ADDED
+import com.tuniv.backend.qa.dto.AttachmentDto;
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.Instant;
+import java.util.List;
+
+@Getter
+@Setter
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public class ChatMessageDto {
+
+    private Long messageId;
+    private Long clientTempId;
+    private MessageType type; // ADDED: To distinguish USER from SYSTEM messages
+
+    private UserSummaryDto sender; // For USER messages; can be null for SYSTEM messages
+    private String content;
+    private Instant sentAt;
+    private MessageStatus status;
+    private boolean isDeleted;
+
+    private boolean isEdited;
+    private Instant editedAt;
+    private List<ReadReceiptDto> readBy;
+
+    private ReplyInfoDto replyTo;
+    private List<AttachmentDto> attachments;
+    private List<ReactionDto> reactions;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\ConversationSummaryDto.java
+package com.tuniv.backend.chat.dto;
+
+import com.tuniv.backend.chat.model.ConversationType;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.time.Instant;
+import java.util.List;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class ConversationSummaryDto {
+
+    private Long conversationId;
+    private ConversationType type;
+    private String name;
+    private String imageUrl;
+    private List<ParticipantDto> participants;
+
+    private String lastMessageContent;
+    private Instant lastMessageTimestamp;
+    private String lastMessageSenderUsername;
+
+    private int unreadCount;
+    
+    // --- ENHANCEMENTS ---
+    private boolean isMuted; // ADDED: To show a mute icon in the conversation list
+    private PinnedMessageDto pinnedMessage; // ADDED: To display the current pinned message
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\CreateGroupRequest.java
+package com.tuniv.backend.chat.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.List;
+
+@Getter
+@Setter
+public class CreateGroupRequest {
+    @NotBlank
+    @Size(min = 3, max = 50)
+    private String name;
+
+    @NotEmpty
+    @Size(min = 1) // Must invite at least one other person
+    private List<Long> participantUserIds;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\EditMessageRequest.java
+package com.tuniv.backend.chat.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class EditMessageRequest {
+    @NotBlank
+    @Size(max = 2000)
+    private String newContent;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\ParticipantDto.java
+package com.tuniv.backend.chat.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class ParticipantDto {
+    private Long userId;
+    private String username;
+    private String profilePhotoUrl;
+    // A field like 'boolean isOnline' could be added later for presence indication
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\PinnedMessageDto.java
+package com.tuniv.backend.chat.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class PinnedMessageDto {
+    private Long messageId;
+    private String contentSnippet;
+    private String senderUsername;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\ReactionDto.java
+package com.tuniv.backend.chat.dto;
+
+import java.util.List;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+
+@Data
+@AllArgsConstructor
+public class ReactionDto {
+    private String emoji;
+    private long count;
+    private List<String> users; // List of usernames who used this emoji
+    private boolean reactedByCurrentUser; // To help the frontend toggle state
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\ReactionRequestDto.java
+package com.tuniv.backend.chat.dto;
+
+import lombok.Data;
+
+@Data
+public class ReactionRequestDto {
+    private String emoji;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\ReadReceiptDto.java
+package com.tuniv.backend.chat.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+import java.time.Instant;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class ReadReceiptDto {
+    private Long userId;
+    private String username;
+    private Instant readAt;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\ReplyInfoDto.java
+package com.tuniv.backend.chat.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class ReplyInfoDto {
+    private Long messageId; // The ID of the message being replied to
+    private String content; // A snippet of the original message content
+    private String senderUsername; // The author of the original message
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\SendMessageRequest.java
+package com.tuniv.backend.chat.dto;
+
+import java.util.List;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class SendMessageRequest {
+
+    @NotNull
+    private Long conversationId;
+
+    @NotBlank
+    @Size(max = 2000)
+    private String content;
+
+    // Optional fields
+    private Long parentMessageId; // The ID of the message this one is replying to
+    private Long clientTempId;    // A temporary ID generated by the client
+    private List<Long> attachmentIds; // List of pre-uploaded attachment IDs
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\StartConversationRequestDto.java
+package com.tuniv.backend.chat.dto;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class StartConversationRequestDto {
+    @NotNull
+    private Integer participantId;
+    // âœ… ADD THIS SETTER FOR DEBUGGING
+    public void setParticipantId(Integer participantId) {
+        System.out.println("--- DEBUG: Setting participantId to: " + participantId + " ---");
+        this.participantId = participantId;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\TypingIndicatorDto.java
+package com.tuniv.backend.chat.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+@AllArgsConstructor
+public class TypingIndicatorDto {
+    private Long conversationId;
+    private String username;
+    private boolean isTyping;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\UpdateConversationSettingsRequest.java
+package com.tuniv.backend.chat.dto;
+
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class UpdateConversationSettingsRequest {
+    
+    /** Set to true to mute notifications, false to unmute. */
+    private Boolean isMuted;
+
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\UpdateGroupInfoRequest.java
+package com.tuniv.backend.chat.dto;
+
+import jakarta.validation.constraints.Size;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class UpdateGroupInfoRequest {
+
+    @Size(min = 3, max = 50)
+    private String name;
+
+    @Size(max = 2048)
+    private String imageUrl;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\UpdateParticipantsRequest.java
+package com.tuniv.backend.chat.dto;
+
+import lombok.Getter;
+import lombok.Setter;
+
+import java.util.List;
+
+@Getter
+@Setter
+public class UpdateParticipantsRequest {
+
+    private List<Long> userIdsToAdd;
+    private List<Long> userIdsToRemove;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\dto\UpdateReactionRequest.java
+package com.tuniv.backend.chat.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
+
+@Getter
+@Setter
+public class UpdateReactionRequest {
+    @NotBlank
+    // Example: "ðŸ‘", "â¤ï¸", etc.
+    private String emoji; 
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\BanMemberRequest.java
+package com.tuniv.backend.community.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+public record BanMemberRequest(
+    @NotBlank @Size(max = 500)
+    String reason,
+    
+    // Optional: for temporary bans. If null, the ban is permanent.
+    Long durationInHours 
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\BannedMemberDto.java
+package com.tuniv.backend.community.dto;
+
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import java.time.Instant;
+
+public record BannedMemberDto(
+    UserSummaryDto user,
+    String banReason,
+    Instant bannedAt,
+    UserSummaryDto bannedBy
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityBasicDto.java
+package com.tuniv.backend.community.dto;
+
+public record CommunityBasicDto(
+    Integer communityId,
+    String name,
+    String universityName
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityCreateRequest.java
+package com.tuniv.backend.community.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record CommunityCreateRequest(
+    @NotBlank @Size(min = 3, max = 100)
+    String name,
+
+    @Size(max = 2000)
+    String description,
+
+    Integer universityId, // Optional: for university-specific communities
+
+    @NotNull
+    CommunitySettingsDto settings
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityDetailDto.java
+package com.tuniv.backend.community.dto;
+
+import java.time.Instant;
+
+import com.tuniv.backend.user.dto.UserSummaryDto;
+
+public record CommunityDetailDto(
+    Integer communityId,
+    String name,
+    String description,
+    String bannerUrl, // ADDED
+    String iconUrl,   // ADDED
+    Integer memberCount,
+    Integer followerCount, // ADDED
+    Integer topicCount,
+    Instant createdAt,
+    UserSummaryDto creator,
+    String universityName,
+    boolean isVerified, // ADDED
+    CommunitySettingsDto settings, // ADDED: All policies in one object
+    CommunityMembershipStatusDto membership // ADDED: Detailed status for the current user
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityInsightsDto.java
+package com.tuniv.backend.community.dto;
+
+import java.util.List;
+import java.util.Map;
+
+public record CommunityInsightsDto(
+    // Growth Metrics
+    int totalMembers,
+    double weeklyGrowthRate,
+    Map<String, Long> newMembersByDay, // Key: "YYYY-MM-DD", Value: count
+
+    // Activity Metrics
+    int dailyActiveMembers,
+    int topicsThisWeek,
+    int repliesThisWeek,
+
+    // Top Content & Contributors
+    List<CommunityMemberDto> topContributors
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityJoinRequestDto.java
+package com.tuniv.backend.community.dto;
+
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import java.time.Instant;
+
+public record CommunityJoinRequestDto(
+    Integer requestId,
+    UserSummaryDto user,
+    Instant requestedAt,
+    // Optional: A message from the user explaining why they want to join
+    String message
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityMemberDto.java
+package com.tuniv.backend.community.dto;
+
+import com.tuniv.backend.community.model.CommunityRole;
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import java.time.Instant;
+
+public record CommunityMemberDto(
+    UserSummaryDto user,
+    CommunityRole role,
+    Instant joinedAt,
+    Integer contributionScore
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityMembershipStatusDto.java
+package com.tuniv.backend.community.dto;
+
+import com.tuniv.backend.community.model.CommunityRole;
+import java.time.Instant;
+
+public record CommunityMembershipStatusDto(
+    boolean isMember,
+    CommunityRole role,
+    boolean isBanned,
+    Instant muteUntil,
+    boolean notificationsEnabled
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityRuleDto.java
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityRuleRequest.java
+package com.tuniv.backend.community.dto;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record CommunityRuleRequest(
+    @NotNull
+    int displayOrder,
+
+    @NotBlank @Size(max = 100)
+    String title,
+
+    @NotBlank @Size(max = 1000)
+    String description
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunitySettingsDto.java
+package com.tuniv.backend.community.dto;
+
+import com.tuniv.backend.community.model.CommunityJoinPolicy;
+import com.tuniv.backend.community.model.CommunityPostingPolicy;
+import com.tuniv.backend.community.model.CommunityVisibility;
+
+public record CommunitySettingsDto(
+    CommunityJoinPolicy joinPolicy,
+    CommunityPostingPolicy postingPolicy,
+    CommunityVisibility visibility,
+    boolean allowExternalMembers
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityStatsDto.java
+package com.tuniv.backend.community.dto;
+
+import java.util.Map;
+
+import com.tuniv.backend.qa.model.TopicType;
+
+public record CommunityStatsDto(
+    Integer communityId,
+    String communityName,
+    Integer totalTopics,
+    Integer totalMembers,
+    Integer solvedTopics,
+    Map<TopicType, Long> topicTypeDistribution,
+    Double solutionRate,
+    Double questionPercentage,
+    Double postPercentage
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunitySummaryDto.java
+package com.tuniv.backend.community.dto;
+
+public record CommunitySummaryDto(
+    Integer communityId,
+    String name,
+    String iconUrl, // ADDED
+    Integer memberCount,
+    Integer topicCount,
+    String universityName
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityTopicStatsDto.java
+package com.tuniv.backend.community.dto;
+
+public record CommunityTopicStatsDto(
+    Integer communityId,
+    String communityName,
+    Long totalTopics,
+    Long solvedTopics,
+    Long questionTopics,
+    Long postTopics
+) {
+    public Double getSolutionRate() {
+        if (totalTopics == 0) return 0.0;
+        return (solvedTopics.doubleValue() / totalTopics.doubleValue()) * 100;
+    }
+
+    public Double getQuestionPercentage() {
+        if (totalTopics == 0) return 0.0;
+        return (questionTopics.doubleValue() / totalTopics.doubleValue()) * 100;
+    }
+
+    public Double getPostPercentage() {
+        if (totalTopics == 0) return 0.0;
+        return (postTopics.doubleValue() / totalTopics.doubleValue()) * 100;
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityUpdateInfoRequest.java
+package com.tuniv.backend.community.dto;
+
+import jakarta.validation.constraints.Size;
+
+public record CommunityUpdateInfoRequest(
+    @Size(min = 3, max = 100) String name,
+    @Size(max = 2000) String description,
+    String bannerUrl,
+    String iconUrl
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityUpdateRequest.java
+package com.tuniv.backend.community.dto;
+
+public record CommunityUpdateRequest(
+    String name,
+    String description
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityUpdateSettingsRequest.java
+package com.tuniv.backend.community.dto;
+
+import jakarta.validation.constraints.NotNull;
+
+public record CommunityUpdateSettingsRequest(
+    @NotNull
+    CommunitySettingsDto settings
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\CommunityWithStatsDto.java
+package com.tuniv.backend.community.dto;
+
+public record CommunityWithStatsDto(
+    CommunityDetailDto community,
+    CommunityStatsDto stats
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\HandleJoinRequest.java
+package com.tuniv.backend.community.dto;
+
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record HandleJoinRequest(
+    @NotNull
+    boolean approve,
+
+    // Optional: Required if approve is false
+    @Size(max = 500)
+    String rejectionReason
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\TrendingCommunityDto.java
+package com.tuniv.backend.community.dto;
+
+public record TrendingCommunityDto(
+    Integer communityId,
+    String name,
+    Integer memberCount,
+    Integer topicCount,
+    String universityName,
+    Long recentActivityCount,
+    Double activityScore
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\dto\UpdateMemberRoleRequest.java
+package com.tuniv.backend.community.dto;
+
+import com.tuniv.backend.community.model.CommunityRole;
+import jakarta.validation.constraints.NotNull;
+
+public record UpdateMemberRoleRequest(
+    @NotNull
+    CommunityRole newRole
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\BulkFollowRequest.java
+package com.tuniv.backend.follow.dto;
+
+import jakarta.validation.constraints.NotEmpty;
+import java.util.List;
+
+public record BulkFollowRequest(
+    // A list of the followable_id for each entity to follow/unfollow.
+    @NotEmpty
+    List<Integer> followableIds
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowableDto.java
+package com.tuniv.backend.follow.dto;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.tuniv.backend.follow.model.FollowableType;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record FollowableDto(
+    // The actual ID of the entity (e.g., userId, communityId)
+    Integer entityId,
+    
+    FollowableType type,
+    String name,
+    String imageUrl,
+    
+    // A brief, contextual detail (e.g., user's reputation or community's member count)
+    String detail, 
+    
+    // Indicates if the currently authenticated user is following this entity
+    boolean isFollowedByCurrentUser 
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowableListResponse.java
+package com.tuniv.backend.follow.dto;
+
+import java.util.List;
+
+public record FollowableListResponse(
+    // The list of items for the current page
+    List<FollowableDto> content,
+
+    // Pagination metadata
+    int pageNumber,
+    int pageSize,
+    long totalElements,
+    int totalPages
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowerAnalyticsDto.java
+package com.tuniv.backend.follow.dto;
+
+import java.util.Map;
+
+public record FollowerAnalyticsDto(
+    int totalFollowers,
+    int newFollowersThisWeek,
+    int mutualFollowersCount,
+
+    // Provides a breakdown of followers by a certain category, e.g., by university.
+    // Key: "University of Bochum", Value: 150
+    Map<String, Long> followerBreakdown
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowerInfoDto.java
+package com.tuniv.backend.follow.dto;
+
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import java.time.Instant;
+
+public record FollowerInfoDto(
+    UserSummaryDto user,
+    Instant followedAt
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowFeedItemDto.java
+package com.tuniv.backend.follow.dto;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import java.time.Instant;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record FollowFeedItemDto(
+    // The entity that generated this feed item (e.g., the Community a topic was posted in)
+    FollowableDto source,
+    
+    // The user who performed the action (e.g., the author of the topic)
+    UserSummaryDto actor,
+    
+    FeedItemType itemType,
+    Instant timestamp,
+    
+    // The actual content, e.g., a TopicSummaryDto. 
+    // Using Object allows for flexibility.
+    Object content 
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowRelationshipDto.java
+package com.tuniv.backend.follow.dto;
+
+import com.tuniv.backend.user.dto.UserSummaryDto;
+
+public record FollowRelationshipDto(
+    // The other user in the relationship
+    UserSummaryDto user,
+
+    // Flags indicating the follow status
+    boolean youFollowThem,
+    boolean theyFollowYou
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowRequestDto.java
+package com.tuniv.backend.follow.dto;
+
+import com.tuniv.backend.follow.model.FollowableType;
+import jakarta.validation.constraints.NotNull;
+
+public record FollowRequestDto(
+    @NotNull
+    FollowableType targetType,
+
+    @NotNull
+    Integer targetId
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowStatusDto.java
+package com.tuniv.backend.follow.dto;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record FollowStatusDto(
+    boolean isFollowing,
+    int followersCount,
+    
+    // Only applicable if the entity being checked is a User
+    Integer followingCount 
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowSuggestionDto.java
+package com.tuniv.backend.follow.dto;
+
+public record FollowSuggestionDto(
+    // Reuses the core FollowableDto for the entity's info
+    FollowableDto followable,
+    
+    // Explains why this suggestion is being made
+    String reasonForSuggestion 
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\dto\FollowSummaryDto.java
+package com.tuniv.backend.follow.dto;
+import com.tuniv.backend.follow.model.FollowableType;
+import java.time.Instant;
+public record FollowSummaryDto(
+    Integer followId,
+    FollowableType targetType,
+    Integer targetId,
+    String targetName,
+    Instant followedAt
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\AssignReportRequest.java
+package com.tuniv.backend.moderation.dto;
+
+import jakarta.validation.constraints.NotNull;
+
+public record AssignReportRequest(
+    @NotNull
+    Integer moderatorId
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\CreateReportRequest.java
+package com.tuniv.backend.moderation.dto;
+
+import com.tuniv.backend.shared.model.ContainerType;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record CreateReportRequest(
+    @NotNull
+    Integer contentId,
+
+    @NotNull
+    ContainerType contentType, // e.g., TOPIC, REPLY, USER_PROFILE
+
+    @NotBlank @Size(max = 255)
+    String reason, // A predefined reason from a list, e.g., "SPAM", "HARASSMENT"
+
+    @Size(max = 2000)
+    String comment // Optional additional details from the user
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\HandleReportRequest.java
+package com.tuniv.backend.moderation.dto;
+
+import com.tuniv.backend.moderation.model.ReportStatus;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+
+public record HandleReportRequest(
+    @NotNull
+    ReportStatus newStatus, // e.g., RESOLVED, DISMISSED
+
+    @Size(max = 5000)
+    String moderatorNotes,
+
+    // The action taken, which will be recorded in the moderation log
+    ModerationActionDto action
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\ModerationActionDto.java
+package com.tuniv.backend.moderation.dto;
+
+public record ModerationActionDto(
+    String actionType, // e.g., "WARN_USER", "DELETE_POST", "BAN_USER"
+    String reason,
+    boolean notifyUser,
+    Long banDurationInHours // Optional: for temporary bans
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\ModerationDashboardStatsDto.java
+package com.tuniv.backend.moderation.dto;
+
+import java.util.Map;
+
+public record ModerationDashboardStatsDto(
+    // Queue Health
+    long pendingReports,
+    long reportsUnderReview,
+    double averageResolutionTimeInHours,
+
+    // Activity Volume
+    long reportsFiledToday,
+    long reportsResolvedToday,
+
+    // Leaderboards
+    Map<String, Long> topReportedUsers, // Key: username, Value: report count
+    Map<String, Long> topModerators // Key: username, Value: resolved count
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\ModerationLogDto.java
+package com.tuniv.backend.moderation.dto;
+
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import java.time.Instant;
+
+public record ModerationLogDto(
+    Integer logId,
+    UserSummaryDto moderator,
+    String action, // e.g., "Banned User"
+    UserSummaryDto targetUser,
+    String targetContentSummary, // e.g., "Post #12345"
+    String reason,
+    Instant timestamp
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\ReportDetailDto.java
+package com.tuniv.backend.moderation.dto;
+
+import com.tuniv.backend.moderation.model.ReportStatus;
+import com.tuniv.backend.user.dto.UserSummaryDto;
+import java.time.Instant;
+import java.util.List;
+
+public record ReportDetailDto(
+    Integer reportId,
+    ReportStatus status,
+    UserSummaryDto reporter,
+    String reason,
+    String reporterComment,
+    Instant createdAt,
+    ReportedContentDto reportedContent,
+    UserSummaryDto assignedModerator, // The moderator handling the case
+    String moderatorNotes,
+    List<ModerationLogDto> targetUserHistory // Past actions against the user who was reported
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\ReportedContentDto.java
+package com.tuniv.backend.moderation.dto;
+
+import com.tuniv.backend.shared.model.ContainerType;
+import com.tuniv.backend.user.dto.UserSummaryDto;
+
+public record ReportedContentDto(
+    Integer contentId,
+    ContainerType contentType,
+    UserSummaryDto contentAuthor,
+    String contentUrl, // A direct link to the reported item
+    String contentSnippet // A preview of the content
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\ReportSummaryDto.java
+package com.tuniv.backend.moderation.dto;
+
+import com.tuniv.backend.moderation.model.ReportStatus;
+import com.tuniv.backend.shared.model.ContainerType;
+import java.time.Instant;
+
+public record ReportSummaryDto(
+    Integer reportId,
+    ReportStatus status,
+    ContainerType contentType,
+    String reason,
+    String reporterUsername,
+    Instant createdAt
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\dto\UserReportHistoryDto.java
+package com.tuniv.backend.moderation.dto;
+
+import com.tuniv.backend.moderation.model.ReportStatus;
+import java.time.Instant;
+
+public record UserReportHistoryDto(
+    Integer reportId,
+    String reportedContentSummary, // e.g., "Your post in 'General Discussion'"
+    String reason,
+    Instant reportDate,
+    ReportStatus status
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\dto\NotificationDto.java
+package com.tuniv.backend.notification.dto;
+
+import java.time.LocalDateTime;
+
+import com.tuniv.backend.notification.model.NotificationType;
+
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+public class NotificationDto {
+    private Integer notificationId;
+    private String actorUsername;
+    private String message;
+    private String link;
+    private boolean isRead;
+    private LocalDateTime createdAt;
+    private NotificationType type;
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\AttachmentDto.java
+package com.tuniv.backend.qa.dto;
+
+public record AttachmentDto(
+    Integer attachmentId,
+    String fileName,
+    String fileUrl,
+    String fileType,
+    Long fileSize
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\ContainerInfoDto.java
+package com.tuniv.backend.qa.dto;
+
+import com.tuniv.backend.shared.model.ContainerType;
+
+public record ContainerInfoDto(
+    Integer id,
+    String name,
+    ContainerType type // "MODULE" or "COMMUNITY"
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\ReplyCreateRequest.java
+package com.tuniv.backend.qa.dto;
+
+public record ReplyCreateRequest(
+    String body,
+    Integer parentReplyId
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\ReplyResponseDto.java
+package com.tuniv.backend.qa.dto;
+
+import java.time.Instant;
+import java.util.List;
+
+public record ReplyResponseDto(
+    Integer id,
+    String body,
+    UserDto author,
+    Instant createdAt,
+    Instant editedAt, // âœ… ADDED
+    int score,
+    String currentUserVote,
+    Integer topicId,
+    Integer parentReplyId,
+    boolean isSolution, // âœ… ADDED
+    List<AttachmentDto> attachments,
+    List<ReplyResponseDto> childReplies
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\ReplyUpdateRequest.java
+package com.tuniv.backend.qa.dto;
+
+import java.util.List;
+
+
+public record ReplyUpdateRequest(
+    String body,
+    List<Integer> attachmentIdsToDelete
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\SolutionInfoDto.java
+package com.tuniv.backend.qa.dto;
+
+import java.time.Instant;
+
+public record SolutionInfoDto(
+    Integer id,
+    String body,
+    UserDto author,
+    Instant createdAt
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\TopicCreateRequest.java
+package com.tuniv.backend.qa.dto;
+
+import java.util.List;
+
+import com.tuniv.backend.qa.model.TopicType;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record TopicCreateRequest(
+    @NotBlank String title,
+    String body,
+    @NotNull TopicType topicType,
+    Integer moduleId,
+    Integer communityId,
+    List<String> tags
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\TopicResponseDto.java
+package com.tuniv.backend.qa.dto;
+
+import java.time.Instant;
+import java.util.List;
+
+import com.tuniv.backend.qa.model.TopicType;
+
+public record TopicResponseDto(
+    Integer id,
+    String title,
+    String body,
+    TopicType topicType,
+    boolean isSolved,
+    UserDto author,
+    Instant createdAt,
+    Instant editedAt, // âœ… ADDED: To show if/when a topic was edited
+    int score,
+    String currentUserVote, // "UPVOTE", "DOWNVOTE", or null
+    int replyCount,
+    int viewCount, // âœ… ADDED: To display engagement
+    SolutionInfoDto acceptedSolution,
+    ContainerInfoDto container,
+    List<String> tags,
+    List<AttachmentDto> attachments,
+    List<ReplyResponseDto> replies
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\TopicSummaryDto.java
+package com.tuniv.backend.qa.dto;
+
+public record TopicSummaryDto(
+    Integer id,
+    String title,
+    TopicType topicType,
+    Integer authorId,
+    String authorUsername,
+    Instant createdAt,
+    int score,
+    int replyCount,
+    String currentUserVote, // "UPVOTE", "DOWNVOTE", or null
+    boolean isSolved,
+    Integer containerId,
+    String containerName,
+    List<String> tags
+) {
+    public TopicSummaryDto withTags(List<String> newTags) {
+        return new TopicSummaryDto(
+            id, title, topicType, authorId, authorUsername, createdAt, score, 
+            replyCount, currentUserVote, isSolved, containerId, containerName, newTags
+        );
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\TopicUpdateRequest.java
+package com.tuniv.backend.qa.dto;
+
+import java.util.List;
+
+import jakarta.validation.constraints.NotBlank;
+
+public record TopicUpdateRequest(
+    @NotBlank String title,
+    String body,
+    List<String> tags,
+    List<Integer> attachmentIdsToDelete
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\UserDto.java
+package com.tuniv.backend.qa.dto;
+
+public record UserDto(
+    Integer id,
+    String username,
+    int reputationScore,
+    String profilePhotoUrl // âœ… Standardized from avatarUrl
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\VoteInfo.java
+package com.tuniv.backend.qa.dto;
+
+public record VoteInfo(Integer postId, int value) {
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\dto\VoteRequest.java
+package com.tuniv.backend.qa.dto;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+
+public record VoteRequest(
+    @NotNull
+    @Min(-1)
+    @Max(1)
+    int value
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\dto\ApiResponse.java
+package com.tuniv.backend.shared.dto;
+
+public record ApiResponse(
+    boolean success,
+    String message
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\dto\ErrorResponse.java
+package com.tuniv.backend.shared.dto;
+
+import java.time.LocalDateTime;
+
+public record ErrorResponse(
+    LocalDateTime timestamp,
+    int status,
+    String error,
+    String message,
+    String path
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\dto\ModuleDetailDto.java
+package com.tuniv.backend.university.dto;
+
+public record ModuleDetailDto(
+    Integer moduleId,
+    String name,
+    UniversityBasicDto university,
+    Integer topicCount,  // âœ… UPDATED: questionCount â†’ topicCount
+    boolean isMember
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\dto\ModuleDto.java
+package com.tuniv.backend.university.dto;
+
+public record ModuleDto(
+    Integer moduleId,
+    String name,
+    Integer topicCount,  // âœ… UPDATED: questionCount â†’ topicCount
+    boolean isMember
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\dto\UniversityBasicDto.java
+package com.tuniv.backend.university.dto;
+
+public record UniversityBasicDto(
+    Integer universityId,
+    String name,
+    boolean isMember,
+    Integer topicCount,  // âœ… UPDATED: questionCount â†’ topicCount
+    Integer memberCount
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\dto\UniversityDto.java
+package com.tuniv.backend.university.dto;
+
+import java.util.List;
+
+public record UniversityDto(
+    Integer universityId,
+    String name,
+    List<ModuleDto> modules,
+    boolean isMember,
+    Integer memberCount,
+    Integer topicCount  // âœ… UPDATED: questionCount â†’ topicCount
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\dto\CommunityDto.java
+package com.tuniv.backend.user.dto;
+
+public record CommunityDto(
+    Integer id,
+    String type, // Will be "UNIVERSITY"
+    String name,
+    long  memberCount,
+    long questionsCount // âœ… ADDED
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\dto\LeaderboardUserDto.java
+package com.tuniv.backend.user.dto;
+
+public record LeaderboardUserDto(
+    Integer userId,
+    String username,
+    Integer reputationScore,
+    String profilePhotoUrl
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\dto\UserActivityItemDto.java
+package com.tuniv.backend.user.dto;
+
+import java.time.Instant; // This is correct
+
+public record UserActivityItemDto(
+    ActivityType type,
+    
+    // THE FIX IS ON THIS LINE: Changed from Instant back to LocalDateTime
+    Instant createdAt, // This is correct
+    
+    Integer postScore,
+    Integer voteValue,
+    Integer questionId,
+    String questionTitle,
+    Integer answerId,
+    boolean isSolution,
+    Integer commentId
+) {
+    public enum ActivityType {
+        TOPIC_CREATED,      // User created a topic
+    ANSWER_POSTED,      // User posted an answer (reply on QUESTION topic)
+    COMMENT_POSTED,     // User posted a comment (reply on POST topic or nested reply)
+    SOLUTION_ACCEPTED,  // User's answer was accepted as solution
+    VOTE_CAST          // User voted on something
+    }
+}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\dto\UserProfileDto.java
+package com.tuniv.backend.user.dto;
+
+import com.tuniv.backend.auth.dto.VerificationInfo;
+
+/**
+ * Represents the detailed public profile of a user.
+ *
+ * @param userId            The unique identifier for the user.
+ * @param username          The user's display name.
+ * @param profilePhotoUrl   URL for the user's avatar.
+ * @param bio               The user's self-description.
+ * @param major             The user's declared major.
+ * @param reputationScore   The user's reputation score.
+ * @param topicsCount       âœ… Renamed from questionsCount. The total number of topics created by the user.
+ * @param repliesCount      âœ… Renamed from answersCount. The total number of replies posted by the user.
+ * @param followersCount    The total number of users following this user.
+ * @param verification      âœ… Standardized name. DTO with primary university verification details.
+ */
+public record UserProfileDto(
+    Integer userId,
+    String username,
+    String profilePhotoUrl,
+    String bio,
+    String major,
+    Integer reputationScore,
+    int topicsCount,
+    int repliesCount,
+    int followersCount,
+    VerificationInfo verification
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\dto\UserProfileUpdateRequest.java
+package com.tuniv.backend.user.dto;
+
+import jakarta.validation.constraints.Size;
+
+public record UserProfileUpdateRequest(
+    @Size(max = 500)
+    String bio,
+
+    @Size(max = 100)
+    String major,
+
+    @Size(max = 255)
+    String profilePhotoUrl
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\dto\UserSummaryDto.java
+package com.tuniv.backend.user.dto;
+
+public record UserSummaryDto(
+    Integer id,
+    String username,
+    String profilePhotoUrl,
+    Integer reputationScore
+) {}
+
+
+
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\dto\VerificationRequestDto.java
+package com.tuniv.backend.user.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+public record VerificationRequestDto(
+    @NotBlank @Email String universityEmail
+) {}
+
+
+

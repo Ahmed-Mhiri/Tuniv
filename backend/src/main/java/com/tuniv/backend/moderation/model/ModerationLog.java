@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import org.hibernate.annotations.CreationTimestamp;
 
+import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.Column;
@@ -23,6 +24,7 @@ import lombok.Setter;
 @Getter
 @Setter
 public class ModerationLog {
+    
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer logId;
@@ -33,18 +35,19 @@ public class ModerationLog {
     private User moderator;
     
     @Column(nullable = false)
-    private String action; // e.g., "REMOVED_POST", "MUTED_USER", "BANNED_USER"
+    private String action;
 
     @Column(columnDefinition = "TEXT")
-    private String justification; // Moderator's notes
+    private String justification;
 
-    // Can be null if action is not on a specific post (e.g., banning a user)
-    @Column(name = "target_post_id")
-    private Integer targetPostId; 
+    // ✅ IMPROVED: Proper JPA relationships instead of raw IDs
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_post_id")
+    private Post targetPost;
     
-    // Can be null if action is not on a specific user
-    @Column(name = "target_user_id")
-    private Integer targetUserId; 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "target_user_id")
+    private User targetUser;
 
     @CreationTimestamp
     private Instant createdAt;
