@@ -1,4 +1,4 @@
-// StartConversationRequestDto.java
+// RemoveReactionRequestDto.java
 package com.tuniv.backend.chat.dto;
 
 import lombok.Getter;
@@ -10,6 +10,6 @@ import lombok.AllArgsConstructor;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class StartConversationRequestDto {
-    private Integer targetUserId;
+public class RemoveReactionRequestDto {
+    private String emoji;
 }

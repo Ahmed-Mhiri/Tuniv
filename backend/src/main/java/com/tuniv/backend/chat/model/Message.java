@@ -69,6 +69,15 @@ public class Message extends Post {
     // Inside Message.java
     @Column(name = "is_pinned", nullable = false)
     private boolean isPinned = false;
+
+    // ✅ NEW: Added fields for pinning context
+    @Column(name = "pinned_at")
+    private Instant pinnedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pinned_by_user_id")
+    private User pinnedBy;
+
     // ========== MESSAGE METADATA ==========
     @Column(name = "client_message_id")
     private String clientMessageId;

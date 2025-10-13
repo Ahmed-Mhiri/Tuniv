@@ -26,11 +26,11 @@ public interface ReactionRepository extends JpaRepository<Reaction, Integer>, Jp
     
     List<Reaction> findByUserAndIsRemovedFalse(User user);
     
-    List<Reaction> findByMessageAndUser(Message message, User user);
-    
-    Optional<Reaction> findByMessageAndUserAndIsRemovedFalse(Message message, User user);
-    
-    Optional<Reaction> findByMessageAndUserAndEmoji(Message message, User user, String emoji);
+    // ✅ CORRECTED: Method now matches the new unique constraint
+    Optional<Reaction> findByMessageAndUserAndEmojiAndIsRemovedFalse(Message message, User user, String emoji);
+
+    // ✅ RENAMED: More descriptive name for finding all reactions by a user on a message
+    List<Reaction> findAllByMessageAndUserAndIsRemovedFalse(Message message, User user);
 
     // ========== Emoji-Based Queries ==========
     
@@ -46,35 +46,18 @@ public interface ReactionRepository extends JpaRepository<Reaction, Integer>, Jp
 
     // ========== Statistics ==========
     
-    long countByMessage(Message message);
-    
     long countByMessageAndIsRemovedFalse(Message message);
-    
-    long countByUser(User user);
     
     long countByUserAndIsRemovedFalse(User user);
     
     @Query("SELECT COUNT(r) FROM Reaction r WHERE r.message.id = :messageId AND r.isRemoved = false")
     long countActiveReactionsByMessageId(@Param("messageId") Integer messageId);
-    
-    @Query("SELECT COUNT(r) FROM Reaction r WHERE r.message.conversation.conversationId = :conversationId AND r.isRemoved = false")
-    long countActiveReactionsByConversationId(@Param("conversationId") Integer conversationId);
 
     // ========== Existence Checks ==========
-    
-    boolean existsByMessageAndUserAndIsRemovedFalse(Message message, User user);
     
     boolean existsByMessageAndUserAndEmojiAndIsRemovedFalse(Message message, User user, String emoji);
 
     // ========== Update Operations ==========
-    
-    @Modifying
-    @Query("UPDATE Reaction r SET r.isRemoved = true, r.removedAt = CURRENT_TIMESTAMP WHERE r.id = :reactionId")
-    void softDeleteReaction(@Param("reactionId") Integer reactionId);
-    
-    @Modifying
-    @Query("UPDATE Reaction r SET r.isRemoved = true, r.removedAt = CURRENT_TIMESTAMP WHERE r.message = :message AND r.user = :user")
-    void removeUserReactionFromMessage(@Param("message") Message message, @Param("user") User user);
     
     @Modifying
     @Query("UPDATE Reaction r SET r.isRemoved = true, r.removedAt = CURRENT_TIMESTAMP WHERE r.message = :message AND r.user = :user AND r.emoji = :emoji")
@@ -84,17 +67,6 @@ public interface ReactionRepository extends JpaRepository<Reaction, Integer>, Jp
 
     // ========== Bulk Operations ==========
     
-    @Modifying
-    @Query("UPDATE Reaction r SET r.isRemoved = true, r.removedAt = CURRENT_TIMESTAMP WHERE r.message = :message")
-    void removeAllReactionsFromMessage(@Param("message") Message message);
-    
-    @Modifying
-    @Query("UPDATE Reaction r SET r.isRemoved = true, r.removedAt = CURRENT_TIMESTAMP WHERE r.user = :user")
-    void removeAllUserReactions(@Param("user") User user);
-
-
     @Query("SELECT r FROM Reaction r WHERE r.message.id IN :messageIds AND r.isRemoved = false")
     List<Reaction> findByMessage_IdInAndIsRemovedFalse(@Param("messageIds") List<Integer> messageIds);
-
-
 }

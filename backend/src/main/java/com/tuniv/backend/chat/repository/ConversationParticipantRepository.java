@@ -23,6 +23,9 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
     
     Optional<ConversationParticipant> findByConversationAndUser_UserId(Conversation conversation, Integer userId);
     
+    // ADDED: The required method for PermissionService
+    Optional<ConversationParticipant> findByConversation_ConversationIdAndUser_UserId(Integer conversationId, Integer userId);
+    
     List<ConversationParticipant> findByConversation(Conversation conversation);
     
     List<ConversationParticipant> findByConversationAndIsActiveTrue(Conversation conversation);
@@ -120,9 +123,10 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
     void updateParticipantsRole(@Param("conversationId") Integer conversationId, 
                                @Param("userIds") List<Integer> userIds, 
                                @Param("roleId") Integer roleId);
-    // In ConversationParticipantRepository.java - Add these methods:
+    
+    // ========== Additional Query Methods ==========
+    
     List<ConversationParticipant> findByConversation_ConversationIdAndIsActiveTrue(Integer conversationId);
-
 
     @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId IN :conversationIds AND cp.user.userId = :userId AND cp.isActive = true")
     List<ConversationParticipant> findByConversation_ConversationIdInAndUser_UserIdAndIsActiveTrue(
@@ -131,17 +135,26 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
     );
 
     @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId IN :conversationIds AND cp.user.userId = :userId AND cp.isActive = true")
-List<ConversationParticipant> findByConversationIdsAndUserId(
-    @Param("conversationIds") List<Integer> conversationIds,
-    @Param("userId") Integer userId
-);
+    List<ConversationParticipant> findByConversationIdsAndUserId(
+        @Param("conversationIds") List<Integer> conversationIds,
+        @Param("userId") Integer userId
+    );
 
+    @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId IN :conversationIds AND cp.isActive = true")
+    List<ConversationParticipant> findByConversation_ConversationIdInAndIsActiveTrue(
+        @Param("conversationIds") List<Integer> conversationIds
+    );
 
+    @Query("SELECT COUNT(cp) FROM ConversationParticipant cp WHERE cp.conversation = :conversation AND cp.lastReadTimestamp >= :timestamp AND cp.isActive = true")
+    long countByConversationAndLastReadTimestampAfter(
+        @Param("conversation") Conversation conversation,
+        @Param("timestamp") Instant timestamp
+    );
 
-
-
-
-
-
-                                                
+    @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation = :conversation AND cp.lastReadTimestamp >= :timestamp AND cp.isActive = true ORDER BY cp.lastReadTimestamp DESC")
+    List<ConversationParticipant> findByConversationAndLastReadTimestampAfter(
+        @Param("conversation") Conversation conversation,
+        @Param("timestamp") Instant timestamp,
+        Pageable pageable
+    );
 }

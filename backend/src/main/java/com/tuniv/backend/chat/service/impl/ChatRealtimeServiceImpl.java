@@ -8,8 +8,11 @@ import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
 import com.tuniv.backend.chat.repository.ConversationRepository;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
+import com.tuniv.backend.user.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +21,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+
+import com.tuniv.backend.user.model.User;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +33,8 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
+    private final UserRepository userRepository; // ✅ ADDED DEPENDENCY
+
 
     // In-memory tracking of active users per conversation
     // conversationId -> Set of active user IDs
@@ -347,25 +354,36 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
 
     @Override
     public void broadcastUserPresence(Integer conversationId, Integer userId, boolean isOnline) {
-        log.debug("Broadcasting user presence to conversation {}: user {} online={}", 
+        log.debug("Broadcasting user presence to conversation {}: user {} online={}",
                  conversationId, userId, isOnline);
-        
+
         if (isOnline) {
             addActiveUser(conversationId, userId);
         } else {
             removeActiveUser(conversationId, userId);
         }
-        
+
+        // ✅ FIXED: Fetch user to get username for the DTO
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
+
         String destination = getConversationTopic(conversationId);
-        UserPresenceDto presenceDto = new UserPresenceDto(userId, conversationId, isOnline, Instant.now());
-        
+        UserPresenceDto presenceDto = new UserPresenceDto(
+                userId,
+                user.getUsername(), // Pass the username
+                conversationId,
+                isOnline,
+                Instant.now()
+        );
+
         RealtimeMessage<UserPresenceDto> realtimeMessage = createRealtimeMessage(
             "USER_PRESENCE", presenceDto, "User presence updated"
         );
-        
+
         messagingTemplate.convertAndSend(destination, realtimeMessage);
         log.debug("User presence broadcast completed for conversation {}", conversationId);
     }
+
 
     @Override
     public void broadcastUserActiveStatus(Integer conversationId, Integer userId, boolean isActive) {
@@ -531,6 +549,20 @@ public void notifyNewConversation(Integer conversationId, List<Integer> userIds)
 
     private Conversation getConversationEntity(Integer conversationId) {
         return conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+        .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
     }
+    private void cleanupUserPresence(Integer userId) {
+    // Remove user from all conversations they were active in
+    Set<Integer> userConversations = userActiveConversations.remove(userId);
+    if (userConversations != null) {
+        for (Integer conversationId : userConversations) {
+            removeActiveUser(conversationId, userId);
+            
+            // Broadcast offline status
+            broadcastUserPresence(conversationId, userId, false);
+        }
+    }
+    
+    log.debug("Completely cleaned up presence for user {}", userId);
+}
 }

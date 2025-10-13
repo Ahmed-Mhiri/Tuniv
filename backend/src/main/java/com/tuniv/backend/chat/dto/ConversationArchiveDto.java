@@ -1,19 +1,19 @@
+// ConversationArchiveDto.java
 package com.tuniv.backend.chat.dto;
 
-import lombok.Getter;
-import lombok.Setter;
 import java.time.Instant;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
 @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class ConversationArchiveDto {
     private Integer conversationId;
     private boolean archived;
     private Instant updatedAt;
-
-    public ConversationArchiveDto(Integer conversationId, boolean archived, Instant updatedAt) {
-        this.conversationId = conversationId;
-        this.archived = archived;
-        this.updatedAt = updatedAt;
-    }
 }

@@ -1,7 +1,8 @@
 package com.tuniv.backend.chat.repository;
 
-import com.tuniv.backend.chat.model.Conversation;
-import com.tuniv.backend.chat.model.ConversationType;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -11,8 +12,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.Optional;
+import com.tuniv.backend.chat.model.Conversation;
+import com.tuniv.backend.chat.model.ConversationType;
 
 @Repository
 public interface ConversationRepository extends JpaRepository<Conversation, Integer>, JpaSpecificationExecutor<Conversation> {
@@ -84,4 +85,14 @@ public interface ConversationRepository extends JpaRepository<Conversation, Inte
 
     @EntityGraph(attributePaths = {"participants", "participants.user", "participants.role"})
     Optional<Conversation> findByIdWithParticipants(Integer conversationId);
+
+    @EntityGraph(attributePaths = {"participants.user", "participants.role"})
+Optional<Conversation> findWithParticipantsById(Integer conversationId);
+
+@EntityGraph(attributePaths = {"participants", "participants.user", "participants.role", "universityContext"})
+Optional<Conversation> findWithParticipantsAndContextById(Integer conversationId);
+
+// For cases where you need pinned messages too, create a custom query
+@Query("SELECT c FROM Conversation c LEFT JOIN FETCH c.participants p LEFT JOIN FETCH p.user LEFT JOIN FETCH p.role WHERE c.conversationId = :conversationId")
+Optional<Conversation> findWithParticipantsAndUsersAndRoles(@Param("conversationId") Integer conversationId);
 }

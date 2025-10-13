@@ -28,7 +28,8 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "reactions", indexes = {
-    @Index(name = "idx_reaction_message_user", columnList = "message_id, user_id", unique = true),
+    // ✅ CORRECTED: Unique constraint now includes emoji
+    @Index(name = "idx_reaction_message_user_emoji", columnList = "message_id, user_id, emoji", unique = true),
     @Index(name = "idx_reaction_message", columnList = "message_id, created_at"),
     @Index(name = "idx_reaction_user", columnList = "user_id, created_at"),
     @Index(name = "idx_reaction_emoji", columnList = "emoji, created_at"),

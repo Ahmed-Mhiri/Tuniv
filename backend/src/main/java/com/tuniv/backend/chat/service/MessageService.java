@@ -1,16 +1,43 @@
 package com.tuniv.backend.chat.service;
 
-import com.tuniv.backend.chat.dto.*;
-import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import java.util.List;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import java.util.List;
-
+import com.tuniv.backend.chat.dto.ChatMessageDto;
+import com.tuniv.backend.chat.dto.EditMessageRequest;
+import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
+import com.tuniv.backend.chat.dto.MessageStatsDto;
+import com.tuniv.backend.chat.dto.MessageThreadDto;
+import com.tuniv.backend.chat.dto.PinnedMessageDto;
+import com.tuniv.backend.chat.dto.ReactionDto;
+import com.tuniv.backend.chat.dto.ReactionRequestDto;
+import com.tuniv.backend.chat.dto.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.SendMessageRequest;
+import com.tuniv.backend.chat.dto.UnreadCountDto;
 import com.tuniv.backend.chat.model.MessageStatus;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.user.model.User;
 
 public interface MessageService {
+
+    // ========== Permission Methods ==========
+    
+    /**
+     * Primary efficient permission check using user ID and conversation ID
+     */
+    boolean hasMessagePermission(Integer userId, Integer conversationId, String permission);
+    
+    /**
+     * Permission check using UserDetailsImpl
+     */
+    boolean hasMessagePermission(UserDetailsImpl user, Integer conversationId, String permission);
+    
+    /**
+     * Permission check using User entity
+     */
+    boolean hasMessagePermission(User user, Integer conversationId, String permission);
 
     // ========== Core Message Actions ==========
     
@@ -29,7 +56,7 @@ public interface MessageService {
      * Edits an existing message.
      * Permissions: Requires 'edit_own_messages' for self, or 'edit_any_message' for moderators.
      */
-    ChatMessageDto editMessage(Integer messageId, EditMessageRequest request, UserDetailsImpl currentUser);
+   ChatMessageDto editMessage(Integer messageId, EditMessageRequest request, UserDetailsImpl currentUser);
     
     /**
      * Deletes a message (soft delete).
@@ -75,7 +102,8 @@ public interface MessageService {
     /**
      * Marks messages as read for the current user.
      */
-    void markMessagesAsRead(Integer conversationId, List<Integer> messageIds, UserDetailsImpl currentUser);
+    void markMessagesAsRead(Integer conversationId, Integer lastReadMessageId, UserDetailsImpl currentUser);
+
     
     /**
      * Marks all messages in a conversation as read.
@@ -166,4 +194,6 @@ public interface MessageService {
      * Gets message statistics for a conversation.
      */
     MessageStatsDto getMessageStats(Integer conversationId, UserDetailsImpl currentUser);
+
+    Page<ReadReceiptDto> getMessageReadReceipts(Integer messageId, UserDetailsImpl currentUser, Pageable pageable);
 }

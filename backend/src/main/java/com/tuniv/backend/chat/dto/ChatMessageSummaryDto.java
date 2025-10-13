@@ -1,5 +1,5 @@
+// ChatMessageSummaryDto.java
 package com.tuniv.backend.chat.dto;
-
 
 import java.time.Instant;
 
@@ -10,8 +10,9 @@ import lombok.Setter;
 
 @Getter
 @Setter
+@NoArgsConstructor
 @AllArgsConstructor
-public class ChatMessageDto {
+public class ChatMessageSummaryDto {
     private Integer id;
     private String body;
     private Integer authorId;
@@ -19,31 +20,17 @@ public class ChatMessageDto {
     private String authorProfilePhotoUrl;
     private Integer conversationId;
     private Instant sentAt;
-    private Instant editedAt;
     private boolean isEdited;
-    private Integer editCount;
     private String messageType;
-    private boolean isDeleted;
-    private Instant deletedAt;
-    private String deletionReason;
     private boolean isPinned;
-    private String clientMessageId;
     
-    // Reply information
+    // Reply information (basic)
     private Integer replyToMessageId;
     private String replyToMessageBody;
-    private Integer replyToAuthorId;
-    private String replyToAuthorUsername;
     
-    // Reactions - ONLY SUMMARY, no detailed list
+    // Reactions summary only (no detailed list)
     private MessageReactionsSummaryDto reactionsSummary;
     
-    // Read status
+    // Read status (basic)
     private boolean isReadByCurrentUser;
-    private Integer readByCount; // ✅ ADDED: Simple count instead of detailed list
-
-    public ChatMessageDto() {
-        this.reactionsSummary = new MessageReactionsSummaryDto();
-        // ❌ REMOVED: this.readBy = new ArrayList<>();
-    }
 }

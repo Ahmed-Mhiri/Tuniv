@@ -97,5 +97,14 @@ public class Conversation extends Auditable {
 
     @Column(name = "is_archived", nullable = false)
     private boolean isArchived = false;
+
+    // ========== RELATIONSHIPS ==========
+    @OneToMany(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    private Set<Message> messages = new HashSet<>();
+
+    @OneToMany(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    private Set<ConversationParticipant> participants = new HashSet<>();
+
+
     
 }

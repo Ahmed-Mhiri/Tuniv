@@ -1,9 +1,18 @@
 package com.tuniv.backend.chat.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+import java.util.List;
+
+
 @Getter
 @Setter
-public class MessageReactionUpdateDto {
+@NoArgsConstructor
+@AllArgsConstructor
+public class MessageReactionsDto {
     private Integer messageId;
-    private ReactionDto reaction;
-    private ReactionAction action; // Changed from String to enum
+    private List<ReactionDto> reactions;
 }
