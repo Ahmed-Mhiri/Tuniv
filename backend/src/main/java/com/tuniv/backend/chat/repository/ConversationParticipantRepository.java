@@ -157,4 +157,7 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
         @Param("timestamp") Instant timestamp,
         Pageable pageable
     );
+
+@Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId IN :conversationIds AND cp.isActive = true")
+List<ConversationParticipant> findByConversationIds(@Param("conversationIds") List<Integer> conversationIds);
 }

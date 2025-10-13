@@ -9,13 +9,12 @@ import com.tuniv.backend.chat.repository.ConversationRepository;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.user.repository.UserRepository;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.redis.core.RedisTemplate;
 
 import java.time.Instant;
 import java.util.*;
@@ -33,20 +32,10 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
     private final SimpMessagingTemplate messagingTemplate;
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
-    private final UserRepository userRepository; // ✅ ADDED DEPENDENCY
+    private final UserRepository userRepository;
+    private final RedisTemplate<String, Object> redisTemplate;
 
-
-    // In-memory tracking of active users per conversation
-    // conversationId -> Set of active user IDs
-    private final Map<Integer, Set<Integer>> activeUsersByConversation = new ConcurrentHashMap<>();
-    
-    // UserId -> Set of conversation IDs where user is active
-    private final Map<Integer, Set<Integer>> userActiveConversations = new ConcurrentHashMap<>();
-    
-    // Track typing users: conversationId -> Set of typing user IDs
     private final Map<Integer, Set<Integer>> typingUsersByConversation = new ConcurrentHashMap<>();
-
-    // ========== Message Broadcasting ==========
 
     @Override
     public void broadcastNewMessage(Integer conversationId, ChatMessageDto messageDto) {
@@ -59,7 +48,6 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         
         messagingTemplate.convertAndSend(destination, realtimeMessage);
         
-        // Also send to user-specific queues for reliability
         broadcastToUserQueues(conversationId, "MESSAGE_NEW", messageDto);
         
         log.debug("New message broadcast completed for conversation {}", conversationId);
@@ -109,8 +97,6 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         log.debug("Bulk message deletion broadcast completed for conversation {}", conversationId);
     }
 
-    // ========== Reaction Broadcasting ==========
-
     @Override
     public void broadcastReactionUpdate(Integer conversationId, MessageReactionUpdateDto reactionUpdateDto) {
         log.debug("Broadcasting reaction update to conversation {} for message {}", 
@@ -140,14 +126,11 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         log.debug("Reactions update broadcast completed for conversation {}", conversationId);
     }
 
-    // ========== Typing Indicators ==========
-
     @Override
     public void broadcastTypingIndicator(Integer conversationId, TypingIndicatorDto typingIndicator) {
         log.debug("Broadcasting typing indicator to conversation {} from user {}", 
                  conversationId, typingIndicator.getUserId());
         
-        // Add user to typing set
         typingUsersByConversation
             .computeIfAbsent(conversationId, k -> new CopyOnWriteArraySet<>())
             .add(typingIndicator.getUserId());
@@ -165,7 +148,6 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
     public void broadcastStopTyping(Integer conversationId, Integer userId) {
         log.debug("Broadcasting stop typing to conversation {} from user {}", conversationId, userId);
         
-        // Remove user from typing set
         Optional.ofNullable(typingUsersByConversation.get(conversationId))
                 .ifPresent(typingUsers -> typingUsers.remove(userId));
         
@@ -179,8 +161,6 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         messagingTemplate.convertAndSend(destination, realtimeMessage);
         log.debug("Stop typing broadcast completed for conversation {}", conversationId);
     }
-
-    // ========== Read Receipts ==========
 
     @Override
     public void broadcastReadReceipt(Integer conversationId, ReadReceiptDto readReceipt) {
@@ -211,8 +191,6 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         log.debug("Bulk read receipts broadcast completed for conversation {}", conversationId);
     }
 
-    // ========== Participant Updates ==========
-
     @Override
     public void broadcastParticipantJoined(Integer conversationId, ParticipantDto participantDto) {
         log.debug("Broadcasting participant joined to conversation {}: user {}", 
@@ -240,7 +218,6 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         
         messagingTemplate.convertAndSend(destination, realtimeMessage);
         
-        // Remove from active users if they were active
         removeActiveUser(conversationId, userId);
         
         log.debug("Participant left broadcast completed for conversation {}", conversationId);
@@ -290,14 +267,11 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         messagingTemplate.convertAndSend(destination, realtimeMessage);
         
         if (isBanned) {
-            // Remove banned user from active users
             removeActiveUser(conversationId, bannedUserDto.getUserId());
         }
         
         log.debug("Participant ban update broadcast completed for conversation {}", conversationId);
     }
-
-    // ========== Conversation Updates ==========
 
     @Override
     public void broadcastConversationInfoUpdate(Integer conversationId, ConversationDetailDto conversationDto) {
@@ -344,33 +318,23 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         
         messagingTemplate.convertAndSend(destination, realtimeMessage);
         
-        // Clean up active users tracking
         cleanupConversation(conversationId);
         
         log.debug("Conversation deletion broadcast completed for conversation {}", conversationId);
     }
-
-    // ========== Presence Updates ==========
 
     @Override
     public void broadcastUserPresence(Integer conversationId, Integer userId, boolean isOnline) {
         log.debug("Broadcasting user presence to conversation {}: user {} online={}",
                  conversationId, userId, isOnline);
 
-        if (isOnline) {
-            addActiveUser(conversationId, userId);
-        } else {
-            removeActiveUser(conversationId, userId);
-        }
-
-        // ✅ FIXED: Fetch user to get username for the DTO
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
 
         String destination = getConversationTopic(conversationId);
         UserPresenceDto presenceDto = new UserPresenceDto(
                 userId,
-                user.getUsername(), // Pass the username
+                user.getUsername(),
                 conversationId,
                 isOnline,
                 Instant.now()
@@ -383,7 +347,6 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         messagingTemplate.convertAndSend(destination, realtimeMessage);
         log.debug("User presence broadcast completed for conversation {}", conversationId);
     }
-
 
     @Override
     public void broadcastUserActiveStatus(Integer conversationId, Integer userId, boolean isActive) {
@@ -401,8 +364,6 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         log.debug("User active status broadcast completed for conversation {}", conversationId);
     }
 
-    // ========== System Messages ==========
-
     @Override
     public void broadcastSystemMessage(Integer conversationId, SystemMessageDto systemMessage) {
         log.debug("Broadcasting system message to conversation {}: {}", conversationId, systemMessage.getType());
@@ -416,45 +377,55 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
         log.debug("System message broadcast completed for conversation {}", conversationId);
     }
 
-    // ========== Utility Methods ==========
-
     @Override
     public List<Integer> getActiveUsersInConversation(Integer conversationId) {
-        Set<Integer> activeUsers = activeUsersByConversation.get(conversationId);
-        return activeUsers != null ? new ArrayList<>(activeUsers) : new ArrayList<>();
+        String key = String.format("conversation:active:users:%d", conversationId);
+        Set<Object> userIds = redisTemplate.opsForSet().members(key);
+        List<Integer> result = new ArrayList<>();
+        
+        if (userIds != null) {
+            for (Object userId : userIds) {
+                try {
+                    result.add(Integer.parseInt(userId.toString()));
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid user ID: {}", userId);
+                }
+            }
+        }
+        
+        return result;
     }
 
     @Override
     public boolean isUserActiveInConversation(Integer conversationId, Integer userId) {
-        Set<Integer> activeUsers = activeUsersByConversation.get(conversationId);
-        return activeUsers != null && activeUsers.contains(userId);
+        List<Integer> activeUsers = getActiveUsersInConversation(conversationId);
+        return activeUsers.contains(userId);
     }
 
     @Override
-public void notifyNewConversation(Integer conversationId, List<Integer> userIds) {
-    log.debug("Notifying {} users about new conversation {}", userIds.size(), conversationId);
-    
-    Conversation conversation = getConversationEntity(conversationId);
-    
-    // Manually construct the DTO using the correct constructor
-    ConversationNotificationDto notification = new ConversationNotificationDto(
-        conversation.getConversationId(),
-        conversation.getTitle(),
-        conversation.getConversationType().name(),
-        conversation.getParticipantCount()
-    );
-    
-    for (Integer userId : userIds) {
-        String userDestination = getUserQueue(userId);
-        RealtimeMessage<ConversationNotificationDto> realtimeMessage = createRealtimeMessage(
-            "NEW_CONVERSATION", notification, "You've been added to a new conversation"
+    public void notifyNewConversation(Integer conversationId, List<Integer> userIds) {
+        log.debug("Notifying {} users about new conversation {}", userIds.size(), conversationId);
+        
+        Conversation conversation = getConversationEntity(conversationId);
+        
+        ConversationNotificationDto notification = new ConversationNotificationDto(
+            conversation.getConversationId(),
+            conversation.getTitle(),
+            conversation.getConversationType().name(),
+            conversation.getParticipantCount()
         );
         
-        messagingTemplate.convertAndSend(userDestination, realtimeMessage);
+        for (Integer userId : userIds) {
+            String userDestination = getUserQueue(userId);
+            RealtimeMessage<ConversationNotificationDto> realtimeMessage = createRealtimeMessage(
+                "NEW_CONVERSATION", notification, "You've been added to a new conversation"
+            );
+            
+            messagingTemplate.convertAndSend(userDestination, realtimeMessage);
+        }
+        
+        log.debug("New conversation notifications sent to {} users", userIds.size());
     }
-    
-    log.debug("New conversation notifications sent to {} users", userIds.size());
-}
 
     @Override
     public void sendDirectNotification(Integer userId, ChatNotificationDto notification) {
@@ -468,8 +439,6 @@ public void notifyNewConversation(Integer conversationId, List<Integer> userIds)
         messagingTemplate.convertAndSend(userDestination, realtimeMessage);
         log.debug("Direct notification sent to user {}", userId);
     }
-
-    // ========== Private Helper Methods ==========
 
     private String getConversationTopic(Integer conversationId) {
         return "/topic/conversations/" + conversationId;
@@ -489,25 +458,22 @@ public void notifyNewConversation(Integer conversationId, List<Integer> userIds)
     }
 
     private void addActiveUser(Integer conversationId, Integer userId) {
-        activeUsersByConversation
-            .computeIfAbsent(conversationId, k -> new CopyOnWriteArraySet<>())
-            .add(userId);
+        String userConversationsKey = String.format("user:active:conversations:%d", userId);
+        String conversationUsersKey = String.format("conversation:active:users:%d", conversationId);
         
-        userActiveConversations
-            .computeIfAbsent(userId, k -> new CopyOnWriteArraySet<>())
-            .add(conversationId);
+        redisTemplate.opsForSet().add(userConversationsKey, conversationId.toString());
+        redisTemplate.opsForSet().add(conversationUsersKey, userId.toString());
         
         log.debug("User {} marked as active in conversation {}", userId, conversationId);
     }
 
     private void removeActiveUser(Integer conversationId, Integer userId) {
-        Optional.ofNullable(activeUsersByConversation.get(conversationId))
-                .ifPresent(activeUsers -> activeUsers.remove(userId));
+        String userConversationsKey = String.format("user:active:conversations:%d", userId);
+        String conversationUsersKey = String.format("conversation:active:users:%d", conversationId);
         
-        Optional.ofNullable(userActiveConversations.get(userId))
-                .ifPresent(conversations -> conversations.remove(conversationId));
+        redisTemplate.opsForSet().remove(userConversationsKey, conversationId.toString());
+        redisTemplate.opsForSet().remove(conversationUsersKey, userId.toString());
         
-        // Also remove from typing indicators
         Optional.ofNullable(typingUsersByConversation.get(conversationId))
                 .ifPresent(typingUsers -> typingUsers.remove(userId));
         
@@ -515,23 +481,28 @@ public void notifyNewConversation(Integer conversationId, List<Integer> userIds)
     }
 
     private void cleanupConversation(Integer conversationId) {
-        // Remove all active users from this conversation
-        Set<Integer> activeUsers = activeUsersByConversation.remove(conversationId);
-        if (activeUsers != null) {
-            for (Integer userId : activeUsers) {
-                Optional.ofNullable(userActiveConversations.get(userId))
-                        .ifPresent(conversations -> conversations.remove(conversationId));
+        String conversationUsersKey = String.format("conversation:active:users:%d", conversationId);
+        Set<Object> userIds = redisTemplate.opsForSet().members(conversationUsersKey);
+        
+        if (userIds != null) {
+            for (Object userIdObj : userIds) {
+                try {
+                    Integer userId = Integer.parseInt(userIdObj.toString());
+                    String userConversationsKey = String.format("user:active:conversations:%d", userId);
+                    redisTemplate.opsForSet().remove(userConversationsKey, conversationId.toString());
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid user ID: {}", userIdObj);
+                }
             }
         }
         
-        // Clean up typing indicators
+        redisTemplate.delete(conversationUsersKey);
         typingUsersByConversation.remove(conversationId);
         
         log.debug("Cleaned up realtime tracking for conversation {}", conversationId);
     }
 
     private void broadcastToUserQueues(Integer conversationId, String eventType, Object data) {
-        // Get all participants of the conversation
         List<ConversationParticipant> participants = participantRepository
                 .findByConversation_ConversationIdAndIsActiveTrue(conversationId);
         
@@ -551,18 +522,24 @@ public void notifyNewConversation(Integer conversationId, List<Integer> userIds)
         return conversationRepository.findById(conversationId)
         .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
     }
+
     private void cleanupUserPresence(Integer userId) {
-    // Remove user from all conversations they were active in
-    Set<Integer> userConversations = userActiveConversations.remove(userId);
-    if (userConversations != null) {
-        for (Integer conversationId : userConversations) {
-            removeActiveUser(conversationId, userId);
-            
-            // Broadcast offline status
-            broadcastUserPresence(conversationId, userId, false);
+        String userConversationsKey = String.format("user:active:conversations:%d", userId);
+        Set<Object> conversationIds = redisTemplate.opsForSet().members(userConversationsKey);
+        
+        if (conversationIds != null) {
+            for (Object convIdObj : conversationIds) {
+                try {
+                    Integer conversationId = Integer.parseInt(convIdObj.toString());
+                    removeActiveUser(conversationId, userId);
+                    broadcastUserPresence(conversationId, userId, false);
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid conversation ID: {}", convIdObj);
+                }
+            }
         }
+        
+        redisTemplate.delete(userConversationsKey);
+        log.debug("Completely cleaned up presence for user {}", userId);
     }
-    
-    log.debug("Completely cleaned up presence for user {}", userId);
-}
 }

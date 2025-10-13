@@ -14,8 +14,10 @@ import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -29,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import com.tuniv.backend.shared.service.HtmlSanitizerService;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +48,7 @@ public class MessageServiceImpl implements MessageService {
     private final PermissionService permissionService;
     private final ChatMapper chatMapper;
     private final ChatRealtimeService chatRealtimeService;
+    private final HtmlSanitizerService htmlSanitizerService;
 
     @Override
     @Transactional(readOnly = true)
@@ -63,11 +68,12 @@ public class MessageServiceImpl implements MessageService {
         return hasMessagePermission(user.getUserId(), conversationId, permission);
     }
 
-    // ========== Core Message Actions ==========
-
     @Override
     public ChatMessageDto sendMessage(Integer conversationId, SendMessageRequest request, UserDetailsImpl currentUser) {
         log.info("Sending message to conversation {} by user {}", conversationId, currentUser.getId());
+        
+        String sanitizedBody = htmlSanitizerService.sanitizeMessageBody(request.getBody(), true);
+        request.setBody(sanitizedBody);
         
         Conversation conversation = getConversationEntity(conversationId);
         User currentUserEntity = getUserEntity(currentUser.getId());
@@ -121,6 +127,9 @@ public class MessageServiceImpl implements MessageService {
     @Override
     public ChatMessageDto editMessage(Integer messageId, EditMessageRequest request, UserDetailsImpl currentUser) {
         log.info("Editing message {} by user {}", messageId, currentUser.getId());
+        
+        String sanitizedBody = htmlSanitizerService.sanitizeMessageBody(request.getBody(), true);
+        request.setBody(sanitizedBody);
         
         Message message = getMessageEntity(messageId);
         validateMessageOwnershipOrPermission(message, currentUser, "edit_own_messages", "edit_any_message");
@@ -178,27 +187,28 @@ public class MessageServiceImpl implements MessageService {
         log.info("Message {} permanently deleted", messageId);
     }
 
-    // ========== Message Retrieval ==========
-
     @Override
-    @Transactional(readOnly = true)
-    public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, UserDetailsImpl currentUser, Pageable pageable) {
-        log.debug("Fetching messages for conversation {} by user {}", conversationId, currentUser.getId());
-        
-        Conversation conversation = getConversationEntity(conversationId);
-        validateConversationMembership(conversation, currentUser);
-        
-        Specification<Message> spec = (root, query, cb) -> 
-            cb.and(
-                cb.equal(root.get("conversation").get("conversationId"), conversationId),
-                cb.equal(root.get("deleted"), false)
-            );
-        
-        Page<Message> messages = messageRepository.findAll(spec, pageable);
-        
-        List<ChatMessageDto> dtos = chatMapper.toChatMessageDtoListOptimized(messages.getContent(), currentUser.getId());
-        return new org.springframework.data.domain.PageImpl<>(dtos, pageable, messages.getTotalElements());
-    }
+@Transactional(readOnly = true)
+public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, UserDetailsImpl currentUser, Pageable pageable) {
+    log.debug("Fetching messages for conversation {} by user {}", conversationId, currentUser.getId());
+    
+    Conversation conversation = getConversationEntity(conversationId);
+    validateConversationMembership(conversation, currentUser);
+    
+    Specification<Message> spec = (root, query, cb) -> 
+        cb.and(
+            cb.equal(root.get("conversation").get("conversationId"), conversationId),
+            cb.equal(root.get("deleted"), false)
+        );
+    
+    Page<Message> messages = messageRepository.findAll(spec, pageable);
+    
+    // Use optimized bulk mapper to avoid N+1 queries for reactions
+    List<ChatMessageDto> dtos = chatMapper.toChatMessageDtoListOptimized(
+        messages.getContent(), currentUser.getId());
+    
+    return new PageImpl<>(dtos, pageable, messages.getTotalElements());
+}
 
     @Override
     @Transactional(readOnly = true)
@@ -286,8 +296,6 @@ public class MessageServiceImpl implements MessageService {
         return messages.map(chatMapper::toChatMessageDto);
     }
 
-    // ========== Message Interactions ==========
-
     @Override
     public void markMessagesAsRead(Integer conversationId, Integer lastReadMessageId, UserDetailsImpl currentUser) {
         log.debug("Marking messages as read in conversation {} up to message {} by user {}",
@@ -353,8 +361,6 @@ public class MessageServiceImpl implements MessageService {
         
         return unreadCount;
     }
-
-    // ========== Reactions ==========
 
     @Override
     public ReactionDto addOrUpdateReaction(Integer messageId, ReactionRequestDto request, UserDetailsImpl currentUser) {
@@ -491,8 +497,6 @@ public class MessageServiceImpl implements MessageService {
         return summary;
     }
 
-    // ========== Pinning ==========
-
     @Override
     public PinnedMessageDto pinMessage(Integer messageId, UserDetailsImpl currentUser) {
         log.info("Pinning message {} by user {}", messageId, currentUser.getId());
@@ -556,8 +560,6 @@ public class MessageServiceImpl implements MessageService {
         return message.isPinned();
     }
 
-    // ========== Threads & Replies ==========
-
     @Override
     @Transactional(readOnly = true)
     public Page<ChatMessageDto> getMessageReplies(Integer parentMessageId, UserDetailsImpl currentUser, Pageable pageable) {
@@ -610,8 +612,6 @@ public class MessageServiceImpl implements MessageService {
         return new PageImpl<>(receiptDtos, pageable, readers.size());
     }
 
-    // ========== Utility Methods ==========
-
     @Override
     public void updateMessageStatus(Integer messageId, MessageStatus status, UserDetailsImpl currentUser) {
         log.debug("Updating message {} status to {}", messageId, status);
@@ -654,8 +654,6 @@ public class MessageServiceImpl implements MessageService {
         
         return stats;
     }
-
-    // ========== Private Helper Methods ==========
 
     private Message createMessageEntity(SendMessageRequest request, Conversation conversation, User author) {
         Message message = new Message();

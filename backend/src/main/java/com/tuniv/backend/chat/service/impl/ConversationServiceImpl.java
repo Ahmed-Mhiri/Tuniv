@@ -21,6 +21,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
@@ -223,47 +224,23 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public Page<ConversationSummaryDto> getMyConversations(UserDetailsImpl currentUser, Pageable pageable) {
-        log.debug("Fetching conversations for user {}", currentUser.getId());
-        
-        Page<Conversation> conversations = conversationRepository.findActiveNonArchivedConversationsByUserId(
-            currentUser.getId(), pageable);
-        
-        if (conversations.isEmpty()) {
-            return Page.empty(pageable);
-        }
-        
-        List<Integer> conversationIds = conversations.getContent().stream()
-                .map(Conversation::getConversationId)
-                .collect(Collectors.toList());
-        
-        List<ConversationParticipant> participants = participantRepository
-                .findByConversation_ConversationIdInAndUser_UserIdAndIsActiveTrue(conversationIds, currentUser.getId());
-        
-        Map<Integer, ConversationParticipant> participantMap = participants.stream()
-                .collect(Collectors.toMap(
-                    cp -> cp.getConversation().getConversationId(),
-                    cp -> cp
-                ));
-        
-        List<ConversationSummaryDto> dtos = conversations.getContent().stream()
-                .map(conversation -> {
-                    ConversationSummaryDto dto = toConversationSummaryDtoBasic(conversation);
-                    
-                    ConversationParticipant participant = participantMap.get(conversation.getConversationId());
-                    if (participant != null) {
-                        dto.setUnreadCount(participant.getUnreadCount());
-                    } else {
-                        dto.setUnreadCount(0);
-                    }
-                    
-                    return dto;
-                })
-                .collect(Collectors.toList());
-        
-        return new org.springframework.data.domain.PageImpl<>(dtos, pageable, conversations.getTotalElements());
+@Transactional(readOnly = true)
+public Page<ConversationSummaryDto> getMyConversations(UserDetailsImpl currentUser, Pageable pageable) {
+    log.debug("Fetching conversations for user {}", currentUser.getId());
+    
+    Page<Conversation> conversations = conversationRepository.findActiveNonArchivedConversationsByUserId(
+        currentUser.getId(), pageable);
+    
+    if (conversations.isEmpty()) {
+        return Page.empty(pageable);
     }
+    
+    // Use the optimized bulk mapper instead of individual queries
+    List<ConversationSummaryDto> dtos = chatMapper.toConversationSummaryDtoListOptimized(
+        conversations.getContent(), currentUser.getId());
+    
+    return new PageImpl<>(dtos, pageable, conversations.getTotalElements());
+}
 
     @Override
     @Transactional(readOnly = true)

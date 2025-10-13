@@ -1,9 +1,7 @@
 package com.tuniv.backend.config;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
@@ -21,30 +19,24 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // =========================================================================
-        // ✅ THE FIX: Remove the .withSockJS() call
-        // This configures the endpoint for a standard, native WebSocket connection.
-        // =========================================================================
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*");
+                .setAllowedOriginPatterns("*")
+                .withSockJS(); // Keep SockJS for fallback
     }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        ThreadPoolTaskScheduler ts = new ThreadPoolTaskScheduler();
-        ts.setPoolSize(1);
-        ts.setThreadNamePrefix("wss-heartbeat-thread-");
-        ts.initialize();
-
-        registry.enableSimpleBroker("/topic")
-                .setHeartbeatValue(new long[]{10000, 10000})
-                .setTaskScheduler(ts);
+        // Configure RabbitMQ as the external message broker
+        registry.enableStompBrokerRelay("/topic", "/queue")
+                .setRelayHost("localhost") // Use your RabbitMQ host
+                .setRelayPort(61613) // STOMP port for RabbitMQ
+                .setClientLogin("guest") // Default RabbitMQ credentials
+                .setClientPasscode("guest")
+                .setSystemLogin("guest")
+                .setSystemPasscode("guest")
+                .setVirtualHost("/");
         
         registry.setApplicationDestinationPrefixes("/app");
-    }
-
-    @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(jwtAuthChannelInterceptor);
+        registry.setUserDestinationPrefix("/user");
     }
 }
