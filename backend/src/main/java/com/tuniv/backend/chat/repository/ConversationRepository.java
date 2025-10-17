@@ -35,6 +35,12 @@ public interface ConversationRepository extends JpaRepository<Conversation, Inte
     List<Conversation> findByIsArchivedFalse();
     
     Page<Conversation> findByIsArchived(boolean isArchived, Pageable pageable);
+    
+    // ========== Bulk Finders ==========
+    
+    List<Conversation> findByConversationIdIn(List<Integer> conversationIds);
+    
+    List<Conversation> findByConversationIdInAndIsActiveTrue(List<Integer> conversationIds);
 
     // ========== Complex Queries ==========
     
@@ -83,16 +89,22 @@ public interface ConversationRepository extends JpaRepository<Conversation, Inte
            "AND c.isActive = true")
     Page<Conversation> searchConversations(@Param("query") String query, Pageable pageable);
 
+    // ========== Entity Graph Methods ==========
+    
     @EntityGraph(attributePaths = {"participants", "participants.user", "participants.role"})
     Optional<Conversation> findByIdWithParticipants(Integer conversationId);
 
     @EntityGraph(attributePaths = {"participants.user", "participants.role"})
-Optional<Conversation> findWithParticipantsById(Integer conversationId);
+    Optional<Conversation> findWithParticipantsById(Integer conversationId);
 
-@EntityGraph(attributePaths = {"participants", "participants.user", "participants.role", "universityContext"})
-Optional<Conversation> findWithParticipantsAndContextById(Integer conversationId);
+    @EntityGraph(attributePaths = {"participants", "participants.user", "participants.role", "universityContext"})
+    Optional<Conversation> findWithParticipantsAndContextById(Integer conversationId);
 
-// For cases where you need pinned messages too, create a custom query
-@Query("SELECT c FROM Conversation c LEFT JOIN FETCH c.participants p LEFT JOIN FETCH p.user LEFT JOIN FETCH p.role WHERE c.conversationId = :conversationId")
-Optional<Conversation> findWithParticipantsAndUsersAndRoles(@Param("conversationId") Integer conversationId);
+    // For cases where you need pinned messages too, create a custom query
+    @Query("SELECT c FROM Conversation c LEFT JOIN FETCH c.participants p LEFT JOIN FETCH p.user LEFT JOIN FETCH p.role WHERE c.conversationId = :conversationId")
+    Optional<Conversation> findWithParticipantsAndUsersAndRoles(@Param("conversationId") Integer conversationId);
+    
+    // ========== Existence Checks ==========
+    
+    boolean existsByConversationId(Integer conversationId);
 }

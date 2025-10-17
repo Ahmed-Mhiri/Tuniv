@@ -36,6 +36,14 @@ public interface MessageRepository extends JpaRepository<Message, Integer>, JpaS
     List<Message> findByMessageType(MessageType messageType);
     
     List<Message> findByConversationAndMessageType(Conversation conversation, MessageType messageType);
+    
+    // ========== Bulk Finders ==========
+    
+    List<Message> findByIdIn(List<Integer> messageIds);
+    
+    List<Message> findByConversation_ConversationIdIn(List<Integer> conversationIds);
+    
+    List<Message> findByConversation_ConversationIdInAndDeletedFalse(List<Integer> conversationIds);
 
     // ========== Complex Queries ==========
     
@@ -58,6 +66,17 @@ public interface MessageRepository extends JpaRepository<Message, Integer>, JpaS
     List<Message> findMessagesBetween(@Param("conversationId") Integer conversationId,
                                     @Param("startTime") Instant startTime,
                                     @Param("endTime") Instant endTime);
+
+    // ========== Entity Graph Methods ==========
+    
+    @Query("SELECT m FROM Message m JOIN FETCH m.conversation WHERE m.id = :messageId")
+    Optional<Message> findWithConversationById(@Param("messageId") Integer messageId);
+    
+    @Query("SELECT m FROM Message m JOIN FETCH m.conversation JOIN FETCH m.author WHERE m.id = :messageId")
+    Optional<Message> findWithConversationAndAuthorById(@Param("messageId") Integer messageId);
+    
+    @Query("SELECT m FROM Message m JOIN FETCH m.conversation LEFT JOIN FETCH m.replyToMessage WHERE m.id = :messageId")
+    Optional<Message> findWithConversationAndReplyById(@Param("messageId") Integer messageId);
 
     // ========== Search Queries ==========
     
@@ -93,6 +112,11 @@ public interface MessageRepository extends JpaRepository<Message, Integer>, JpaS
     List<Message> findPinnedMessages(@Param("conversationId") Integer conversationId);
     
     long countByConversationAndPinnedTrueAndDeletedFalse(Conversation conversation);
+    
+    @Query("SELECT m FROM Message m WHERE m.conversation.conversationId IN :conversationIds AND m.pinned = true AND m.deleted = false")
+    List<Message> findByConversation_ConversationIdInAndPinnedTrueAndDeletedFalse(
+        @Param("conversationIds") List<Integer> conversationIds
+    );
 
     // ========== Unread/Read Status Queries ==========
     
@@ -150,4 +174,8 @@ public interface MessageRepository extends JpaRepository<Message, Integer>, JpaS
     @Modifying
     @Query("UPDATE Message m SET m.pinned = false WHERE m.conversation.conversationId = :conversationId")
     void unpinAllInConversation(@Param("conversationId") Integer conversationId);
+    
+    // ========== Existence Checks ==========
+    
+    boolean existsById(Integer messageId);
 }

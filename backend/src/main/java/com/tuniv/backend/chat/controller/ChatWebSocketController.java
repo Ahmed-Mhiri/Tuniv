@@ -1,26 +1,28 @@
 package com.tuniv.backend.chat.controller;
 
 import java.security.Principal;
+import java.util.stream.Collectors;
 
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.messaging.simp.annotation.SubscribeMapping;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import com.tuniv.backend.authorization.service.PermissionService;
+import com.tuniv.backend.chat.annotation.RequiresMembership;
 import com.tuniv.backend.chat.dto.ChatMessageDto;
 import com.tuniv.backend.chat.dto.ChatNotificationDto;
 import com.tuniv.backend.chat.dto.EditMessageRequest;
 import com.tuniv.backend.chat.dto.ReactionRequestDto;
 import com.tuniv.backend.chat.dto.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.RemoveReactionRequestDto;
 import com.tuniv.backend.chat.dto.SendMessageRequest;
 import com.tuniv.backend.chat.dto.TypingIndicatorDto;
 import com.tuniv.backend.chat.dto.UserPresenceDto;
@@ -32,6 +34,8 @@ import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
 
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -45,46 +49,44 @@ public class ChatWebSocketController {
     private final ConversationService conversationService;
     private final PermissionService permissionService;
     private final UserRepository userRepository;
-    private final SimpMessagingTemplate messagingTemplate;
 
-    // ========== Message Events ==========
+    // ========== Message Operations ==========
 
-    @MessageMapping("/chat/{conversationId}/typing")
-    public void handleTyping(
+    @MessageMapping("/chat/{conversationId}/send")
+    @SendToUser("/queue/messages/ack")
+    @RequiresMembership(conversationIdParam = "conversationId")
+    public ChatMessageDto sendMessage(
             @DestinationVariable Integer conversationId,
-            @Payload TypingIndicatorDto typingIndicator,
+            @Payload SendMessageRequest request,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
         
-        log.debug("WebSocket: User {} typing in conversation {}", currentUser.getId(), conversationId);
+        log.info("WebSocket: Sending message to conversation {} by user {}", conversationId, currentUser.getId());
         
-        // ✅ MODIFIED: Pass userId directly instead of User object
-        validateConversationMembership(conversationId, currentUser.getId());
+        // Membership validation is handled by AOP - @RequiresMembership annotation
+        // Specific permission check for sending messages
+        if (!permissionService.hasPermission(currentUser.getId(), "chat.message.send", conversationId)) {
+            throw new AccessDeniedException("No permission to send messages in this conversation");
+        }
         
-        // Set the user ID from the authenticated user (security measure)
-        typingIndicator.setUserId(currentUser.getId());
-        typingIndicator.setUsername(currentUser.getUsername());
-        
-        chatRealtimeService.broadcastTypingIndicator(conversationId, typingIndicator);
+        return messageService.sendMessage(conversationId, request, currentUser);
     }
 
-    @MessageMapping("/chat/{conversationId}/stop-typing")
-    public void handleStopTyping(
-            @DestinationVariable Integer conversationId,
+    @MessageMapping("/chat/messages/{messageId}/edit")
+    @SendToUser("/queue/messages/ack")
+    public ChatMessageDto editMessage(
+            @DestinationVariable Integer messageId,
+            @Payload EditMessageRequest request,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
         
-        log.debug("WebSocket: User {} stopped typing in conversation {}", currentUser.getId(), conversationId);
+        log.info("WebSocket: Editing message {} by user {}", messageId, currentUser.getId());
         
-        // ✅ MODIFIED: Pass userId directly
-        validateConversationMembership(conversationId, currentUser.getId());
-        
-        chatRealtimeService.broadcastStopTyping(conversationId, currentUser.getId());
+        // Message-level permissions are handled by MessageService
+        return messageService.editMessage(messageId, request, currentUser);
     }
-
-    // ========== Message Management Events ==========
 
     @MessageMapping("/chat/messages/{messageId}/delete")
     public void deleteMessage(
@@ -95,13 +97,14 @@ public class ChatWebSocketController {
         
         log.info("WebSocket: Deleting message {} by user {}", messageId, currentUser.getId());
         
-        // Permission check is handled in MessageService
+        // Message-level permissions are handled by MessageService
         messageService.deleteMessage(messageId, currentUser);
     }
 
-    // ========== Reaction Events ==========
+    // ========== Reaction Operations ==========
 
     @MessageMapping("/chat/messages/{messageId}/reactions/add")
+    @RequiresMembership // Membership will be inferred from message context
     public void addReaction(
             @DestinationVariable Integer messageId,
             @Payload ReactionRequestDto request,
@@ -111,26 +114,66 @@ public class ChatWebSocketController {
         
         log.info("WebSocket: Adding reaction to message {} by user {}", messageId, currentUser.getId());
         
-        // Permission check is handled in MessageService
+        // Membership validation handled by AOP, message permissions by service
         messageService.addOrUpdateReaction(messageId, request, currentUser);
     }
 
     @MessageMapping("/chat/messages/{messageId}/reactions/remove")
+    @RequiresMembership // Membership will be inferred from message context
     public void removeReaction(
             @DestinationVariable Integer messageId,
-            @RequestParam String emoji,
+            @Payload @Valid RemoveReactionRequestDto request,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
         
         log.info("WebSocket: Removing reaction from message {} by user {}", messageId, currentUser.getId());
         
-        messageService.removeReaction(messageId, emoji, currentUser);
+        // Membership validation handled by AOP, message permissions by service
+        messageService.removeReaction(messageId, request.getEmoji(), currentUser);
     }
 
-    // ========== Presence & Activity Events ==========
+    // ========== Typing Indicators ==========
+
+    @MessageMapping("/chat/{conversationId}/typing")
+    @RequiresMembership(conversationIdParam = "conversationId")
+    public void handleTyping(
+            @DestinationVariable Integer conversationId,
+            @Payload TypingIndicatorDto typingIndicator,
+            Principal principal) {
+        
+        UserDetailsImpl currentUser = extractUserDetails(principal);
+        
+        log.debug("WebSocket: User {} typing in conversation {}", currentUser.getId(), conversationId);
+        
+        // Membership validation handled by AOP - @RequiresMembership annotation
+        
+        typingIndicator.setUserId(currentUser.getId());
+        typingIndicator.setUsername(currentUser.getUsername());
+        typingIndicator.setConversationId(conversationId);
+        
+        chatRealtimeService.broadcastTypingIndicator(conversationId, typingIndicator);
+    }
+
+    @MessageMapping("/chat/{conversationId}/stop-typing")
+    @RequiresMembership(conversationIdParam = "conversationId")
+    public void handleStopTyping(
+            @DestinationVariable Integer conversationId,
+            Principal principal) {
+        
+        UserDetailsImpl currentUser = extractUserDetails(principal);
+        
+        log.debug("WebSocket: User {} stopped typing in conversation {}", currentUser.getId(), conversationId);
+        
+        // Membership validation handled by AOP - @RequiresMembership annotation
+        
+        chatRealtimeService.broadcastStopTyping(conversationId, currentUser.getId());
+    }
+
+    // ========== Presence & Read Receipts ==========
 
     @MessageMapping("/chat/{conversationId}/presence")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public void handlePresence(
             @DestinationVariable Integer conversationId,
             @Payload UserPresenceDto presence,
@@ -141,17 +184,17 @@ public class ChatWebSocketController {
         log.debug("WebSocket: User {} presence update in conversation {}: online={}", 
                  currentUser.getId(), conversationId, presence.isOnline());
         
-        // ✅ MODIFIED: Pass userId directly
-        validateConversationMembership(conversationId, currentUser.getId());
+        // Membership validation handled by AOP - @RequiresMembership annotation
         
-        // Ensure the presence data matches the authenticated user
         presence.setUserId(currentUser.getId());
         presence.setUsername(currentUser.getUsername());
+        presence.setConversationId(conversationId);
         
         chatRealtimeService.broadcastUserPresence(conversationId, currentUser.getId(), presence.isOnline());
     }
 
     @MessageMapping("/chat/{conversationId}/read-receipt")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public void handleReadReceipt(
             @DestinationVariable Integer conversationId,
             @Payload ReadReceiptDto readReceipt,
@@ -161,12 +204,11 @@ public class ChatWebSocketController {
         
         log.debug("WebSocket: User {} read receipt in conversation {}", currentUser.getId(), conversationId);
         
-        // ✅ MODIFIED: Pass userId directly
-        validateConversationMembership(conversationId, currentUser.getId());
+        // Membership validation handled by AOP - @RequiresMembership annotation
         
-        // Set user info from authentication
         readReceipt.setUserId(currentUser.getId());
         readReceipt.setUsername(currentUser.getUsername());
+        readReceipt.setConversationId(conversationId);
         
         chatRealtimeService.broadcastReadReceipt(conversationId, readReceipt);
     }
@@ -180,12 +222,12 @@ public class ChatWebSocketController {
             UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
             log.debug("WebSocket: User {} subscribed to notifications", userDetails.getId());
             
-            // Send welcome message or initial notifications
             sendWelcomeNotification(userDetails);
         }
     }
 
     @SubscribeMapping("/topic/conversations/{conversationId}")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public void handleConversationSubscription(
             @DestinationVariable Integer conversationId,
             SimpMessageHeaderAccessor headerAccessor) {
@@ -196,14 +238,20 @@ public class ChatWebSocketController {
             
             log.debug("WebSocket: User {} subscribed to conversation {}", userDetails.getId(), conversationId);
             
-            // ✅ MODIFIED: Pass userId directly
-            validateConversationMembership(conversationId, userDetails.getId());
+            // Membership validation handled by AOP - @RequiresMembership annotation
             
-            // Notify others that user is now active in this conversation
             chatRealtimeService.broadcastUserActiveStatus(conversationId, userDetails.getId(), true);
             
-            // Send conversation state (pinned messages, active users, etc.)
             sendConversationState(conversationId, userDetails);
+        }
+    }
+
+    @SubscribeMapping("/user/queue/messages/ack")
+    public void handleMessageAckSubscription(SimpMessageHeaderAccessor headerAccessor) {
+        Authentication auth = (Authentication) headerAccessor.getUser();
+        if (auth != null) {
+            UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
+            log.debug("WebSocket: User {} subscribed to message acknowledgments", userDetails.getId());
         }
     }
 
@@ -216,7 +264,7 @@ public class ChatWebSocketController {
         }
     }
 
-    // ========== Error Handling ==========
+    // ========== Exception Handlers ==========
 
     @MessageExceptionHandler
     @SendToUser("/queue/errors")
@@ -239,12 +287,53 @@ public class ChatWebSocketController {
         return errorMessage;
     }
 
-    // ========== Utility Methods ==========
+    @MessageExceptionHandler(MethodArgumentNotValidException.class)
+    @SendToUser("/queue/errors")
+    public ErrorMessage handleValidationException(MethodArgumentNotValidException exception, Principal principal) {
+        log.warn("Validation error for user {}: {}", principal.getName(), exception.getMessage());
+    
+        String errorMessage = exception.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.joining(", "));
+        
+        ErrorMessage error = new ErrorMessage();
+        error.setType("VALIDATION_ERROR");
+        error.setCode("INVALID_INPUT");
+        error.setMessage(errorMessage);
+        error.setTimestamp(java.time.Instant.now());
+        
+        return error;
+    }
+
+    @MessageExceptionHandler(ConstraintViolationException.class)
+    @SendToUser("/queue/errors")
+    public ErrorMessage handleConstraintViolationException(ConstraintViolationException exception, Principal principal) {
+        log.warn("Constraint violation for user {}: {}", principal.getName(), exception.getMessage());
+        
+        String errorMessage = exception.getConstraintViolations()
+                .stream()
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .collect(Collectors.joining(", "));
+        
+        ErrorMessage error = new ErrorMessage();
+        error.setType("VALIDATION_ERROR");
+        error.setCode("INVALID_INPUT");
+        error.setMessage(errorMessage);
+        error.setTimestamp(java.time.Instant.now());
+        
+        return error;
+    }
+
+    // ========== Private Helper Methods ==========
 
     private UserDetailsImpl extractUserDetails(Principal principal) {
         if (principal instanceof Authentication) {
             Authentication auth = (Authentication) principal;
-            return (UserDetailsImpl) auth.getPrincipal();
+            if (auth.getPrincipal() instanceof UserDetailsImpl) {
+                return (UserDetailsImpl) auth.getPrincipal();
+            }
         }
         throw new SecurityException("Unable to extract user details from principal");
     }
@@ -254,7 +343,11 @@ public class ChatWebSocketController {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 
-    // ✅ MODIFIED: Updated to accept userId instead of User object
+    /**
+     * Note: This method is no longer needed for WebSocket operations
+     * as membership validation is now handled by the AOP aspect
+     */
+    @Deprecated
     private void validateConversationMembership(Integer conversationId, Integer userId) {
         if (!conversationService.hasConversationPermission(userId, conversationId, "chat.conversation.view")) {
             throw new AccessDeniedException("Not a member of this conversation");
@@ -273,63 +366,11 @@ public class ChatWebSocketController {
 
     private void sendConversationState(Integer conversationId, UserDetailsImpl userDetails) {
         try {
-            // Send active users list
             var activeUsers = chatRealtimeService.getActiveUsersInConversation(conversationId);
-            
-            // Send typing indicators
-            // This would require storing typing state in ChatRealtimeService
             
             log.debug("Sent conversation state to user {} for conversation {}", userDetails.getId(), conversationId);
         } catch (Exception e) {
             log.warn("Failed to send conversation state to user {}: {}", userDetails.getId(), e.getMessage());
-        }
-    }
-
-    @MessageMapping("/chat/{conversationId}/send")
-    @SendToUser("/queue/messages/ack")
-    public ChatMessageDto sendMessage(
-            @DestinationVariable Integer conversationId,
-            @Payload SendMessageRequest request,
-            Principal principal) {
-        
-        UserDetailsImpl currentUser = extractUserDetails(principal);
-        
-        log.info("WebSocket: Sending message to conversation {} by user {}", conversationId, currentUser.getId());
-        
-        // ✅ MODIFIED: Pass userId directly
-        validateConversationMembership(conversationId, currentUser.getId());
-        
-        // Check if user has permission to send messages in this conversation
-        if (!permissionService.hasPermission(currentUser.getId(), "chat.message.send", conversationId)) {
-            throw new AccessDeniedException("No permission to send messages in this conversation");
-        }
-        
-        // The service method broadcasts to all participants and returns the DTO for acknowledgment
-        return messageService.sendMessage(conversationId, request, currentUser);
-    }
-
-    @MessageMapping("/chat/messages/{messageId}/edit")
-    @SendToUser("/queue/messages/ack")
-    public ChatMessageDto editMessage(
-            @DestinationVariable Integer messageId,
-            @Payload EditMessageRequest request,
-            Principal principal) {
-        
-        UserDetailsImpl currentUser = extractUserDetails(principal);
-        
-        log.info("WebSocket: Editing message {} by user {}", messageId, currentUser.getId());
-        
-        // Permission check is handled in MessageService
-        return messageService.editMessage(messageId, request, currentUser);
-    }
-
-    // Add subscription handler for acknowledgments
-    @SubscribeMapping("/user/queue/messages/ack")
-    public void handleMessageAckSubscription(SimpMessageHeaderAccessor headerAccessor) {
-        Authentication auth = (Authentication) headerAccessor.getUser();
-        if (auth != null) {
-            UserDetailsImpl userDetails = (UserDetailsImpl) auth.getPrincipal();
-            log.debug("WebSocket: User {} subscribed to message acknowledgments", userDetails.getId());
         }
     }
 

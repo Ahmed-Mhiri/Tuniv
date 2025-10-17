@@ -2,6 +2,7 @@ package com.tuniv.backend.chat.controller;
 
 import com.tuniv.backend.chat.dto.*;
 import com.tuniv.backend.chat.service.MessageService;
+import com.tuniv.backend.chat.annotation.RequiresMembership;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -29,6 +30,7 @@ public class MessageController {
 
     @PostMapping("/conversation/{conversationId}")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'send_messages')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ChatMessageDto> sendMessage(
             @PathVariable Integer conversationId,
             @RequestBody @Valid SendMessageRequest request,
@@ -72,7 +74,7 @@ public class MessageController {
     // ========== Message Retrieval ==========
 
     @GetMapping("/conversation/{conversationId}")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<Page<ChatMessageDto>> getMessagesForConversation(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
@@ -104,7 +106,7 @@ public class MessageController {
     }
 
     @GetMapping("/conversation/{conversationId}/around/{aroundMessageId}")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<List<ChatMessageDto>> getMessagesAround(
             @PathVariable Integer conversationId,
             @PathVariable Integer aroundMessageId,
@@ -116,7 +118,7 @@ public class MessageController {
     }
 
     @GetMapping("/conversation/{conversationId}/unread")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<Page<ChatMessageDto>> getUnreadMessages(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser,
@@ -143,7 +145,7 @@ public class MessageController {
     }
 
     @PostMapping("/conversation/{conversationId}/read")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ApiResponse> markAllMessagesAsRead(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -153,7 +155,7 @@ public class MessageController {
     }
 
     @GetMapping("/conversation/{conversationId}/unread-count")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<UnreadCountDto> getUnreadCount(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -236,7 +238,7 @@ public class MessageController {
     }
 
     @GetMapping("/conversation/{conversationId}/pinned")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<List<PinnedMessageDto>> getPinnedMessages(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -287,7 +289,7 @@ public class MessageController {
     }
 
     @GetMapping("/conversation/{conversationId}/stats")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<MessageStatsDto> getMessageStats(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {

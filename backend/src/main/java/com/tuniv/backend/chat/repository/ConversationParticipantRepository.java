@@ -160,4 +160,8 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
 
 @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId IN :conversationIds AND cp.isActive = true")
 List<ConversationParticipant> findByConversationIds(@Param("conversationIds") List<Integer> conversationIds);
+
+
+@Query("SELECT COUNT(cp) > 0 FROM ConversationParticipant cp WHERE cp.conversation.conversationId = :conversationId AND cp.user.userId = :userId AND cp.isActive = true")
+boolean isUserActiveParticipant(@Param("conversationId") Integer conversationId, @Param("userId") Integer userId);
 }

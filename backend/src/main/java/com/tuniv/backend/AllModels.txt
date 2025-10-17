@@ -320,6 +320,15 @@ public class Conversation extends Auditable {
 
     @Column(name = "is_archived", nullable = false)
     private boolean isArchived = false;
+
+    // ========== RELATIONSHIPS ==========
+    @OneToMany(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    private Set<Message> messages = new HashSet<>();
+
+    @OneToMany(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
+    private Set<ConversationParticipant> participants = new HashSet<>();
+
+
     
 }
 
@@ -591,6 +600,62 @@ public enum DefaultConversationRoles {
 
 
 
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\DirectConversationLookup.java
+package com.tuniv.backend.chat.model;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Table(name = "direct_conversation_lookup", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"user1_id", "user2_id"}),
+    @UniqueConstraint(columnNames = {"conversation_id"})
+})
+@Getter
+@Setter
+@NoArgsConstructor
+public class DirectConversationLookup {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Integer id;
+    
+    @Column(name = "user1_id", nullable = false)
+    private Integer user1Id;
+    
+    @Column(name = "user2_id", nullable = false)
+    private Integer user2Id;
+    
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "conversation_id", nullable = false)
+    private Conversation conversation;
+    
+    public DirectConversationLookup(Integer user1Id, Integer user2Id, Conversation conversation) {
+        // Ensure consistent ordering
+        if (user1Id < user2Id) {
+            this.user1Id = user1Id;
+            this.user2Id = user2Id;
+        } else {
+            this.user1Id = user2Id;
+            this.user2Id = user1Id;
+        }
+        this.conversation = conversation;
+    }
+}
+
+
+
 //// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Message.java
 package com.tuniv.backend.chat.model;
 
@@ -663,6 +728,15 @@ public class Message extends Post {
     // Inside Message.java
     @Column(name = "is_pinned", nullable = false)
     private boolean isPinned = false;
+
+    // âœ… NEW: Added fields for pinning context
+    @Column(name = "pinned_at")
+    private Instant pinnedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "pinned_by_user_id")
+    private User pinnedBy;
+
     // ========== MESSAGE METADATA ==========
     @Column(name = "client_message_id")
     private String clientMessageId;
@@ -725,6 +799,15 @@ public enum MessageType {
 
 
 
+//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MuteDuration.java
+package com.tuniv.backend.chat.model;
+
+ public enum MuteDuration {
+        ONE_HOUR, EIGHT_HOURS, ONE_DAY, ONE_WEEK, PERMANENT
+    }
+
+
+
 //// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Reaction.java
 package com.tuniv.backend.chat.model;
 
@@ -756,7 +839,8 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "reactions", indexes = {
-    @Index(name = "idx_reaction_message_user", columnList = "message_id, user_id", unique = true),
+    // âœ… CORRECTED: Unique constraint now includes emoji
+    @Index(name = "idx_reaction_message_user_emoji", columnList = "message_id, user_id, emoji", unique = true),
     @Index(name = "idx_reaction_message", columnList = "message_id, created_at"),
     @Index(name = "idx_reaction_user", columnList = "user_id, created_at"),
     @Index(name = "idx_reaction_emoji", columnList = "emoji, created_at"),

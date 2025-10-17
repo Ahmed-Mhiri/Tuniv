@@ -1,38 +1,59 @@
 package com.tuniv.backend.chat.service.impl;
 
-import com.tuniv.backend.authorization.service.PermissionService;
-import com.tuniv.backend.chat.dto.*;
-import com.tuniv.backend.chat.mapper.ChatMapper;
-import com.tuniv.backend.chat.model.*;
-import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
-import com.tuniv.backend.chat.repository.ConversationRepository;
-import com.tuniv.backend.chat.repository.MessageRepository;
-import com.tuniv.backend.chat.repository.ReactionRepository;
-import com.tuniv.backend.chat.service.ChatRealtimeService;
-import com.tuniv.backend.chat.service.MessageService;
-import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import com.tuniv.backend.shared.exception.ResourceNotFoundException;
-import com.tuniv.backend.user.model.User;
-import com.tuniv.backend.user.repository.UserRepository;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
-
+import com.tuniv.backend.authorization.service.PermissionService;
+import com.tuniv.backend.chat.dto.ChatMessageDto;
+import com.tuniv.backend.chat.dto.EditMessageRequest;
+import com.tuniv.backend.chat.dto.MessageReactionUpdateDto;
+import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
+import com.tuniv.backend.chat.dto.MessageStatsDto;
+import com.tuniv.backend.chat.dto.MessageThreadDto;
+import com.tuniv.backend.chat.dto.PinnedMessageDto;
+import com.tuniv.backend.chat.dto.ReactionAction;
+import com.tuniv.backend.chat.dto.ReactionDto;
+import com.tuniv.backend.chat.dto.ReactionRequestDto;
+import com.tuniv.backend.chat.dto.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.SendMessageRequest;
+import com.tuniv.backend.chat.dto.UnreadCountDto;
+import com.tuniv.backend.chat.mapper.mapstruct.MessageMapper;
+import com.tuniv.backend.chat.mapper.mapstruct.ReactionMapper;
+import com.tuniv.backend.chat.mapper.mapstruct.ReadReceiptMapper;
+import com.tuniv.backend.chat.model.Conversation;
+import com.tuniv.backend.chat.model.ConversationParticipant;
+import com.tuniv.backend.chat.model.Message;
+import com.tuniv.backend.chat.model.MessageStatus;
+import com.tuniv.backend.chat.model.MessageType;
+import com.tuniv.backend.chat.model.Reaction;
+import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
+import com.tuniv.backend.chat.repository.ConversationRepository;
+import com.tuniv.backend.chat.repository.MessageRepository;
+import com.tuniv.backend.chat.repository.ReactionRepository;
+import com.tuniv.backend.chat.service.BulkDataFetcherService;
+import com.tuniv.backend.chat.service.ChatRealtimeService;
+import com.tuniv.backend.chat.service.EntityFinderService;
+import com.tuniv.backend.chat.service.MessageService;
+import com.tuniv.backend.chat.service.ReactionService;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.shared.service.HtmlSanitizerService;
+import com.tuniv.backend.user.model.User;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
@@ -44,11 +65,15 @@ public class MessageServiceImpl implements MessageService {
     private final ConversationRepository conversationRepository;
     private final ConversationParticipantRepository participantRepository;
     private final ReactionRepository reactionRepository;
-    private final UserRepository userRepository;
     private final PermissionService permissionService;
-    private final ChatMapper chatMapper;
+    private final MessageMapper messageMapper;
+    private final ReactionMapper reactionMapper;
+    private final ReadReceiptMapper readReceiptMapper;
+    private final BulkDataFetcherService bulkDataFetcherService;
     private final ChatRealtimeService chatRealtimeService;
     private final HtmlSanitizerService htmlSanitizerService;
+    private final ReactionService reactionService;
+    private final EntityFinderService entityFinderService;
 
     @Override
     @Transactional(readOnly = true)
@@ -75,8 +100,8 @@ public class MessageServiceImpl implements MessageService {
         String sanitizedBody = htmlSanitizerService.sanitizeMessageBody(request.getBody(), true);
         request.setBody(sanitizedBody);
         
-        Conversation conversation = getConversationEntity(conversationId);
-        User currentUserEntity = getUserEntity(currentUser.getId());
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        User currentUserEntity = entityFinderService.getUserOrThrow(currentUser.getId());
         
         validateConversationMembership(conversation, currentUser);
         validateMessagePermissions(conversation, currentUser, "send_messages");
@@ -89,7 +114,16 @@ public class MessageServiceImpl implements MessageService {
         
         updateParticipantMessageCount(conversation, currentUserEntity);
         
-        ChatMessageDto messageDto = chatMapper.toChatMessageDto(savedMessage);
+        // Use bulk mapper for single message with reactions
+        List<Message> singleMessageList = List.of(savedMessage);
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(singleMessageList);
+        List<Reaction> messageReactions = reactionsByMessage.getOrDefault(savedMessage.getId(), List.of());
+        
+        // Use ReactionService for reaction calculation instead of mapper
+        MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+            messageReactions, currentUser.getId(), savedMessage.getId());
+        
+        ChatMessageDto messageDto = messageMapper.toChatMessageDto(savedMessage, reactionsSummary);
         
         chatRealtimeService.broadcastNewMessage(conversationId, messageDto);
         
@@ -101,7 +135,7 @@ public class MessageServiceImpl implements MessageService {
     public void createAndSendSystemMessage(Integer conversationId, String text) {
         log.info("Creating system message for conversation {}: {}", conversationId, text);
         
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         
         Message systemMessage = new Message();
         systemMessage.setBody(text);
@@ -118,7 +152,7 @@ public class MessageServiceImpl implements MessageService {
         
         updateConversationLastMessage(conversation, savedMessage);
         
-        ChatMessageDto messageDto = chatMapper.toChatMessageDto(savedMessage);
+        ChatMessageDto messageDto = messageMapper.toChatMessageDto(savedMessage);
         chatRealtimeService.broadcastNewMessage(conversationId, messageDto);
         
         log.info("System message created with ID: {}", savedMessage.getId());
@@ -131,7 +165,7 @@ public class MessageServiceImpl implements MessageService {
         String sanitizedBody = htmlSanitizerService.sanitizeMessageBody(request.getBody(), true);
         request.setBody(sanitizedBody);
         
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateMessageOwnershipOrPermission(message, currentUser, "edit_own_messages", "edit_any_message");
         
         message.setBody(request.getBody());
@@ -143,7 +177,16 @@ public class MessageServiceImpl implements MessageService {
         
         updateLastMessageIfNeeded(updatedMessage.getConversation().getConversationId(), messageId);
         
-        ChatMessageDto messageDto = chatMapper.toChatMessageDto(updatedMessage, currentUser.getId());
+        // Use bulk mapper for reactions
+        List<Message> singleMessageList = List.of(updatedMessage);
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(singleMessageList);
+        List<Reaction> messageReactions = reactionsByMessage.getOrDefault(updatedMessage.getId(), List.of());
+        
+        // Use ReactionService for reaction calculation instead of mapper
+        MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+            messageReactions, currentUser.getId(), updatedMessage.getId());
+        
+        ChatMessageDto messageDto = messageMapper.toChatMessageDto(updatedMessage, reactionsSummary);
         
         chatRealtimeService.broadcastMessageUpdate(
             message.getConversation().getConversationId(), 
@@ -158,7 +201,7 @@ public class MessageServiceImpl implements MessageService {
     public void deleteMessage(Integer messageId, UserDetailsImpl currentUser) {
         log.info("Deleting message {} by user {}", messageId, currentUser.getId());
         
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         Integer conversationId = message.getConversation().getConversationId();
         validateMessageOwnershipOrPermission(message, currentUser, "delete_own_messages", "delete_any_message");
         
@@ -179,7 +222,7 @@ public class MessageServiceImpl implements MessageService {
     public void permanentlyDeleteMessage(Integer messageId, UserDetailsImpl currentUser) {
         log.info("Permanently deleting message {} by user {}", messageId, currentUser.getId());
         
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateMessagePermission(message, currentUser, "delete_any_message");
         
         messageRepository.delete(message);
@@ -188,37 +231,59 @@ public class MessageServiceImpl implements MessageService {
     }
 
     @Override
-@Transactional(readOnly = true)
-public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, UserDetailsImpl currentUser, Pageable pageable) {
-    log.debug("Fetching messages for conversation {} by user {}", conversationId, currentUser.getId());
-    
-    Conversation conversation = getConversationEntity(conversationId);
-    validateConversationMembership(conversation, currentUser);
-    
-    Specification<Message> spec = (root, query, cb) -> 
-        cb.and(
-            cb.equal(root.get("conversation").get("conversationId"), conversationId),
-            cb.equal(root.get("deleted"), false)
-        );
-    
-    Page<Message> messages = messageRepository.findAll(spec, pageable);
-    
-    // Use optimized bulk mapper to avoid N+1 queries for reactions
-    List<ChatMessageDto> dtos = chatMapper.toChatMessageDtoListOptimized(
-        messages.getContent(), currentUser.getId());
-    
-    return new PageImpl<>(dtos, pageable, messages.getTotalElements());
-}
+    @Transactional(readOnly = true)
+    public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, UserDetailsImpl currentUser, Pageable pageable) {
+        log.debug("Fetching messages for conversation {} by user {}", conversationId, currentUser.getId());
+        
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        validateConversationMembership(conversation, currentUser);
+        
+        Specification<Message> spec = (root, query, cb) -> 
+            cb.and(
+                cb.equal(root.get("conversation").get("conversationId"), conversationId),
+                cb.equal(root.get("deleted"), false)
+            );
+        
+        Page<Message> messages = messageRepository.findAll(spec, pageable);
+        
+        if (messages.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        
+        // Use optimized bulk mapper to avoid N+1 queries for reactions
+        List<Message> messageList = messages.getContent();
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(messageList);
+        
+        List<ChatMessageDto> dtos = new ArrayList<>();
+        for (Message message : messageList) {
+            List<Reaction> messageReactions = reactionsByMessage.getOrDefault(message.getId(), List.of());
+            // Use ReactionService for reaction calculation instead of mapper
+            MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+                messageReactions, currentUser.getId(), message.getId());
+            dtos.add(messageMapper.toChatMessageDto(message, reactionsSummary));
+        }
+        
+        return new PageImpl<>(dtos, pageable, messages.getTotalElements());
+    }
 
     @Override
     @Transactional(readOnly = true)
     public ChatMessageDto getMessage(Integer messageId, UserDetailsImpl currentUser) {
         log.debug("Fetching message {} by user {}", messageId, currentUser.getId());
         
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
         
-        return chatMapper.toChatMessageDto(message);
+        // Use bulk mapper for reactions
+        List<Message> singleMessageList = List.of(message);
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(singleMessageList);
+        List<Reaction> messageReactions = reactionsByMessage.getOrDefault(message.getId(), List.of());
+        
+        // Use ReactionService for reaction calculation instead of mapper
+        MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+            messageReactions, currentUser.getId(), message.getId());
+        
+        return messageMapper.toChatMessageDto(message, reactionsSummary);
     }
 
     @Override
@@ -239,7 +304,25 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
         };
         
         Page<Message> messages = messageRepository.findAll(spec, pageable);
-        return messages.map(chatMapper::toChatMessageDto);
+        
+        if (messages.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        
+        // Use optimized bulk mapper for search results
+        List<Message> messageList = messages.getContent();
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(messageList);
+        
+        List<ChatMessageDto> dtos = new ArrayList<>();
+        for (Message message : messageList) {
+            List<Reaction> messageReactions = reactionsByMessage.getOrDefault(message.getId(), List.of());
+            // Use ReactionService for reaction calculation instead of mapper
+            MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+                messageReactions, currentUser.getId(), message.getId());
+            dtos.add(messageMapper.toChatMessageDto(message, reactionsSummary));
+        }
+        
+        return new PageImpl<>(dtos, pageable, messages.getTotalElements());
     }
 
     @Override
@@ -247,10 +330,10 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     public List<ChatMessageDto> getMessagesAround(Integer conversationId, Integer aroundMessageId, UserDetailsImpl currentUser, int limit) {
         log.debug("Fetching messages around {} in conversation {} by user {}", aroundMessageId, conversationId, currentUser.getId());
         
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         validateConversationMembership(conversation, currentUser);
         
-        Message aroundMessage = getMessageEntity(aroundMessageId);
+        Message aroundMessage = entityFinderService.getMessageOrThrow(aroundMessageId);
         
         Pageable beforePageable = Pageable.ofSize(limit / 2);
         Pageable afterPageable = Pageable.ofSize(limit / 2);
@@ -268,9 +351,19 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
         
         allMessages.sort(Comparator.comparing(Message::getSentAt));
         
-        return allMessages.stream()
-                .map(msg -> chatMapper.toChatMessageDto(msg, currentUser.getId()))
-                .collect(Collectors.toList());
+        // Use bulk mapper for reactions
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(allMessages);
+        
+        List<ChatMessageDto> dtos = new ArrayList<>();
+        for (Message message : allMessages) {
+            List<Reaction> messageReactions = reactionsByMessage.getOrDefault(message.getId(), List.of());
+            // Use ReactionService for reaction calculation instead of mapper
+            MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+                messageReactions, currentUser.getId(), message.getId());
+            dtos.add(messageMapper.toChatMessageDto(message, reactionsSummary));
+        }
+        
+        return dtos;
     }
 
     @Override
@@ -278,7 +371,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     public Page<ChatMessageDto> getUnreadMessages(Integer conversationId, UserDetailsImpl currentUser, Pageable pageable) {
         log.debug("Fetching unread messages for conversation {} by user {}", conversationId, currentUser.getId());
         
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         ConversationParticipant participant = getParticipantEntity(conversation, currentUser.getId());
         
         if (participant.getLastReadTimestamp() == null) {
@@ -293,7 +386,25 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
             );
         
         Page<Message> messages = messageRepository.findAll(spec, pageable);
-        return messages.map(chatMapper::toChatMessageDto);
+        
+        if (messages.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        
+        // Use optimized bulk mapper
+        List<Message> messageList = messages.getContent();
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(messageList);
+        
+        List<ChatMessageDto> dtos = new ArrayList<>();
+        for (Message message : messageList) {
+            List<Reaction> messageReactions = reactionsByMessage.getOrDefault(message.getId(), List.of());
+            // Use ReactionService for reaction calculation instead of mapper
+            MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+                messageReactions, currentUser.getId(), message.getId());
+            dtos.add(messageMapper.toChatMessageDto(message, reactionsSummary));
+        }
+        
+        return new PageImpl<>(dtos, pageable, messages.getTotalElements());
     }
 
     @Override
@@ -301,9 +412,9 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
         log.debug("Marking messages as read in conversation {} up to message {} by user {}",
                  conversationId, lastReadMessageId, currentUser.getId());
 
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         ConversationParticipant participant = getParticipantEntity(conversation, currentUser.getId());
-        Message lastReadMessage = getMessageEntity(lastReadMessageId);
+        Message lastReadMessage = entityFinderService.getMessageOrThrow(lastReadMessageId);
         Instant newLastReadTimestamp = lastReadMessage.getSentAt();
 
         if (participant.getLastReadTimestamp() == null || newLastReadTimestamp.isAfter(participant.getLastReadTimestamp())) {
@@ -328,7 +439,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     public void markAllMessagesAsRead(Integer conversationId, UserDetailsImpl currentUser) {
         log.debug("Marking all messages as read in conversation {} by user {}", conversationId, currentUser.getId());
         
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         ConversationParticipant participant = getParticipantEntity(conversation, currentUser.getId());
         
         Optional<Message> latestMessage = messageRepository.findFirstByConversationOrderBySentAtDesc(conversation);
@@ -351,7 +462,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     @Override
     @Transactional(readOnly = true)
     public UnreadCountDto getUnreadCount(Integer conversationId, UserDetailsImpl currentUser) {
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         ConversationParticipant participant = getParticipantEntity(conversation, currentUser.getId());
         
         UnreadCountDto unreadCount = new UnreadCountDto();
@@ -366,9 +477,9 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     public ReactionDto addOrUpdateReaction(Integer messageId, ReactionRequestDto request, UserDetailsImpl currentUser) {
         log.info("Adding/updating reaction '{}' to message {} by user {}", request.getEmoji(), messageId, currentUser.getId());
         
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
-        User currentUserEntity = getUserEntity(currentUser.getId());
+        User currentUserEntity = entityFinderService.getUserOrThrow(currentUser.getId());
         
         Optional<Reaction> existingReactionOpt = reactionRepository.findByMessageAndUserAndEmojiAndIsRemovedFalse(
             message, currentUserEntity, request.getEmoji());
@@ -389,7 +500,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
         }
         
         Reaction savedReaction = reactionRepository.save(reaction);
-        ReactionDto reactionDto = chatMapper.toReactionDto(savedReaction);
+        ReactionDto reactionDto = reactionMapper.toReactionDto(savedReaction);
         
         MessageReactionUpdateDto reactionUpdate = new MessageReactionUpdateDto();
         reactionUpdate.setMessageId(messageId);
@@ -405,8 +516,8 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     public void removeReaction(Integer messageId, String emoji, UserDetailsImpl currentUser) {
         log.info("Removing reaction '{}' from message {} by user {}", emoji, messageId, currentUser.getId());
         
-        Message message = getMessageEntity(messageId);
-        User currentUserEntity = getUserEntity(currentUser.getId());
+        Message message = entityFinderService.getMessageOrThrow(messageId);
+        User currentUserEntity = entityFinderService.getUserOrThrow(currentUser.getId());
         
         Optional<Reaction> reactionOpt = reactionRepository.findByMessageAndUserAndEmojiAndIsRemovedFalse(
             message, currentUserEntity, emoji);
@@ -418,7 +529,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
             reaction.setRemovedAt(Instant.now());
             reactionRepository.save(reaction);
 
-            ReactionDto reactionDto = chatMapper.toReactionDto(reaction);
+            ReactionDto reactionDto = reactionMapper.toReactionDto(reaction);
             
             MessageReactionUpdateDto reactionUpdate = new MessageReactionUpdateDto();
             reactionUpdate.setMessageId(messageId);
@@ -436,7 +547,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     public void removeReactionById(Integer reactionId, UserDetailsImpl currentUser) {
         log.info("Removing reaction by ID {} by user {}", reactionId, currentUser.getId());
 
-        Reaction reaction = getReactionEntity(reactionId);
+        Reaction reaction = entityFinderService.getReactionOrThrow(reactionId);
         if (!reaction.getUser().getUserId().equals(currentUser.getId())) {
             throw new AccessDeniedException("You can only remove your own reactions.");
         }
@@ -445,7 +556,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
         reaction.setRemovedAt(Instant.now());
         reactionRepository.save(reaction);
 
-        ReactionDto reactionDto = chatMapper.toReactionDto(reaction);
+        ReactionDto reactionDto = reactionMapper.toReactionDto(reaction);
 
         MessageReactionUpdateDto reactionUpdate = new MessageReactionUpdateDto();
         reactionUpdate.setMessageId(reaction.getMessage().getId());
@@ -459,50 +570,30 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     @Override
     @Transactional(readOnly = true)
     public List<ReactionDto> getMessageReactions(Integer messageId, UserDetailsImpl currentUser) {
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
         
-        return reactionRepository.findByMessageAndIsRemovedFalse(message).stream()
-                .map(chatMapper::toReactionDto)
-                .collect(Collectors.toList());
+        List<Reaction> reactions = reactionRepository.findByMessageAndIsRemovedFalse(message);
+        return reactionMapper.toReactionDtoList(reactions);
     }
 
     @Override
     @Transactional(readOnly = true)
     public MessageReactionsSummaryDto getMessageReactionsSummary(Integer messageId, UserDetailsImpl currentUser) {
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
         
         List<Reaction> reactions = reactionRepository.findByMessageAndIsRemovedFalse(message);
-        
-        Map<String, Long> reactionCounts = reactions.stream()
-                .collect(Collectors.groupingBy(
-                    Reaction::getEmoji,
-                    Collectors.counting()
-                ));
-        
-        Map<String, Boolean> userReactions = reactions.stream()
-                .filter(r -> r.getUser().getUserId().equals(currentUser.getId()))
-                .collect(Collectors.toMap(
-                    Reaction::getEmoji,
-                    r -> true
-                ));
-        
-        MessageReactionsSummaryDto summary = new MessageReactionsSummaryDto();
-        summary.setMessageId(messageId);
-        summary.setReactionCounts(reactionCounts);
-        summary.setUserReactions(userReactions);
-        summary.setTotalReactions(reactions.size());
-        
-        return summary;
+        // Use ReactionService for reaction calculation instead of mapper
+        return reactionService.calculateReactionsSummary(reactions, currentUser.getId(), messageId);
     }
 
     @Override
     public PinnedMessageDto pinMessage(Integer messageId, UserDetailsImpl currentUser) {
         log.info("Pinning message {} by user {}", messageId, currentUser.getId());
         
-        Message message = getMessageEntity(messageId);
-        User currentUserEntity = getUserEntity(currentUser.getId());
+        Message message = entityFinderService.getMessageOrThrow(messageId);
+        User currentUserEntity = entityFinderService.getUserOrThrow(currentUser.getId());
         validateMessagePermission(message, currentUser, "pin_messages");
         
         message.setPinned(true);
@@ -511,11 +602,22 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
         
         Message updatedMessage = messageRepository.save(message);
         
-        PinnedMessageDto pinnedMessage = chatMapper.toPinnedMessageDto(updatedMessage);
+        PinnedMessageDto pinnedMessage = messageMapper.toPinnedMessageDto(updatedMessage);
+        
+        // Use bulk mapper for reactions in broadcast
+        List<Message> singleMessageList = List.of(updatedMessage);
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(singleMessageList);
+        List<Reaction> messageReactions = reactionsByMessage.getOrDefault(updatedMessage.getId(), List.of());
+        
+        // Use ReactionService for reaction calculation instead of mapper
+        MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+            messageReactions, currentUser.getId(), updatedMessage.getId());
+        
+        ChatMessageDto messageDto = messageMapper.toChatMessageDto(updatedMessage, reactionsSummary);
         
         chatRealtimeService.broadcastMessageUpdate(
             message.getConversation().getConversationId(), 
-            chatMapper.toChatMessageDto(updatedMessage, currentUser.getId())
+            messageDto
         );
         
         log.info("Message {} pinned successfully", messageId);
@@ -526,15 +628,26 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     public void unpinMessage(Integer messageId, UserDetailsImpl currentUser) {
         log.info("Unpinning message {} by user {}", messageId, currentUser.getId());
         
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateMessagePermission(message, currentUser, "pin_messages");
         
         message.setPinned(false);
         messageRepository.save(message);
         
+        // Use bulk mapper for reactions in broadcast
+        List<Message> singleMessageList = List.of(message);
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(singleMessageList);
+        List<Reaction> messageReactions = reactionsByMessage.getOrDefault(message.getId(), List.of());
+        
+        // Use ReactionService for reaction calculation instead of mapper
+        MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+            messageReactions, currentUser.getId(), message.getId());
+        
+        ChatMessageDto messageDto = messageMapper.toChatMessageDto(message, reactionsSummary);
+        
         chatRealtimeService.broadcastMessageUpdate(
             message.getConversation().getConversationId(), 
-            chatMapper.toChatMessageDto(message)
+            messageDto
         );
         
         log.info("Message {} unpinned successfully", messageId);
@@ -543,18 +656,17 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     @Override
     @Transactional(readOnly = true)
     public List<PinnedMessageDto> getPinnedMessages(Integer conversationId, UserDetailsImpl currentUser) {
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         validateConversationMembership(conversation, currentUser);
         
-        return messageRepository.findByConversationAndPinnedTrueAndDeletedFalse(conversation).stream()
-                .map(chatMapper::toPinnedMessageDto)
-                .collect(Collectors.toList());
+        List<Message> pinnedMessages = messageRepository.findByConversationAndPinnedTrueAndDeletedFalse(conversation);
+        return messageMapper.toPinnedMessageDtoList(pinnedMessages);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean isMessagePinned(Integer messageId, UserDetailsImpl currentUser) {
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
         
         return message.isPinned();
@@ -563,7 +675,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     @Override
     @Transactional(readOnly = true)
     public Page<ChatMessageDto> getMessageReplies(Integer parentMessageId, UserDetailsImpl currentUser, Pageable pageable) {
-        Message parentMessage = getMessageEntity(parentMessageId);
+        Message parentMessage = entityFinderService.getMessageOrThrow(parentMessageId);
         validateConversationMembership(parentMessage.getConversation(), currentUser);
         
         Specification<Message> spec = (root, query, cb) -> 
@@ -573,22 +685,49 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
             );
         
         Page<Message> replies = messageRepository.findAll(spec, pageable);
-        return replies.map(chatMapper::toChatMessageDto);
+        
+        if (replies.isEmpty()) {
+            return Page.empty(pageable);
+        }
+        
+        // Use optimized bulk mapper for replies
+        List<Message> replyList = replies.getContent();
+        Map<Integer, List<Reaction>> reactionsByMessage = bulkDataFetcherService.getReactionsByMessages(replyList);
+        
+        List<ChatMessageDto> dtos = new ArrayList<>();
+        for (Message reply : replyList) {
+            List<Reaction> messageReactions = reactionsByMessage.getOrDefault(reply.getId(), List.of());
+            // Use ReactionService for reaction calculation instead of mapper
+            MessageReactionsSummaryDto reactionsSummary = reactionService.calculateReactionsSummary(
+                messageReactions, currentUser.getId(), reply.getId());
+            dtos.add(messageMapper.toChatMessageDto(reply, reactionsSummary));
+        }
+        
+        return new PageImpl<>(dtos, pageable, replies.getTotalElements());
     }
 
     @Override
     @Transactional(readOnly = true)
     public MessageThreadDto getMessageThread(Integer messageId, UserDetailsImpl currentUser) {
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
         
         MessageThreadDto thread = new MessageThreadDto();
-        thread.setParentMessage(chatMapper.toChatMessageDto(message));
         
-        List<ChatMessageDto> replies = getMessageReplies(messageId, currentUser, Pageable.ofSize(10))
-                .getContent();
-        thread.setReplies(replies);
-        thread.setReplyCount(replies.size());
+        // Use bulk mapper for parent message
+        List<Message> parentMessageList = List.of(message);
+        Map<Integer, List<Reaction>> parentReactions = bulkDataFetcherService.getReactionsByMessages(parentMessageList);
+        List<Reaction> parentMessageReactions = parentReactions.getOrDefault(message.getId(), List.of());
+        // Use ReactionService for reaction calculation instead of mapper
+        MessageReactionsSummaryDto parentReactionsSummary = reactionService.calculateReactionsSummary(
+            parentMessageReactions, currentUser.getId(), message.getId());
+        
+        thread.setParentMessage(messageMapper.toChatMessageDto(message, parentReactionsSummary));
+        
+        // Get replies with bulk mapping
+        Page<ChatMessageDto> repliesPage = getMessageReplies(messageId, currentUser, Pageable.ofSize(10));
+        thread.setReplies(repliesPage.getContent());
+        thread.setReplyCount(repliesPage.getContent().size());
         
         return thread;
     }
@@ -596,7 +735,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     @Override
     @Transactional(readOnly = true)
     public Page<ReadReceiptDto> getMessageReadReceipts(Integer messageId, UserDetailsImpl currentUser, Pageable pageable) {
-        Message message = getMessageEntity(messageId);
+        Message message = entityFinderService.getMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
         
         List<ConversationParticipant> readers = participantRepository.findByConversationAndLastReadTimestampAfter(
@@ -605,9 +744,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
             pageable
         );
         
-        List<ReadReceiptDto> receiptDtos = readers.stream()
-            .map(chatMapper::toReadReceiptDto)
-            .collect(Collectors.toList());
+        List<ReadReceiptDto> receiptDtos = readReceiptMapper.toReadReceiptDtoList(readers);
     
         return new PageImpl<>(receiptDtos, pageable, readers.size());
     }
@@ -621,7 +758,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     @Transactional(readOnly = true)
     public boolean canInteractWithMessage(Integer messageId, UserDetailsImpl currentUser, String action) {
         try {
-            Message message = getMessageEntity(messageId);
+            Message message = entityFinderService.getMessageOrThrow(messageId);
             
             switch (action.toLowerCase()) {
                 case "edit":
@@ -644,7 +781,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     @Override
     @Transactional(readOnly = true)
     public MessageStatsDto getMessageStats(Integer conversationId, UserDetailsImpl currentUser) {
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         validateConversationMembership(conversation, currentUser);
         
         MessageStatsDto stats = new MessageStatsDto();
@@ -665,7 +802,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
         message.setClientMessageId(request.getClientMessageId());
         
         if (request.getReplyToMessageId() != null) {
-            Message replyTo = getMessageEntity(request.getReplyToMessageId());
+            Message replyTo = entityFinderService.getMessageOrThrow(request.getReplyToMessageId());
             message.setReplyToMessage(replyTo);
         }
         
@@ -677,7 +814,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
     }
 
     private void updateConversationLastMessage(Conversation conversation, Message message) {
-        conversation.setLastMessageBody(truncateMessageBody(message.getBody()));
+        conversation.setLastMessageBody(messageMapper.truncateMessageBody(message.getBody(), 100));
         conversation.setLastMessageSentAt(message.getSentAt());
         conversation.setLastMessageAuthor(message.getAuthor());
         conversation.setMessageCount(conversation.getMessageCount() + 1);
@@ -693,13 +830,8 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
                 });
     }
 
-    private String truncateMessageBody(String body) {
-        if (body == null) return null;
-        return body.length() > 100 ? body.substring(0, 100) + "..." : body;
-    }
-
     private void updateLastMessageIfNeeded(Integer conversationId, Integer affectedMessageId) {
-        Conversation conversation = getConversationEntity(conversationId);
+        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
         
         Message affectedMessage = messageRepository.findById(affectedMessageId).orElse(null);
         if (affectedMessage == null || conversation.getLastMessageSentAt() == null ||
@@ -711,7 +843,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
 
         if (newLastMessageOpt.isPresent()) {
             Message newLastMessage = newLastMessageOpt.get();
-            conversation.setLastMessageBody(truncateMessageBody(newLastMessage.getBody()));
+            conversation.setLastMessageBody(messageMapper.truncateMessageBody(newLastMessage.getBody(), 100));
             conversation.setLastMessageSentAt(newLastMessage.getSentAt());
             conversation.setLastMessageAuthor(newLastMessage.getAuthor());
         } else {
@@ -760,26 +892,7 @@ public Page<ChatMessageDto> getMessagesForConversation(Integer conversationId, U
         }
     }
 
-    private User getUserEntity(Integer userId) {
-        return userRepository.findById(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-    }
-
-    private Conversation getConversationEntity(Integer conversationId) {
-        return conversationRepository.findById(conversationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
-    }
-
-    private Message getMessageEntity(Integer messageId) {
-        return messageRepository.findById(messageId)
-                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + messageId));
-    }
-
-    private Reaction getReactionEntity(Integer reactionId) {
-        return reactionRepository.findById(reactionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Reaction not found with id: " + reactionId));
-    }
-
+    // Keep only the participant entity method since it's more complex
     private ConversationParticipant getParticipantEntity(Conversation conversation, Integer userId) {
         return participantRepository.findByConversationAndUser_UserId(conversation, userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Participant not found in conversation"));

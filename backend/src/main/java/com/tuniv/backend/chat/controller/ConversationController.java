@@ -3,6 +3,7 @@ package com.tuniv.backend.chat.controller;
 import com.tuniv.backend.chat.dto.*;
 import com.tuniv.backend.chat.service.ConversationService;
 import com.tuniv.backend.chat.model.MuteDuration;
+import com.tuniv.backend.chat.annotation.RequiresMembership;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.dto.ApiResponse;
 import jakarta.validation.Valid;
@@ -49,6 +50,7 @@ public class ConversationController {
 
     @PostMapping("/{conversationId}/archive")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'archive_conversation')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ApiResponse> archiveConversation(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -59,6 +61,7 @@ public class ConversationController {
 
     @DeleteMapping("/{conversationId}")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'delete_conversation')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ApiResponse> deleteConversation(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -69,6 +72,7 @@ public class ConversationController {
 
     @PostMapping("/{conversationId}/restore")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'archive_conversation')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ApiResponse> restoreConversation(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -90,7 +94,7 @@ public class ConversationController {
     }
 
     @GetMapping("/{conversationId}")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ConversationDetailDto> getConversationDetails(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -124,6 +128,7 @@ public class ConversationController {
 
     @PutMapping("/{conversationId}/info")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'edit_conversation_info')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ConversationDetailDto> updateGroupInfo(
             @PathVariable Integer conversationId,
             @RequestBody @Valid UpdateGroupInfoRequest request,
@@ -134,7 +139,7 @@ public class ConversationController {
     }
 
     @PutMapping("/{conversationId}/my-settings")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ParticipantDto> updateMyConversationSettings(
             @PathVariable Integer conversationId,
             @RequestBody @Valid UpdateConversationSettingsRequest request,
@@ -148,6 +153,7 @@ public class ConversationController {
 
     @PostMapping("/{conversationId}/participants")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'add_participants')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<List<ParticipantDto>> addParticipants(
             @PathVariable Integer conversationId,
             @RequestBody @Valid UpdateParticipantsRequest request,
@@ -159,6 +165,7 @@ public class ConversationController {
 
     @DeleteMapping("/{conversationId}/participants/{userId}")
     @PreAuthorize("@conversationPermissionService.canRemoveParticipant(#conversationId, #userId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ApiResponse> removeParticipant(
             @PathVariable Integer conversationId,
             @PathVariable Integer userId,
@@ -169,7 +176,7 @@ public class ConversationController {
     }
 
     @PostMapping("/{conversationId}/leave")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ApiResponse> leaveConversation(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -180,6 +187,7 @@ public class ConversationController {
 
     @PutMapping("/{conversationId}/participants/{userId}/role")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'manage_roles')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ParticipantDto> updateParticipantRole(
             @PathVariable Integer conversationId,
             @PathVariable Integer userId,
@@ -191,7 +199,7 @@ public class ConversationController {
     }
 
     @GetMapping("/{conversationId}/participants")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<List<ParticipantDto>> getConversationParticipants(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -201,7 +209,7 @@ public class ConversationController {
     }
 
     @GetMapping("/{conversationId}/my-participant-info")
-    @PreAuthorize("@conversationPermissionService.isMember(#conversationId, #currentUser)")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ParticipantDto> getMyParticipantInfo(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
@@ -214,10 +222,11 @@ public class ConversationController {
 
     @PostMapping("/{conversationId}/participants/{userId}/mute")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'mute_participants')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ParticipantDto> muteParticipant(
             @PathVariable Integer conversationId,
             @PathVariable Integer userId,
-             @RequestParam MuteDuration duration,
+            @RequestParam MuteDuration duration,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         log.info("Muting user {} in conversation {} by user {}", userId, conversationId, currentUser.getId());
         ParticipantDto participant = conversationService.muteParticipant(conversationId, userId, duration, currentUser);
@@ -226,6 +235,7 @@ public class ConversationController {
 
     @PostMapping("/{conversationId}/participants/{userId}/unmute")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'mute_participants')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ParticipantDto> unmuteParticipant(
             @PathVariable Integer conversationId,
             @PathVariable Integer userId,
@@ -237,6 +247,7 @@ public class ConversationController {
 
     @PostMapping("/{conversationId}/participants/{userId}/ban")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'ban_participants')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ApiResponse> banParticipant(
             @PathVariable Integer conversationId,
             @PathVariable Integer userId,
@@ -249,6 +260,7 @@ public class ConversationController {
 
     @PostMapping("/{conversationId}/participants/{userId}/unban")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'ban_participants')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<ApiResponse> unbanParticipant(
             @PathVariable Integer conversationId,
             @PathVariable Integer userId,
@@ -260,6 +272,7 @@ public class ConversationController {
 
     @GetMapping("/{conversationId}/banned-participants")
     @PreAuthorize("@conversationPermissionService.hasPermission(#conversationId, #currentUser, 'ban_participants')")
+    @RequiresMembership(conversationIdParam = "conversationId")
     public ResponseEntity<List<BannedUserDto>> getBannedParticipants(
             @PathVariable Integer conversationId,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
