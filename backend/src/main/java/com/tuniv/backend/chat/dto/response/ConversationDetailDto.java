@@ -1,5 +1,4 @@
-// ConversationDetailDto.java
-package com.tuniv.backend.chat.dto;
+package com.tuniv.backend.chat.dto.response;
 
 import java.time.Instant;
 import java.util.List;
@@ -28,7 +27,26 @@ public class ConversationDetailDto {
     private boolean isArchived;
     private Instant createdAt;
     private Instant updatedAt;
-    private List<ParticipantDto> participants;
+    
+    // ✅ ENHANCED: Online status information
+    private Integer onlineParticipantCount;
+    private Integer recentlyActiveParticipantCount;
+    private Instant lastActivityAt;
+    private boolean isLargeGroup;
+    
+    // ✅ OPTIMIZED: Participant summary for large groups
+    private ParticipantSummaryDto participantSummary;
     private List<PinnedMessageDto> pinnedMessages;
     private ParticipantDto currentUserParticipant;
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ParticipantSummaryDto {
+        private List<ParticipantDto> admins; // Cached admin list
+        private List<ParticipantDto> recentlyActiveUsers; // Limited list
+        private boolean hasMoreParticipants; // Flag for frontend
+        private String participantFetchUrl; // URL for full list
+    }
 }

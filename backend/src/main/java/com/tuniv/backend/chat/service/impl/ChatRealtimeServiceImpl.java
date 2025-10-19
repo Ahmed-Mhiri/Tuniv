@@ -8,7 +8,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.springframework.data.redis.core.Cursor;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ScanOptions;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -287,20 +289,27 @@ public class ChatRealtimeServiceImpl implements ChatRealtimeService {
     @Override
     public List<Integer> getActiveUsersInConversation(Integer conversationId) {
         String key = String.format("conversation:active:users:%d", conversationId);
-        Set<Object> userIds = redisTemplate.opsForSet().members(key);
-        List<Integer> result = new ArrayList<>();
-        
-        if (userIds != null) {
-            for (Object userId : userIds) {
-                try {
-                    result.add(Integer.parseInt(userId.toString()));
-                } catch (NumberFormatException e) {
-                    log.warn("Invalid user ID: {}", userId);
+        List<Integer> activeUserIds = new ArrayList<>();
+        ScanOptions scanOptions = ScanOptions.scanOptions().match("*").count(1000).build(); // Adjust count as needed
+
+        try (Cursor<Object> cursor = redisTemplate.opsForSet().scan(key, scanOptions)) {
+            while (cursor.hasNext()) {
+                Object userIdObj = cursor.next();
+                if (userIdObj != null) {
+                    try {
+                        activeUserIds.add(Integer.parseInt(userIdObj.toString()));
+                    } catch (NumberFormatException e) {
+                        log.warn("Invalid user ID found in Redis set {} for conversation {}: {}", key, conversationId, userIdObj);
+                    }
                 }
             }
+        } catch (Exception e) {
+            log.error("Error scanning Redis set {} for conversation {}: {}", key, conversationId, e.getMessage(), e);
+            return Collections.emptyList(); // Return empty list on error
         }
-        
-        return result;
+
+        log.debug("Found {} active users in conversation {} using SSCAN", activeUserIds.size(), conversationId);
+        return activeUserIds;
     }
     
     @Override

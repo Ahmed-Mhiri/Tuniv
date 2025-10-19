@@ -2,10 +2,7 @@ package com.tuniv.backend.chat.model;
 
 import java.time.Instant;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.hibernate.annotations.Where;
 
@@ -40,7 +37,9 @@ import lombok.Setter;
     @Index(name = "idx_conversation_university", columnList = "university_context_id"),
     @Index(name = "idx_conversation_created", columnList = "created_at DESC"),
     @Index(name = "idx_conversation_last_message", columnList = "last_message_sent_at DESC"),
-    @Index(name = "idx_conversation_active", columnList = "is_active, last_message_sent_at DESC")
+    @Index(name = "idx_conversation_active", columnList = "is_active, last_message_sent_at DESC"),
+    // ✅ NEW: Index for online status queries
+    @Index(name = "idx_conversation_online_stats", columnList = "online_participant_count, last_activity_at DESC")
 })
 @Getter
 @Setter
@@ -98,13 +97,37 @@ public class Conversation extends Auditable {
     @Column(name = "is_archived", nullable = false)
     private boolean isArchived = false;
 
+    // ========== ONLINE STATUS TRACKING ==========
+    @Column(name = "online_participant_count", nullable = false)
+    private Integer onlineParticipantCount = 0;
+
+    @Column(name = "last_activity_at")
+    private Instant lastActivityAt = Instant.now();
+
+    @Column(name = "recent_active_participant_count", nullable = false)
+    private Integer recentActiveParticipantCount = 0;
+
+    // ========== CACHED PARTICIPANT SUMMARY ==========
+    @Column(name = "cached_admin_ids", length = 1000)
+    private String cachedAdminIds; // JSON array of admin user IDs
+
+    @Column(name = "cached_online_user_ids", length = 2000)
+    private String cachedOnlineUserIds; // JSON array of online user IDs
+
+    @Column(name = "summary_updated_at")
+    private Instant summaryUpdatedAt;
+
+    // ========== PERFORMANCE OPTIMIZATIONS ==========
+    @Column(name = "is_large_group", nullable = false)
+    private boolean isLargeGroup = false;
+
+    @Column(name = "participant_count_threshold", nullable = false)
+    private Integer participantCountThreshold = 100;
+
     // ========== RELATIONSHIPS ==========
     @OneToMany(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private Set<Message> messages = new HashSet<>();
 
     @OneToMany(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private Set<ConversationParticipant> participants = new HashSet<>();
-
-
-    
 }

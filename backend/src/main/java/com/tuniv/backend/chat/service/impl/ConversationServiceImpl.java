@@ -2,6 +2,7 @@ package com.tuniv.backend.chat.service.impl;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
@@ -11,9 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.tuniv.backend.chat.dto.ConversationDetailDto;
 import com.tuniv.backend.chat.dto.ConversationSummaryDto;
 import com.tuniv.backend.chat.dto.CreateGroupRequest;
+import com.tuniv.backend.chat.dto.ParticipantDto;
 import com.tuniv.backend.chat.dto.StartConversationRequestDto;
 import com.tuniv.backend.chat.dto.UpdateGroupInfoRequest;
 import com.tuniv.backend.chat.mapper.mapstruct.ConversationMapper;
+import com.tuniv.backend.chat.mapper.mapstruct.MessageMapper;
+import com.tuniv.backend.chat.mapper.mapstruct.ParticipantMapper;
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.model.ConversationParticipant;
 import com.tuniv.backend.chat.model.ConversationRole;
@@ -22,8 +26,10 @@ import com.tuniv.backend.chat.model.DirectConversationLookup;
 import com.tuniv.backend.chat.model.Message;
 import com.tuniv.backend.chat.repository.ConversationRepository;
 import com.tuniv.backend.chat.repository.DirectConversationLookupRepository;
+import com.tuniv.backend.chat.repository.MessageRepository;
 import com.tuniv.backend.chat.service.BulkDataFetcherService;
 import com.tuniv.backend.chat.service.ChatEventPublisher;
+import com.tuniv.backend.chat.service.ConversationOnlineStatusService;
 import com.tuniv.backend.chat.service.ConversationPermissionService;
 import com.tuniv.backend.chat.service.ConversationRoleService;
 import com.tuniv.backend.chat.service.ConversationService;
@@ -38,12 +44,16 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import com.tuniv.backend.chat.repository.ParticipantRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -59,7 +69,12 @@ public class ConversationServiceImpl implements ConversationService {
     private final EntityFinderService entityFinderService;
     private final ConversationPermissionService conversationPermissionService;
     private final ParticipantService participantService;
-    private final ConversationRoleService conversationRoleService; // Added this dependency
+    private final ConversationRoleService conversationRoleService;
+    private final ConversationOnlineStatusService conversationOnlineStatusService;
+    private final MessageRepository messageRepository;
+    private final ParticipantRepository participantRepository;
+    private final ParticipantMapper participantMapper;
+    private final MessageMapper messageMapper;
 
     @Override
     public ConversationDetailDto startDirectConversation(StartConversationRequestDto request, UserDetailsImpl currentUser) {
@@ -104,7 +119,7 @@ public class ConversationServiceImpl implements ConversationService {
             throw new RuntimeException("Failed to create direct conversation due to race condition", e);
         }
         
-        ConversationRole memberRole = getDefaultConversationRole(); // Now uses the new service
+        ConversationRole memberRole = getDefaultConversationRole();
         participantService.addParticipant(savedConversation, currentUserEntity, memberRole);
         participantService.addParticipant(savedConversation, targetUser, memberRole);
         
@@ -134,8 +149,8 @@ public class ConversationServiceImpl implements ConversationService {
         Conversation savedConversation = conversationRepository.save(conversation);
         log.info("Created new group conversation: {}", savedConversation.getConversationId());
         
-        ConversationRole adminRole = getConversationAdminRole(); // Now uses the new service
-        ConversationRole memberRole = getDefaultConversationRole(); // Now uses the new service
+        ConversationRole adminRole = getConversationAdminRole();
+        ConversationRole memberRole = getDefaultConversationRole();
         
         participantService.addParticipant(savedConversation, currentUserEntity, adminRole);
         
@@ -232,26 +247,131 @@ public class ConversationServiceImpl implements ConversationService {
         
         conversationPermissionService.checkMembership(currentUser.getId(), conversationId);
         
-        List<Conversation> singleConversationList = List.of(conversation);
+        // Get online status from dedicated service
+        ConversationOnlineStatusService.ConversationOnlineStatus onlineStatus = 
+            conversationOnlineStatusService.getOnlineStatus(conversationId);
         
-        Map<Integer, List<ConversationParticipant>> participantsByConversation = 
-            bulkDataFetcherService.getParticipantsByConversations(singleConversationList);
+        // Build DTO with optimized data
+        ConversationDetailDto dto = buildOptimizedConversationDetailDto(
+            conversation, onlineStatus, currentUser);
         
-        Map<Integer, List<Message>> pinnedMessagesByConversation = 
-            bulkDataFetcherService.getPinnedMessagesByConversations(singleConversationList);
-        
-        Map<Integer, ConversationParticipant> currentUserParticipants = 
-            bulkDataFetcherService.getCurrentUserParticipants(singleConversationList, currentUser.getId());
-        
-        List<ConversationParticipant> participants = participantsByConversation.getOrDefault(
-            conversationId, List.of());
-        List<Message> pinnedMessages = pinnedMessagesByConversation.getOrDefault(
-            conversationId, List.of());
-        ConversationParticipant currentUserParticipant = currentUserParticipants.get(conversationId);
-        
-        return conversationMapper.toConversationDetailDto(
-            conversation, participants, pinnedMessages, currentUserParticipant);
+        log.debug("Conversation details built with optimized data for conversation {}", conversationId);
+        return dto;
     }
+
+    private ConversationDetailDto buildOptimizedConversationDetailDto(
+        Conversation conversation, 
+        ConversationOnlineStatusService.ConversationOnlineStatus onlineStatus,
+        UserDetailsImpl currentUser) {
+    
+    ConversationDetailDto dto = new ConversationDetailDto();
+    
+    // Map basic fields
+    dto.setConversationId(conversation.getConversationId());
+    dto.setTitle(conversation.getTitle());
+    dto.setConversationType(conversation.getConversationType().name());
+    dto.setParticipantCount(conversation.getParticipantCount());
+    dto.setMessageCount(conversation.getMessageCount());
+    dto.setOnlineParticipantCount(onlineStatus.getOnlineCount());
+    dto.setRecentlyActiveParticipantCount(onlineStatus.getRecentlyActiveCount());
+    dto.setLastActivityAt(conversation.getLastActivityAt());
+    dto.setLargeGroup(conversation.isLargeGroup());
+    
+    // Build participant summary based on group size
+    dto.setParticipantSummary(buildParticipantSummary(conversation, currentUser));
+    
+    // Get pinned messages (limited)
+    List<Message> pinnedMessages = messageRepository.findPinnedMessages(conversation.getConversationId());
+    dto.setPinnedMessages(messageMapper.toPinnedMessageDtoList(pinnedMessages));
+    
+    // Get current user's participant info - FIXED: using composite ID method
+    ConversationParticipant currentUserParticipant = participantRepository
+        .findById_UserIdAndId_ConversationId(currentUser.getId(), conversation.getConversationId())
+        .orElse(null);
+    if (currentUserParticipant != null) {
+        dto.setCurrentUserParticipant(participantMapper.toParticipantDto(currentUserParticipant));
+    }
+    
+    return dto;
+}
+    private ConversationDetailDto.ParticipantSummaryDto buildParticipantSummary(
+            Conversation conversation, UserDetailsImpl currentUser) {
+        
+        ConversationDetailDto.ParticipantSummaryDto summary = new ConversationDetailDto.ParticipantSummaryDto();
+        
+        if (conversation.isLargeGroup()) {
+            // For large groups, use cached data and minimal queries
+            summary.setAdmins(getCachedAdmins(conversation));
+            summary.setRecentlyActiveUsers(getRecentlyActiveUsers(conversation.getConversationId(), 5));
+        } else {
+            // For small groups, fetch fresh data
+            summary.setAdmins(getFreshAdmins(conversation.getConversationId()));
+            summary.setRecentlyActiveUsers(getRecentlyActiveUsers(conversation.getConversationId(), 10));
+        }
+        
+        summary.setHasMoreParticipants(conversation.getParticipantCount() > 20);
+        summary.setParticipantFetchUrl("/api/v1/conversations/" + conversation.getConversationId() + "/participants");
+        
+        return summary;
+    }
+
+    private List<ParticipantDto> getCachedAdmins(Conversation conversation) {
+        if (conversation.getCachedAdminIds() != null && 
+            conversation.getSummaryUpdatedAt() != null &&
+            conversation.getSummaryUpdatedAt().isAfter(Instant.now().minus(1, ChronoUnit.HOURS))) {
+            
+            // Parse cached admin IDs and fetch minimal user data
+            try {
+                // Implementation to parse JSON and fetch user details
+                return getUsersByIds(parseAdminIds(conversation.getCachedAdminIds()));
+            } catch (Exception e) {
+                log.warn("Failed to parse cached admin IDs for conversation {}, fetching fresh data", 
+                         conversation.getConversationId());
+            }
+        }
+        
+        // Fallback to fresh data
+        return getFreshAdmins(conversation.getConversationId());
+    }
+
+    private List<ParticipantDto> getFreshAdmins(Integer conversationId) {
+        List<ConversationParticipant> admins = participantRepository.findActiveParticipantsByRole(
+            conversationId, "CONVERSATION_ADMIN");
+        return participantMapper.toParticipantDtoList(admins);
+    }
+
+    private List<ParticipantDto> getRecentlyActiveUsers(Integer conversationId, int limit) {
+        // Use Redis or database to get recently active users
+        List<ConversationParticipant> activeParticipants = participantRepository
+            .findRecentlyActiveParticipants(conversationId, PageRequest.of(0, limit))
+            .getContent();
+        return participantMapper.toParticipantDtoList(activeParticipants);
+    }
+
+    private List<Integer> parseAdminIds(String cachedAdminIds) {
+        // Simple JSON array parsing - implement based on your JSON library
+        // This is a placeholder implementation
+        try {
+            // Example: "[1,2,3]" -> List.of(1,2,3)
+            String clean = cachedAdminIds.replace("[", "").replace("]", "").replace("\"", "");
+            return List.of(clean.split(",")).stream()
+                .map(String::trim)
+                .map(Integer::parseInt)
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse admin IDs", e);
+        }
+    }
+
+    private List<ParticipantDto> getUsersByIds(List<Integer> userIds) {
+    if (userIds == null || userIds.isEmpty()) {
+        return new ArrayList<>();
+    }
+    
+    // Fetch minimal user data for the given IDs using existing repository method
+    List<ConversationParticipant> participants = participantRepository.findById_UserIdIn(userIds);
+    return participantMapper.toParticipantDtoList(participants);
+}
 
     @Override
     @Transactional(readOnly = true)
@@ -356,12 +476,10 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     private ConversationRole getDefaultConversationRole() {
-        // Now uses the new ConversationRoleService
         return conversationRoleService.getDefaultConversationRole();
     }
 
     private ConversationRole getConversationAdminRole() {
-        // Now uses the new ConversationRoleService
         return conversationRoleService.getConversationAdminRole();
     }
 

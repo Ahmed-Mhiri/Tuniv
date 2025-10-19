@@ -1,8 +1,9 @@
 package com.tuniv.backend.chat.repository;
 
-import com.tuniv.backend.chat.model.Conversation;
-import com.tuniv.backend.chat.model.Message;
-import com.tuniv.backend.chat.model.MessageType;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -12,9 +13,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
+import com.tuniv.backend.chat.model.Conversation;
+import com.tuniv.backend.chat.model.Message;
+import com.tuniv.backend.chat.model.MessageType;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Integer>, JpaSpecificationExecutor<Message> {
@@ -103,10 +104,22 @@ public interface MessageRepository extends JpaRepository<Message, Integer>, JpaS
     
     @Query("SELECT COUNT(m) FROM Message m WHERE m.replyToMessage.id = :parentMessageId AND m.deleted = false")
     long countRepliesByParentId(@Param("parentMessageId") Integer parentMessageId);
+    
+    // ✅ ADDED: Missing method for reply count
+    long countByReplyToMessageAndDeletedFalse(Message replyToMessage);
 
     // ========== Pinned Messages ==========
     
     List<Message> findByConversationAndPinnedTrueAndDeletedFalse(Conversation conversation);
+    
+    // ✅ ADDED: Missing method for pinned messages with ordering
+    List<Message> findByConversationAndPinnedTrueAndDeletedFalseOrderByPinnedAtDesc(Conversation conversation);
+    
+    // ✅ ADDED: Missing method for pinned messages after timestamp
+    List<Message> findByConversationAndPinnedTrueAndPinnedAtAfterAndDeletedFalseOrderByPinnedAtDesc(
+        Conversation conversation, 
+        Instant pinnedAtAfter
+    );
     
     @Query("SELECT m FROM Message m WHERE m.conversation.conversationId = :conversationId AND m.pinned = true AND m.deleted = false ORDER BY m.sentAt DESC")
     List<Message> findPinnedMessages(@Param("conversationId") Integer conversationId);
@@ -178,4 +191,13 @@ public interface MessageRepository extends JpaRepository<Message, Integer>, JpaS
     // ========== Existence Checks ==========
     
     boolean existsById(Integer messageId);
+    
+    // ========== Additional Pinned Message Queries ==========
+    
+    @Query("SELECT m FROM Message m WHERE m.conversation = :conversation AND m.pinned = true AND m.pinnedAt > :pinnedAtAfter AND m.deleted = false ORDER BY m.pinnedAt DESC")
+    List<Message> findRecentPinnedMessages(@Param("conversation") Conversation conversation, 
+                                         @Param("pinnedAtAfter") Instant pinnedAtAfter);
+    
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.replyToMessage = :replyToMessage AND m.deleted = false")
+    long countReplies(@Param("replyToMessage") Message replyToMessage);
 }

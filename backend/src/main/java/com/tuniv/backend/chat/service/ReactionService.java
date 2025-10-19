@@ -1,55 +1,43 @@
 package com.tuniv.backend.chat.service;
 
-import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
-import com.tuniv.backend.chat.model.Reaction;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
-@Service
-@RequiredArgsConstructor
-public class ReactionService {
+import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
+import com.tuniv.backend.chat.dto.ReactionDto;
+import com.tuniv.backend.chat.dto.ReactionRequestDto;
+import com.tuniv.backend.chat.model.Reaction;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+
+public interface ReactionService {
+
+    /**
+     * Adds or updates a user's reaction to a message.
+     */
+    ReactionDto addOrUpdateReaction(Integer messageId, ReactionRequestDto request, UserDetailsImpl currentUser);
     
-    private final ReactionMapper reactionMapper;
-
-    public MessageReactionsSummaryDto calculateReactionsSummary(
-        List<Reaction> reactions, 
-        Integer currentUserId,
-        Integer messageId
-    ) {
-        if (reactions == null || reactions.isEmpty()) {
-            return reactionMapper.toMessageReactionsSummaryDto(
-                Map.of(), Map.of(), 0, messageId
-            );
-        }
-        
-        // Group by emoji and count
-        Map<String, Long> reactionCounts = reactions.stream()
-            .collect(Collectors.groupingBy(
-                Reaction::getEmoji,
-                Collectors.counting()
-            ));
-        
-        // Check if current user has reacted with each emoji
-        Map<String, Boolean> userReactions = Map.of();
-        if (currentUserId != null) {
-            userReactions = reactions.stream()
-                .filter(reaction -> reaction.getUser().getUserId().equals(currentUserId))
-                .collect(Collectors.toMap(
-                    Reaction::getEmoji,
-                    reaction -> true,
-                    (existing, replacement) -> existing
-                ));
-        }
-        
-        return reactionMapper.toMessageReactionsSummaryDto(
-            reactionCounts,
-            userReactions,
-            reactions.size(),
-            messageId
-        );
-    }
+    /**
+     * Removes a reaction from a message based on the emoji.
+     */
+    void removeReaction(Integer messageId, String emoji, UserDetailsImpl currentUser);
+    
+    /**
+     * Removes a specific reaction by its unique ID.
+     */
+    void removeReactionById(Integer reactionId, UserDetailsImpl currentUser);
+    
+    /**
+     * Gets all reaction details (who reacted with what) for a specific message.
+     */
+    List<ReactionDto> getMessageReactions(Integer messageId, UserDetailsImpl currentUser);
+    
+    /**
+     * Gets a summary of reactions for a message (counts by emoji, and if current user reacted).
+     */
+    MessageReactionsSummaryDto getMessageReactionsSummary(Integer messageId, UserDetailsImpl currentUser);
+    
+    /**
+     * Calculates reaction summary from a list of reactions.
+     * This method can be used internally and by other services that need reaction summaries.
+     */
+    MessageReactionsSummaryDto calculateReactionsSummary(List<Reaction> reactions, Integer currentUserId, Integer messageId);
 }

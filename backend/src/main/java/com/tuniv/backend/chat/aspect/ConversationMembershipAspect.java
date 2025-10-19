@@ -1,10 +1,7 @@
 package com.tuniv.backend.chat.aspect;
 
-import com.tuniv.backend.chat.annotation.RequiresMembership;
-import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
-import com.tuniv.backend.config.security.services.UserDetailsImpl;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.lang.reflect.Parameter;
+
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -15,8 +12,12 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
+import com.tuniv.backend.chat.annotation.RequiresMembership;
+import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
+import com.tuniv.backend.config.security.services.UserDetailsImpl;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Aspect
 @Component
@@ -35,11 +36,13 @@ public class ConversationMembershipAspect {
         }
         UserDetailsImpl currentUser = (UserDetailsImpl) authentication.getPrincipal();
 
-        // 2. Extract conversationId (your existing logic is good here)
+        // 2. Extract conversationId using only the explicit parameter name
         MethodSignature signature = (MethodSignature) joinPoint.getSignature();
         Integer conversationId = extractConversationId(joinPoint.getArgs(), signature.getMethod().getParameters(), requiresMembership.conversationIdParam());
         if (conversationId == null) {
-            throw new IllegalArgumentException("Conversation ID could not be determined for membership check");
+            // This now correctly fires if the explicit parameter isn't found
+            throw new IllegalArgumentException("Conversation ID could not be determined for membership check. " +
+                    "Ensure @RequiresMembership points to a valid Integer parameter named '" + requiresMembership.conversationIdParam() + "'.");
         }
 
         // 3. Perform a direct, efficient membership check
@@ -56,12 +59,12 @@ public class ConversationMembershipAspect {
         for (int i = 0; i < parameters.length; i++) {
             Parameter param = parameters[i];
             
-            // Check if this is the conversationId parameter
+            // Check if this is the conversationId parameter by name
             if (param.getName().equals(conversationIdParamName) && args[i] instanceof Integer) {
                 return (Integer) args[i];
             }
             
-            // Also check for @DestinationVariable annotation
+            // Also check for @DestinationVariable annotation with matching name
             DestinationVariable destVar = param.getAnnotation(DestinationVariable.class);
             if (destVar != null && (param.getName().equals(conversationIdParamName) || 
                 destVar.value().equals(conversationIdParamName)) && args[i] instanceof Integer) {
@@ -69,14 +72,8 @@ public class ConversationMembershipAspect {
             }
         }
         
-        // Fallback: look for any Integer parameter with "conversation" in name
-        for (int i = 0; i < parameters.length; i++) {
-            String paramName = parameters[i].getName().toLowerCase();
-            if (paramName.contains("conversation") && args[i] instanceof Integer) {
-                return (Integer) args[i];
-            }
-        }
-        
+        // ✅ FIX: Completely removed the fragile fallback logic
+        // The aspect now relies exclusively on the explicitly defined conversationIdParam
         return null;
     }
 }

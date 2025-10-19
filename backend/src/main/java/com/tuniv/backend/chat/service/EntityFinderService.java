@@ -1,9 +1,16 @@
 package com.tuniv.backend.chat.service;
 
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+
 import com.tuniv.backend.chat.model.Conversation;
+import com.tuniv.backend.chat.model.ConversationParticipant;
 import com.tuniv.backend.chat.model.ConversationRole;
 import com.tuniv.backend.chat.model.Message;
 import com.tuniv.backend.chat.model.Reaction;
+import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
 import com.tuniv.backend.chat.repository.ConversationRepository;
 import com.tuniv.backend.chat.repository.ConversationRoleRepository;
 import com.tuniv.backend.chat.repository.MessageRepository;
@@ -11,10 +18,8 @@ import com.tuniv.backend.chat.repository.ReactionRepository;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.user.model.User;
 import com.tuniv.backend.user.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
 
-import java.util.List;
+import lombok.RequiredArgsConstructor;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +29,7 @@ public class EntityFinderService {
     private final ReactionRepository reactionRepository;
     private final UserRepository userRepository;
     private final ConversationRoleRepository conversationRoleRepository;
+    private final ConversationParticipantRepository conversationParticipantRepository;
 
     public Conversation getConversationOrThrow(Integer id) {
         return conversationRepository.findById(id)
@@ -84,5 +90,46 @@ public class EntityFinderService {
 
     public boolean messageExists(Integer messageId) {
         return messageRepository.existsById(messageId);
+    }
+
+    // Conversation Participant methods
+    public ConversationParticipant getConversationParticipantOrThrow(Integer conversationId, Integer userId) {
+        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserId(conversationId, userId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Conversation participant not found for conversationId: " + conversationId + " and userId: " + userId));
+    }
+
+    public ConversationParticipant getActiveConversationParticipantOrThrow(Integer conversationId, Integer userId) {
+        return conversationParticipantRepository.findActiveParticipant(conversationId, userId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Active conversation participant not found for conversationId: " + conversationId + " and userId: " + userId));
+    }
+
+    public Optional<ConversationParticipant> getConversationParticipant(Integer conversationId, Integer userId) {
+        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserId(conversationId, userId);
+    }
+
+    public Optional<ConversationParticipant> getActiveConversationParticipant(Integer conversationId, Integer userId) {
+        return conversationParticipantRepository.findActiveParticipant(conversationId, userId);
+    }
+
+    public List<ConversationParticipant> getActiveParticipantsByConversation(Integer conversationId) {
+        return conversationParticipantRepository.findActiveParticipantsByConversationId(conversationId);
+    }
+
+    public List<ConversationParticipant> getAllParticipantsByConversation(Integer conversationId) {
+        return conversationParticipantRepository.findByConversation_ConversationId(conversationId);
+    }
+
+    public List<ConversationParticipant> getActiveConversationsByUser(Integer userId) {
+        return conversationParticipantRepository.findActiveConversationsByUserId(userId);
+    }
+
+    public boolean isUserActiveParticipant(Integer conversationId, Integer userId) {
+        return conversationParticipantRepository.findActiveParticipant(conversationId, userId).isPresent();
+    }
+
+    public boolean isUserParticipant(Integer conversationId, Integer userId) {
+        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserId(conversationId, userId).isPresent();
     }
 }

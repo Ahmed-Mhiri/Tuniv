@@ -1,12 +1,17 @@
 package com.tuniv.backend.chat.mapper.mapstruct;
 
-import com.tuniv.backend.chat.dto.*;
-import com.tuniv.backend.chat.model.Message;
-import com.tuniv.backend.chat.model.Reaction;
-import org.mapstruct.*;
-
 import java.util.List;
-import java.util.Map;
+
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.ReportingPolicy;
+
+import com.tuniv.backend.chat.dto.ChatMessageDto;
+import com.tuniv.backend.chat.dto.ChatMessageLightDto;
+import com.tuniv.backend.chat.dto.ChatMessageSummaryDto;
+import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
+import com.tuniv.backend.chat.dto.PinnedMessageDto;
+import com.tuniv.backend.chat.model.Message;
 
 @Mapper(componentModel = "spring", 
         uses = {ReactionMapper.class},
@@ -35,10 +40,32 @@ public interface MessageMapper {
     // Pinned message mapping
     @Mapping(target = "authorId", source = "author.userId")
     @Mapping(target = "authorUsername", source = "author.username")
+    @Mapping(target = "authorProfilePhotoUrl", source = "author.profilePhotoUrl")
     @Mapping(target = "conversationId", source = "conversation.conversationId")
     @Mapping(target = "pinnedByUserId", source = "pinnedBy.userId")
     @Mapping(target = "pinnedByUsername", source = "pinnedBy.username")
+    @Mapping(target = "messageType", source = "messageType")
+    @Mapping(target = "replyToMessageId", source = "replyToMessage.id")
+    @Mapping(target = "replyToMessageBody", expression = "java(truncateMessageBody(message.getReplyToMessage() != null ? message.getReplyToMessage().getBody() : null, 100))")
+    @Mapping(target = "replyToAuthorId", source = "replyToMessage.author.userId")
+    @Mapping(target = "replyToAuthorUsername", source = "replyToMessage.author.username")
+    @Mapping(target = "reactionsSummary", ignore = true)
     PinnedMessageDto toPinnedMessageDto(Message message);
+    
+    // Pinned message with reactions summary
+    @Mapping(target = "authorId", source = "author.userId")
+    @Mapping(target = "authorUsername", source = "author.username")
+    @Mapping(target = "authorProfilePhotoUrl", source = "author.profilePhotoUrl")
+    @Mapping(target = "conversationId", source = "conversation.conversationId")
+    @Mapping(target = "pinnedByUserId", source = "pinnedBy.userId")
+    @Mapping(target = "pinnedByUsername", source = "pinnedBy.username")
+    @Mapping(target = "messageType", source = "messageType")
+    @Mapping(target = "replyToMessageId", source = "replyToMessage.id")
+    @Mapping(target = "replyToMessageBody", expression = "java(truncateMessageBody(message.getReplyToMessage() != null ? message.getReplyToMessage().getBody() : null, 100))")
+    @Mapping(target = "replyToAuthorId", source = "replyToMessage.author.userId")
+    @Mapping(target = "replyToAuthorUsername", source = "replyToMessage.author.username")
+    @Mapping(target = "reactionsSummary", source = "reactionsSummary")
+    PinnedMessageDto toPinnedMessageDto(Message message, MessageReactionsSummaryDto reactionsSummary);
     
     // Lightweight mappings
     @Mapping(target = "authorId", source = "author.userId")

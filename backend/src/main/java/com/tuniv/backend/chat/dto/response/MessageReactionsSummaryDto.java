@@ -1,6 +1,7 @@
 // MessageReactionsSummaryDto.java
-package com.tuniv.backend.chat.dto;
+package com.tuniv.backend.chat.dto.response;
 
+import java.util.List;
 import java.util.Map;
 
 import lombok.AllArgsConstructor;
@@ -17,4 +18,5 @@ public class MessageReactionsSummaryDto {
     private Map<String, Long> reactionCounts; // emoji -> count
     private Map<String, Boolean> userReactions; // emoji -> hasReacted
     private Integer totalReactions;
+    private List<String> topReactions; // Add this field
 }

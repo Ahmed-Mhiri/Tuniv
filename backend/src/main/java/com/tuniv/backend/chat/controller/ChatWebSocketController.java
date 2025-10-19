@@ -27,7 +27,7 @@ import com.tuniv.backend.chat.dto.SendMessageRequest;
 import com.tuniv.backend.chat.dto.TypingIndicatorDto;
 import com.tuniv.backend.chat.dto.UserPresenceDto;
 import com.tuniv.backend.chat.service.ChatRealtimeService;
-import com.tuniv.backend.chat.service.ConversationService;
+import com.tuniv.backend.chat.service.ConversationPermissionService;
 import com.tuniv.backend.chat.service.MessageService;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
@@ -46,7 +46,7 @@ public class ChatWebSocketController {
 
     private final ChatRealtimeService chatRealtimeService;
     private final MessageService messageService;
-    private final ConversationService conversationService;
+    private final ConversationPermissionService conversationPermissionService;
     private final PermissionService permissionService;
     private final UserRepository userRepository;
 
@@ -57,18 +57,15 @@ public class ChatWebSocketController {
     @RequiresMembership(conversationIdParam = "conversationId")
     public ChatMessageDto sendMessage(
             @DestinationVariable Integer conversationId,
-            @Payload SendMessageRequest request,
+            @Payload @Valid SendMessageRequest request,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
         
         log.info("WebSocket: Sending message to conversation {} by user {}", conversationId, currentUser.getId());
         
-        // Membership validation is handled by AOP - @RequiresMembership annotation
-        // Specific permission check for sending messages
-        if (!permissionService.hasPermission(currentUser.getId(), "chat.message.send", conversationId)) {
-            throw new AccessDeniedException("No permission to send messages in this conversation");
-        }
+        // ✅ FIXED: Remove redundant permission check - @RequiresMembership AOP already validates membership
+        // The messageService.sendMessage() will handle the specific "send message" business logic permissions
         
         return messageService.sendMessage(conversationId, request, currentUser);
     }
@@ -77,7 +74,7 @@ public class ChatWebSocketController {
     @SendToUser("/queue/messages/ack")
     public ChatMessageDto editMessage(
             @DestinationVariable Integer messageId,
-            @Payload EditMessageRequest request,
+            @Payload @Valid EditMessageRequest request,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
@@ -104,22 +101,20 @@ public class ChatWebSocketController {
     // ========== Reaction Operations ==========
 
     @MessageMapping("/chat/messages/{messageId}/reactions/add")
-    @RequiresMembership // Membership will be inferred from message context
     public void addReaction(
             @DestinationVariable Integer messageId,
-            @Payload ReactionRequestDto request,
+            @Payload @Valid ReactionRequestDto request,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
         
         log.info("WebSocket: Adding reaction to message {} by user {}", messageId, currentUser.getId());
         
-        // Membership validation handled by AOP, message permissions by service
+        // Membership validation and permissions handled by MessageService
         messageService.addOrUpdateReaction(messageId, request, currentUser);
     }
 
     @MessageMapping("/chat/messages/{messageId}/reactions/remove")
-    @RequiresMembership // Membership will be inferred from message context
     public void removeReaction(
             @DestinationVariable Integer messageId,
             @Payload @Valid RemoveReactionRequestDto request,
@@ -129,7 +124,7 @@ public class ChatWebSocketController {
         
         log.info("WebSocket: Removing reaction from message {} by user {}", messageId, currentUser.getId());
         
-        // Membership validation handled by AOP, message permissions by service
+        // Membership validation and permissions handled by MessageService
         messageService.removeReaction(messageId, request.getEmoji(), currentUser);
     }
 
@@ -139,7 +134,7 @@ public class ChatWebSocketController {
     @RequiresMembership(conversationIdParam = "conversationId")
     public void handleTyping(
             @DestinationVariable Integer conversationId,
-            @Payload TypingIndicatorDto typingIndicator,
+            @Payload @Valid TypingIndicatorDto typingIndicator,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
@@ -176,7 +171,7 @@ public class ChatWebSocketController {
     @RequiresMembership(conversationIdParam = "conversationId")
     public void handlePresence(
             @DestinationVariable Integer conversationId,
-            @Payload UserPresenceDto presence,
+            @Payload @Valid UserPresenceDto presence,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
@@ -197,7 +192,7 @@ public class ChatWebSocketController {
     @RequiresMembership(conversationIdParam = "conversationId")
     public void handleReadReceipt(
             @DestinationVariable Integer conversationId,
-            @Payload ReadReceiptDto readReceipt,
+            @Payload @Valid ReadReceiptDto readReceipt,
             Principal principal) {
         
         UserDetailsImpl currentUser = extractUserDetails(principal);
@@ -269,7 +264,8 @@ public class ChatWebSocketController {
     @MessageExceptionHandler
     @SendToUser("/queue/errors")
     public ErrorMessage handleException(Exception exception, Principal principal) {
-        log.error("WebSocket error for user {}: {}", principal.getName(), exception.getMessage());
+        String username = principal != null ? principal.getName() : "unknown";
+        log.error("WebSocket error for user {}: {}", username, exception.getMessage());
         
         ErrorMessage errorMessage = new ErrorMessage();
         errorMessage.setType("ERROR");
@@ -280,6 +276,8 @@ public class ChatWebSocketController {
             errorMessage.setCode("ACCESS_DENIED");
         } else if (exception instanceof ResourceNotFoundException) {
             errorMessage.setCode("NOT_FOUND");
+        } else if (exception instanceof jakarta.validation.ValidationException) {
+            errorMessage.setCode("VALIDATION_ERROR");
         } else {
             errorMessage.setCode("INTERNAL_ERROR");
         }
@@ -290,7 +288,8 @@ public class ChatWebSocketController {
     @MessageExceptionHandler(MethodArgumentNotValidException.class)
     @SendToUser("/queue/errors")
     public ErrorMessage handleValidationException(MethodArgumentNotValidException exception, Principal principal) {
-        log.warn("Validation error for user {}: {}", principal.getName(), exception.getMessage());
+        String username = principal != null ? principal.getName() : "unknown";
+        log.warn("Validation error for user {}: {}", username, exception.getMessage());
     
         String errorMessage = exception.getBindingResult()
                 .getFieldErrors()
@@ -310,7 +309,8 @@ public class ChatWebSocketController {
     @MessageExceptionHandler(ConstraintViolationException.class)
     @SendToUser("/queue/errors")
     public ErrorMessage handleConstraintViolationException(ConstraintViolationException exception, Principal principal) {
-        log.warn("Constraint violation for user {}: {}", principal.getName(), exception.getMessage());
+        String username = principal != null ? principal.getName() : "unknown";
+        log.warn("Constraint violation for user {}: {}", username, exception.getMessage());
         
         String errorMessage = exception.getConstraintViolations()
                 .stream()
@@ -341,17 +341,6 @@ public class ChatWebSocketController {
     private User getUserEntity(Integer userId) {
         return userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-    }
-
-    /**
-     * Note: This method is no longer needed for WebSocket operations
-     * as membership validation is now handled by the AOP aspect
-     */
-    @Deprecated
-    private void validateConversationMembership(Integer conversationId, Integer userId) {
-        if (!conversationService.hasConversationPermission(userId, conversationId, "chat.conversation.view")) {
-            throw new AccessDeniedException("Not a member of this conversation");
-        }
     }
 
     private void sendWelcomeNotification(UserDetailsImpl userDetails) {

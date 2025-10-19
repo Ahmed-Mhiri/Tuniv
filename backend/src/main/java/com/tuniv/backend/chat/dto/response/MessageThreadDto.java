@@ -17,4 +17,6 @@ public class MessageThreadDto {
     private List<ChatMessageDto> replies;
     private Integer replyCount;
     private boolean hasMoreReplies;
+    private Integer threadStarterId; // Add this field
+    private Integer conversationId;  // Add this field
 }

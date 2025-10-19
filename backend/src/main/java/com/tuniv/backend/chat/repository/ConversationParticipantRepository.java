@@ -1,7 +1,9 @@
 package com.tuniv.backend.chat.repository;
 
-import com.tuniv.backend.chat.model.Conversation;
-import com.tuniv.backend.chat.model.ConversationParticipant;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,9 +13,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
+import com.tuniv.backend.chat.model.Conversation;
+import com.tuniv.backend.chat.model.ConversationParticipant;
 
 @Repository
 public interface ConversationParticipantRepository extends JpaRepository<ConversationParticipant, ConversationParticipant.ConversationParticipantId>, 
@@ -158,10 +159,21 @@ public interface ConversationParticipantRepository extends JpaRepository<Convers
         Pageable pageable
     );
 
-@Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId IN :conversationIds AND cp.isActive = true")
-List<ConversationParticipant> findByConversationIds(@Param("conversationIds") List<Integer> conversationIds);
+    @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId IN :conversationIds AND cp.isActive = true")
+    List<ConversationParticipant> findByConversationIds(@Param("conversationIds") List<Integer> conversationIds);
 
-
-@Query("SELECT COUNT(cp) > 0 FROM ConversationParticipant cp WHERE cp.conversation.conversationId = :conversationId AND cp.user.userId = :userId AND cp.isActive = true")
-boolean isUserActiveParticipant(@Param("conversationId") Integer conversationId, @Param("userId") Integer userId);
+    // ========== NEW METHODS FOR EntityFinderService ==========
+    
+    @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId = :conversationId AND cp.user.userId = :userId AND cp.isActive = true")
+    Optional<ConversationParticipant> findActiveParticipant(@Param("conversationId") Integer conversationId, 
+                                                           @Param("userId") Integer userId);
+    
+    @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId = :conversationId AND cp.isActive = true")
+    List<ConversationParticipant> findActiveParticipantsByConversationId(@Param("conversationId") Integer conversationId);
+    
+    @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.conversation.conversationId = :conversationId")
+    List<ConversationParticipant> findByConversation_ConversationId(@Param("conversationId") Integer conversationId);
+    
+    @Query("SELECT cp FROM ConversationParticipant cp WHERE cp.user.userId = :userId AND cp.isActive = true")
+    List<ConversationParticipant> findActiveConversationsByUserId(@Param("userId") Integer userId);
 }
