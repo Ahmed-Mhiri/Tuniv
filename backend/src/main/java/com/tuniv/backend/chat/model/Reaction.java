@@ -2,8 +2,6 @@ package com.tuniv.backend.chat.model;
 
 import java.time.Instant;
 
-import org.hibernate.annotations.Where;
-
 import com.tuniv.backend.shared.model.Auditable;
 import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.user.model.User;
@@ -38,7 +36,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_removed = false") // ✅ ADD: Global filter for non-removed reactions
 public class Reaction extends Auditable {
 
     @Id

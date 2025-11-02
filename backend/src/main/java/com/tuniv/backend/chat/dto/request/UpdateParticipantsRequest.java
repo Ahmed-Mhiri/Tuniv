@@ -1,4 +1,4 @@
-package com.tuniv.backend.chat.dto;
+package com.tuniv.backend.chat.dto.request;
 
 import java.util.List;
 

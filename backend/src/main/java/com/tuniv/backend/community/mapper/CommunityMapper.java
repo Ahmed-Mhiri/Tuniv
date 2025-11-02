@@ -9,18 +9,18 @@ import org.springframework.stereotype.Component;
 
 import com.tuniv.backend.community.dto.CommunityBasicDto;
 import com.tuniv.backend.community.dto.CommunityDetailDto;
+import com.tuniv.backend.community.dto.CommunityMembershipStatusDto;
 import com.tuniv.backend.community.dto.CommunityStatsDto;
 import com.tuniv.backend.community.dto.CommunitySummaryDto;
 import com.tuniv.backend.community.dto.CommunityTopicStatsDto;
 import com.tuniv.backend.community.dto.CommunityWithStatsDto;
+import com.tuniv.backend.community.dto.ModerationStatusDto;
 import com.tuniv.backend.community.dto.TrendingCommunityDto;
 import com.tuniv.backend.community.model.Community;
 import com.tuniv.backend.community.model.CommunityMembership;
-import com.tuniv.backend.community.model.CommunityRole;
 import com.tuniv.backend.qa.model.TopicType;
 import com.tuniv.backend.user.dto.UserSummaryDto;
 import com.tuniv.backend.user.mapper.UserMapper;
-import com.tuniv.backend.user.model.User;
 
 import lombok.RequiredArgsConstructor;
 
@@ -40,49 +40,60 @@ public class CommunityMapper {
         return new CommunitySummaryDto(
             community.getCommunityId(),
             community.getName(),
+            community.getIconUrl(),
             community.getMemberCount(),
             community.getTopicCount(),
             universityName
         );
     }
 
-    public CommunityDetailDto toDetailDto(Community community, User currentUser) {
+    // ✅ UPDATED: New signature with membership and moderation status
+    public CommunityDetailDto toDetailDto(Community community, CommunityMembership membership, ModerationStatusDto moderationStatus) {
         if (community == null) {
             return null;
         }
 
-        boolean isMember = false;
-        boolean isModerator = false;
-
-        // Check the current user's status within the community
-        if (currentUser != null && community.getMembers() != null) {
-            for (CommunityMembership membership : community.getMembers()) {
-                if (membership.getUser().getUserId().equals(currentUser.getUserId())) {
-                    isMember = true;
-                    if (membership.getRole() == CommunityRole.MODERATOR) {
-                        isModerator = true;
-                    }
-                    break;
-                }
-            }
-        }
+        // Build membership status from the provided data
+        CommunityMembershipStatusDto statusDto = new CommunityMembershipStatusDto(
+            membership != null,                      // isMember
+            membership != null ? membership.getRole() : null, // role
+            moderationStatus != null ? moderationStatus.isBanned() : false, // isBanned
+            moderationStatus != null ? moderationStatus.muteUntil() : null, // muteUntil
+            membership != null ? membership.isNotificationsEnabled() : false // notificationsEnabled
+        );
         
         String universityName = (community.getUniversity() != null) ? community.getUniversity().getName() : null;
+        
+        // FIX 1: Use getCreator() instead of getCreatedBy()
         UserSummaryDto creatorSummary = userMapper.toUserSummaryDto(community.getCreator());
 
         return new CommunityDetailDto(
             community.getCommunityId(),
             community.getName(),
             community.getDescription(),
+            community.getBannerUrl(),
+            community.getIconUrl(),
             community.getMemberCount(),
+            community.getFollowerCount(),
             community.getTopicCount(),
             community.getCreatedAt(),
             creatorSummary,
             universityName,
-            isMember,
-            isModerator
+            community.isVerified(),
+            new com.tuniv.backend.community.dto.CommunitySettingsDto(
+                community.getJoinPolicy(),
+                community.getPostingPolicy(),
+                community.getVisibility(),
+                community.isAllowExternalMembers()
+            ),
+            statusDto
         );
     }
+
+    // ❌ DELETED: Legacy method that was calling repository
+    // public CommunityDetailDto toDetailDto(Community community, User currentUser) {
+    //     This method has been removed as it was calling the repository
+    // }
 
     public List<CommunitySummaryDto> toSummaryDtoList(List<Community> communities) {
         return communities.stream()
@@ -110,7 +121,8 @@ public class CommunityMapper {
 
         Map<TopicType, Long> topicTypeDistribution = new HashMap<>();
         topicTypeDistribution.put(TopicType.QUESTION, statsDto.questionTopics());
-        topicTypeDistribution.put(TopicType.POST, statsDto.postTopics());
+        // FIX 2: Change TopicType.POST to TopicType.DISCUSSION
+        topicTypeDistribution.put(TopicType.DISCUSSION, statsDto.postTopics());
 
         return new CommunityStatsDto(
             statsDto.communityId(),
@@ -125,9 +137,9 @@ public class CommunityMapper {
         );
     }
 
-    // ✅ NEW: Convert to CommunityWithStatsDto (combined detail + stats)
-    public CommunityWithStatsDto toCommunityWithStatsDto(Community community, CommunityTopicStatsDto statsDto, User currentUser) {
-        CommunityDetailDto detailDto = toDetailDto(community, currentUser);
+    // ✅ UPDATED: Convert to CommunityWithStatsDto with new signature
+    public CommunityWithStatsDto toCommunityWithStatsDto(Community community, CommunityTopicStatsDto statsDto, CommunityMembership membership, ModerationStatusDto moderationStatus) {
+        CommunityDetailDto detailDto = toDetailDto(community, membership, moderationStatus);
         CommunityStatsDto stats = toStatsDto(statsDto, community);
 
         return new CommunityWithStatsDto(
@@ -135,6 +147,11 @@ public class CommunityMapper {
             stats
         );
     }
+
+    // ❌ DELETED: Legacy method that was calling repository
+    // public CommunityWithStatsDto toCommunityWithStatsDto(Community community, CommunityTopicStatsDto statsDto, User currentUser) {
+    //     This method has been removed as it was calling the repository
+    // }
 
     // ✅ NEW: Convert to TrendingCommunityDto
     public TrendingCommunityDto toTrendingCommunityDto(Community community, Long recentActivityCount) {

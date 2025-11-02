@@ -1,8 +1,8 @@
 package com.tuniv.backend.chat.controller;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.ReadReceiptDto;
-import com.tuniv.backend.chat.dto.UnreadCountDto;
+import com.tuniv.backend.chat.dto.common.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.event.UnreadCountDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
 import com.tuniv.backend.chat.service.ReadReceiptService;
 import com.tuniv.backend.chat.annotation.RequiresMembership;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;

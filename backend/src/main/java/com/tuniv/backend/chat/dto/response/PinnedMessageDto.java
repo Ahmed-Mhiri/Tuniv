@@ -1,5 +1,5 @@
 // PinnedMessageDto.java
-package com.tuniv.backend.chat.dto;
+package com.tuniv.backend.chat.dto.response;
 
 import lombok.Getter;
 import lombok.Setter;

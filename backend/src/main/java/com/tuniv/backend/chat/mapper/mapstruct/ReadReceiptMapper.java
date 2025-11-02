@@ -1,6 +1,6 @@
 package com.tuniv.backend.chat.mapper.mapstruct;
 
-import com.tuniv.backend.chat.dto.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.common.ReadReceiptDto;
 import com.tuniv.backend.chat.model.ConversationParticipant;
 import org.mapstruct.*;
 

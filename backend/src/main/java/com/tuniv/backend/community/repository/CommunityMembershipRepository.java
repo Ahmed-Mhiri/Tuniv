@@ -1,7 +1,5 @@
 package com.tuniv.backend.community.repository;
 
-
-
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +13,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.tuniv.backend.community.model.CommunityMembership;
+import com.tuniv.backend.community.model.CommunityRole;
 
 @Repository
 public interface CommunityMembershipRepository extends JpaRepository<CommunityMembership, CommunityMembership.CommunityMembershipId> {
@@ -56,10 +55,9 @@ public interface CommunityMembershipRepository extends JpaRepository<CommunityMe
     List<CommunityMembership> findById_CommunityIdAndRole(Integer communityId, CommunityRole role);
 
     /**
-     * ✅ ADDED: Finds all banned members in a community, for moderation purposes.
+     * ❌ REMOVED: Banned members query - now handled by ModerationService
+     * List<CommunityMembership> findById_CommunityIdAndIsBannedTrue(Integer communityId);
      */
-    @EntityGraph(attributePaths = {"user"})
-    List<CommunityMembership> findById_CommunityIdAndIsBannedTrue(Integer communityId);
 
     /**
      * ✅ ADDED: Atomically updates the contribution score for a member.

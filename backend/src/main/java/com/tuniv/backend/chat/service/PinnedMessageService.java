@@ -2,7 +2,7 @@ package com.tuniv.backend.chat.service;
 
 import java.util.List;
 
-import com.tuniv.backend.chat.dto.PinnedMessageDto;
+import com.tuniv.backend.chat.dto.response.PinnedMessageDto;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 
 public interface PinnedMessageService {

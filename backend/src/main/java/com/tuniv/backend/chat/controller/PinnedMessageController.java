@@ -1,8 +1,8 @@
 package com.tuniv.backend.chat.controller;
 
-import com.tuniv.backend.chat.dto.PinnedMessageDto;
 import com.tuniv.backend.chat.service.PinnedMessageService;
 import com.tuniv.backend.chat.annotation.RequiresMembership;
+import com.tuniv.backend.chat.dto.response.PinnedMessageDto;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.dto.ApiResponse;
 import lombok.RequiredArgsConstructor;

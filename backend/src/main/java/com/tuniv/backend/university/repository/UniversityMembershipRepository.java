@@ -77,4 +77,6 @@ public interface UniversityMembershipRepository
     @Modifying
     @Query("UPDATE UniversityMembership um SET um.replyCount = um.replyCount + 1 WHERE um.id.userId = :userId AND um.id.universityId = :universityId")
     void incrementReplyCount(@Param("userId") Integer userId, @Param("universityId") Integer universityId);
+
+    public Optional<UniversityMembership> findByUserIdAndIsPrimaryTrue(Integer userId);
 }

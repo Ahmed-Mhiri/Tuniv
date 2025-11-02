@@ -1,4 +1,4 @@
-package com.tuniv.backend.chat.dto;
+package com.tuniv.backend.chat.dto.common;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor; // ✅ ADDED

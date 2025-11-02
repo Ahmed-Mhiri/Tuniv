@@ -1,6 +1,9 @@
 package com.tuniv.backend.chat.controller;
 
 import com.tuniv.backend.chat.dto.*;
+import com.tuniv.backend.chat.dto.request.UpdateConversationSettingsRequest;
+import com.tuniv.backend.chat.dto.request.UpdateParticipantsRequest;
+import com.tuniv.backend.chat.dto.response.ParticipantDto;
 import com.tuniv.backend.chat.service.ParticipantService;
 import com.tuniv.backend.chat.model.MuteDuration;
 import com.tuniv.backend.chat.annotation.RequiresMembership;

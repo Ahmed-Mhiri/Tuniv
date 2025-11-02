@@ -7,9 +7,10 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
-import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
-import com.tuniv.backend.chat.dto.ReactionDto;
+import com.tuniv.backend.chat.dto.common.ReactionDto;
+import com.tuniv.backend.chat.dto.response.MessageReactionsSummaryDto;
 import com.tuniv.backend.chat.model.Reaction;
+import com.tuniv.backend.chat.projection.reaction.ReactionProjection;
 
 @Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.IGNORE)
 public interface ReactionMapper {
@@ -21,6 +22,29 @@ public interface ReactionMapper {
     ReactionDto toReactionDto(Reaction reaction);
     
     List<ReactionDto> toReactionDtoList(List<Reaction> reactions);
+    
+    /**
+     * Direct mapping from projection for performance
+     */
+    default ReactionDto projectionToDto(ReactionProjection projection) {
+        if (projection == null) {
+            return null;
+        }
+        
+        return new ReactionDto(
+            projection.getId(),
+            projection.getMessageId(),
+            projection.getUserId(),
+            projection.getUsername(),
+            projection.getProfilePhotoUrl(),
+            projection.getEmoji(),
+            projection.getSkinTone(),
+            projection.getCustomText(),
+            projection.getCreatedAt(),
+            projection.getIsRemoved(),
+            projection.getRemovedAt()
+        );
+    }
     
     /**
      * Simplified method - just mapping, no business logic

@@ -1,5 +1,10 @@
 package com.tuniv.backend.qa.dto;
 
+import java.time.Instant;
+import java.util.List;
+
+import com.tuniv.backend.qa.model.TopicType;
+
 public record TopicSummaryDto(
     Integer id,
     String title,

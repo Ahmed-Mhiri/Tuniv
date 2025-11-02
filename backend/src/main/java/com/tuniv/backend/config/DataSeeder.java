@@ -1,15 +1,11 @@
 package com.tuniv.backend.config;
 
 import com.tuniv.backend.authorization.model.*;
-import com.tuniv.backend.authorization.repository.PermissionRepository;
 import com.tuniv.backend.chat.model.ConversationRole;
 import com.tuniv.backend.chat.model.DefaultConversationRoles;
-import com.tuniv.backend.chat.repository.ConversationRoleRepository;
 import com.tuniv.backend.community.model.CommunityRole;
 import com.tuniv.backend.community.model.DefaultCommunityRoles;
-import com.tuniv.backend.community.repository.CommunityRoleRepository;
 import com.tuniv.backend.university.model.UniversityRole;
-import com.tuniv.backend.university.repository.UniversityRoleRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -303,7 +299,9 @@ public class DataSeeder implements CommandLineRunner {
                     ChatPermissions.ADD_PARTICIPANTS.getName(),
                     ChatPermissions.REMOVE_PARTICIPANTS.getName(),
                     ChatPermissions.PIN_MESSAGES.getName(),
-                    ChatPermissions.MUTE_PARTICIPANTS.getName()
+                    ChatPermissions.MUTE_PARTICIPANTS.getName(),
+                    // ✅ ADDED: Manage reports permission for moderators
+                    ChatPermissions.MANAGE_REPORTS.getName()
                 );
 
                 Set<Permission> modPermissions = permissionRepository.findByNameIn(modPermissionNames);

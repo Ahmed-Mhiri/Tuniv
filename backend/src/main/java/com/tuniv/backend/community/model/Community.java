@@ -5,6 +5,7 @@ import org.hibernate.annotations.Where;
 import com.tuniv.backend.follow.model.Followable;
 import com.tuniv.backend.shared.model.Auditable;
 import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -31,7 +32,7 @@ import lombok.Setter;
 @Entity
 @Table(name = "communities", indexes = {
     @Index(name = "idx_community_name", columnList = "name"),
-    @Index(name = "idx_community_university", columnList = "university_id"), // ✅ ADDED: University relationship
+    @Index(name = "idx_community_university", columnList = "university_id"),
     @Index(name = "idx_community_member_count", columnList = "member_count DESC"),
     @Index(name = "idx_community_topic_count", columnList = "topic_count DESC"),
     @Index(name = "idx_community_created", columnList = "created_at DESC"),
@@ -47,11 +48,9 @@ public class Community extends Auditable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer communityId;
 
-    // ========== OPTIMISTIC LOCKING ==========
     @Version
     private Long version;
 
-    // ========== BASIC INFO ==========
     @NotBlank(message = "Community name cannot be empty")
     @Size(max = 100, message = "Community name cannot exceed 100 characters")
     @Column(name = "name", nullable = false, unique = true, length = 100)
@@ -67,12 +66,15 @@ public class Community extends Auditable {
     @Column(name = "icon_url")
     private String iconUrl;
 
-    // ========== UNIVERSITY CONTEXT ==========
+    // ADDED: Missing creator field
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "creator_user_id", nullable = false, updatable = false)
+    private User creator;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "university_id") // ✅ ADDED: Link to university
+    @JoinColumn(name = "university_id")
     private University university;
 
-    // ========== CONFIGURATION ==========
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "join_policy", nullable = false)
@@ -97,7 +99,6 @@ public class Community extends Auditable {
     @Column(name = "is_verified", nullable = false)
     private boolean isVerified = false;
 
-    // ========== STATISTICS ==========
     @Column(name = "member_count", nullable = false)
     private int memberCount = 0;
 
@@ -113,7 +114,6 @@ public class Community extends Auditable {
     @Column(name = "weekly_growth_rate")
     private Double weeklyGrowthRate = 0.0;
 
-    // ========== FOLLOWABLE ==========
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false, orphanRemoval = true)
     @JoinColumn(name = "followable_id", nullable = false, unique = true)
     private Followable followable;

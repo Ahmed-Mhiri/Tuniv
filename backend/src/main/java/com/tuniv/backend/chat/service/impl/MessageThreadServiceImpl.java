@@ -12,9 +12,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
-import com.tuniv.backend.chat.dto.MessageThreadDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.dto.response.MessageReactionsSummaryDto;
+import com.tuniv.backend.chat.dto.response.MessageThreadDto;
 import com.tuniv.backend.chat.mapper.mapstruct.MessageMapper;
 import com.tuniv.backend.chat.model.Message;
 import com.tuniv.backend.chat.model.Reaction;

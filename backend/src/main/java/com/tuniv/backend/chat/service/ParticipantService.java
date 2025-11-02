@@ -2,9 +2,12 @@ package com.tuniv.backend.chat.service;
 
 import java.util.List;
 
-import com.tuniv.backend.chat.dto.ParticipantDto;
-import com.tuniv.backend.chat.dto.UpdateConversationSettingsRequest;
-import com.tuniv.backend.chat.dto.UpdateParticipantsRequest;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+
+import com.tuniv.backend.chat.dto.request.UpdateConversationSettingsRequest;
+import com.tuniv.backend.chat.dto.request.UpdateParticipantsRequest;
+import com.tuniv.backend.chat.dto.response.ParticipantDto;
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.model.ConversationParticipant;
 import com.tuniv.backend.chat.model.ConversationRole;
@@ -38,6 +41,33 @@ public interface ParticipantService {
     
     ParticipantDto getMyParticipantInfo(Integer conversationId, UserDetailsImpl currentUser);
 
+    // ========== Optimized Data Retrieval Methods ==========
+    
+    /**
+     * Get conversation participants with pagination and projections for better performance
+     */
+    Page<ParticipantDto> getConversationParticipants(Integer conversationId, Pageable pageable);
+    
+    /**
+     * Get recently active participants with limit for performance
+     */
+    List<ParticipantDto> getRecentlyActiveParticipants(Integer conversationId, int limit);
+    
+    /**
+     * Get conversation administrators and moderators
+     */
+    List<ParticipantDto> getConversationAdmins(Integer conversationId);
+    
+    /**
+     * Count active participants in a conversation (optimized version)
+     */
+    long countActiveParticipants(Integer conversationId);
+    
+    /**
+     * Batch update last active timestamp for multiple users
+     */
+    void batchUpdateLastActive(List<Integer> userIds, Integer conversationId);
+
     // ========== Utility Methods ==========
     
     ConversationParticipant getParticipantEntity(Conversation conversation, Integer userId);
@@ -48,17 +78,15 @@ public interface ParticipantService {
     
     ConversationParticipant addParticipant(Conversation conversation, User user, ConversationRole role);
     
-    // ========== Statistics & Role Methods ==========
+    // ========== Statistics Methods ==========
     
     void updateConversationStats(Integer conversationId);
     
     long countActiveParticipants(Conversation conversation);
     
-    ConversationRole getDefaultConversationRole();
-    
-    ConversationRole getConversationAdminRole();
-    
-    ConversationRole getConversationModeratorRole();
-    
-    ConversationRole getRoleByName(String roleName);
+    // 🗑️ REMOVED Role Methods - Now handled by ConversationRoleService
+    // ConversationRole getDefaultConversationRole();
+    // ConversationRole getConversationAdminRole();
+    // ConversationRole getConversationModeratorRole();
+    // ConversationRole getRoleByName(String roleName);
 }

@@ -17,7 +17,7 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
 import com.tuniv.backend.chat.model.Message;
-import com.tuniv.backend.chat.model.MessageReaction;
+import com.tuniv.backend.chat.model.Reaction;
 import com.tuniv.backend.community.model.Community;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.follow.model.Follow;
@@ -336,7 +336,7 @@ public class NotificationService {
     @Async
     @EventListener
     public void handleNewChatMessageReaction(NewChatMessageReactionEvent event) {
-        MessageReaction reaction = event.getReaction();
+        Reaction reaction = event.getReaction();
         User actor = reaction.getUser();
         Message message = (Message) reaction.getPost();
         User recipient = message.getAuthor();

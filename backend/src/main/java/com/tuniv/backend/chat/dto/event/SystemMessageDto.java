@@ -1,5 +1,5 @@
 // SystemMessageDto.java
-package com.tuniv.backend.chat.dto;
+package com.tuniv.backend.chat.dto.event;
 
 import lombok.Getter;
 import lombok.Setter;

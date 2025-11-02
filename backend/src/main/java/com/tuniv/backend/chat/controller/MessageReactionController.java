@@ -1,8 +1,8 @@
 package com.tuniv.backend.chat.controller;
 
-import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
-import com.tuniv.backend.chat.dto.ReactionDto;
-import com.tuniv.backend.chat.dto.ReactionRequestDto;
+import com.tuniv.backend.chat.dto.common.ReactionDto;
+import com.tuniv.backend.chat.dto.request.ReactionRequestDto;
+import com.tuniv.backend.chat.dto.response.MessageReactionsSummaryDto;
 import com.tuniv.backend.chat.service.ReactionService;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.dto.ApiResponse;

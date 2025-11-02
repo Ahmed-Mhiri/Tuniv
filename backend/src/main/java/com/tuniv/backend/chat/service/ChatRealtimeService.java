@@ -3,6 +3,16 @@ package com.tuniv.backend.chat.service;
 import java.util.List;
 
 import com.tuniv.backend.chat.dto.*;
+import com.tuniv.backend.chat.dto.common.ReactionDto;
+import com.tuniv.backend.chat.dto.common.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.event.ChatNotificationDto;
+import com.tuniv.backend.chat.dto.event.MessageReactionUpdateDto;
+import com.tuniv.backend.chat.dto.event.SystemMessageDto;
+import com.tuniv.backend.chat.dto.event.TypingIndicatorDto;
+import com.tuniv.backend.chat.dto.response.BannedUserDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.dto.response.ConversationDetailDto;
+import com.tuniv.backend.chat.dto.response.ParticipantDto;
 
 public interface ChatRealtimeService {
 

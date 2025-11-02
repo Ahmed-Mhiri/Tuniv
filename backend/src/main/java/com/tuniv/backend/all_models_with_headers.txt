@@ -1,4 +1,8 @@
-﻿//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\ChatPermissions.java
+==================================================
+File: ChatPermissions.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\ChatPermissions.java
+==================================================
+
 package com.tuniv.backend.authorization.model;
 
 public enum ChatPermissions {
@@ -22,7 +26,10 @@ public enum ChatPermissions {
 
     // Moderation
     MUTE_PARTICIPANTS("mute_participants", "Mute participants temporarily"),
-    BAN_PARTICIPANTS("ban_participants", "Ban participants from conversation");
+    BAN_PARTICIPANTS("ban_participants", "Ban participants from conversation"),
+    
+    // ✅ ADDED: Report management
+    MANAGE_REPORTS("manage_reports", "View and manage chat reports");
 
     private final String name;
     private final String description;
@@ -41,9 +48,11 @@ public enum ChatPermissions {
     }
 }
 
+==================================================
+File: CommunityPermissions.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\CommunityPermissions.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\CommunityPermissions.java
 package com.tuniv.backend.authorization.model;
 
 public enum CommunityPermissions {
@@ -73,9 +82,11 @@ public enum CommunityPermissions {
     }
 }
 
+==================================================
+File: ContentPermissions.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\ContentPermissions.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\ContentPermissions.java
 package com.tuniv.backend.authorization.model;
 
 public enum ContentPermissions {
@@ -108,9 +119,11 @@ public enum ContentPermissions {
     }
 }
 
+==================================================
+File: Permission.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\Permission.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\Permission.java
 package com.tuniv.backend.authorization.model;
 
 import jakarta.persistence.Column;
@@ -152,13 +165,15 @@ public class Permission {
     UNIVERSITY,
     COMMUNITY,
     PLATFORM,
-    CHAT  // âœ… ADDED: New scope for chat permissions
+    CHAT  // ✅ ADDED: New scope for chat permissions
     }
 }
 
+==================================================
+File: PlatformPermissions.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\PlatformPermissions.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\PlatformPermissions.java
 package com.tuniv.backend.authorization.model;
 
 public enum PlatformPermissions {
@@ -185,9 +200,11 @@ public enum PlatformPermissions {
     }
 }
 
+==================================================
+File: UniversityPermissions.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\UniversityPermissions.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\authorization\model\UniversityPermissions.java
 package com.tuniv.backend.authorization.model;
 
 public enum UniversityPermissions {
@@ -218,19 +235,16 @@ public enum UniversityPermissions {
     }
 }
 
+==================================================
+File: Conversation.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Conversation.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Conversation.java
 package com.tuniv.backend.chat.model;
 
 import java.time.Instant;
 import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
-
-import org.hibernate.annotations.Where;
 
 import com.tuniv.backend.shared.model.Auditable;
 import com.tuniv.backend.university.model.University;
@@ -263,13 +277,13 @@ import lombok.Setter;
     @Index(name = "idx_conversation_university", columnList = "university_context_id"),
     @Index(name = "idx_conversation_created", columnList = "created_at DESC"),
     @Index(name = "idx_conversation_last_message", columnList = "last_message_sent_at DESC"),
-    @Index(name = "idx_conversation_active", columnList = "is_active, last_message_sent_at DESC")
+    @Index(name = "idx_conversation_active", columnList = "is_active, last_message_sent_at DESC"),
+    // ✅ NEW: Index for online status queries
+    @Index(name = "idx_conversation_online_stats", columnList = "online_participant_count, last_activity_at DESC")
 })
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_active = true") // âœ… ADD: Global filter for active conversations
-
 public class Conversation extends Auditable {
 
     @Id
@@ -321,27 +335,51 @@ public class Conversation extends Auditable {
     @Column(name = "is_archived", nullable = false)
     private boolean isArchived = false;
 
+    // ========== ONLINE STATUS TRACKING ==========
+    @Column(name = "online_participant_count", nullable = false)
+    private Integer onlineParticipantCount = 0;
+
+    @Column(name = "last_activity_at")
+    private Instant lastActivityAt = Instant.now();
+
+    @Column(name = "recent_active_participant_count", nullable = false)
+    private Integer recentActiveParticipantCount = 0;
+
+    // ========== CACHED PARTICIPANT SUMMARY ==========
+    @Column(name = "cached_admin_ids", length = 1000)
+    private String cachedAdminIds; // JSON array of admin user IDs
+
+    @Column(name = "cached_online_user_ids", length = 2000)
+    private String cachedOnlineUserIds; // JSON array of online user IDs
+
+    @Column(name = "summary_updated_at")
+    private Instant summaryUpdatedAt;
+
+    // ========== PERFORMANCE OPTIMIZATIONS ==========
+    @Column(name = "is_large_group", nullable = false)
+    private boolean isLargeGroup = false;
+
+    @Column(name = "participant_count_threshold", nullable = false)
+    private Integer participantCountThreshold = 100;
+
     // ========== RELATIONSHIPS ==========
     @OneToMany(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private Set<Message> messages = new HashSet<>();
 
     @OneToMany(mappedBy = "conversation", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     private Set<ConversationParticipant> participants = new HashSet<>();
-
-
-    
 }
 
+==================================================
+File: ConversationParticipant.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationParticipant.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationParticipant.java
 package com.tuniv.backend.chat.model;
 
 import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
-
-import org.hibernate.annotations.Where;
 
 import com.tuniv.backend.shared.model.Auditable;
 import com.tuniv.backend.user.model.User;
@@ -374,7 +412,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_active = true") // âœ… ADD: Global filter for active participants
 public class ConversationParticipant extends Auditable {
 
     @EmbeddedId
@@ -479,9 +516,11 @@ public class ConversationParticipant extends Auditable {
     }
 }
 
+==================================================
+File: ConversationRole.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationRole.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationRole.java
 package com.tuniv.backend.chat.model;
 
 import java.util.HashSet;
@@ -527,7 +566,7 @@ public class ConversationRole {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
-    // âœ… Link to conversation (NULL for system roles)
+    // ✅ Link to conversation (NULL for system roles)
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "conversation_id")
     private Conversation conversation;
@@ -538,7 +577,7 @@ public class ConversationRole {
     @Column(name = "is_default", nullable = false)
     private boolean isDefault = false;
 
-    // âœ… Permissions for chat actions
+    // ✅ Permissions for chat actions
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "conversation_role_permissions",
@@ -551,9 +590,11 @@ public class ConversationRole {
     private Integer memberCount = 0;
 }
 
+==================================================
+File: ConversationType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\ConversationType.java
 package com.tuniv.backend.chat.model;
 
 // ========== ENUMS ==========
@@ -565,9 +606,11 @@ package com.tuniv.backend.chat.model;
         COMMUNITY       // Community discussion
     }
 
+==================================================
+File: DefaultConversationRoles.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\DefaultConversationRoles.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\DefaultConversationRoles.java
 package com.tuniv.backend.chat.model;
 
 public enum DefaultConversationRoles {
@@ -598,9 +641,11 @@ public enum DefaultConversationRoles {
     }
 }
 
+==================================================
+File: DirectConversationLookup.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\DirectConversationLookup.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\DirectConversationLookup.java
 package com.tuniv.backend.chat.model;
 
 import jakarta.persistence.Column;
@@ -654,14 +699,14 @@ public class DirectConversationLookup {
     }
 }
 
+==================================================
+File: Message.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Message.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Message.java
 package com.tuniv.backend.chat.model;
 
 import java.time.Instant;
-
-import org.hibernate.annotations.Where;
 
 import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.user.model.User;
@@ -688,13 +733,12 @@ import lombok.Setter;
     @Index(name = "idx_message_reply_to", columnList = "reply_to_message_id"),
     @Index(name = "idx_message_type", columnList = "message_type"),
     @Index(name = "idx_message_status", columnList = "is_deleted, sent_at DESC"),
-    @Index(name = "idx_message_university_context", columnList = "university_context_id"), // âœ… KEEP THIS ONE
+    @Index(name = "idx_message_university_context", columnList = "university_context_id"), // ✅ KEEP THIS ONE
     @Index(name = "idx_message_author_conversation", columnList = "user_id, conversation_id")
 })
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_deleted = false")
 public class Message extends Post {
 
     // ========== OPTIMISTIC LOCKING ==========
@@ -729,7 +773,7 @@ public class Message extends Post {
     @Column(name = "is_pinned", nullable = false)
     private boolean isPinned = false;
 
-    // âœ… NEW: Added fields for pinning context
+    // ✅ NEW: Added fields for pinning context
     @Column(name = "pinned_at")
     private Instant pinnedAt;
 
@@ -769,9 +813,11 @@ public class Message extends Post {
     }
 }
 
+==================================================
+File: MessageStatus.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MessageStatus.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MessageStatus.java
 package com.tuniv.backend.chat.model;
 
 public enum MessageStatus {
@@ -781,9 +827,11 @@ public enum MessageStatus {
         DELETED     // Message deleted
     }
 
+==================================================
+File: MessageType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MessageType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MessageType.java
 package com.tuniv.backend.chat.model;
 
 public enum MessageType {
@@ -797,23 +845,25 @@ public enum MessageType {
     EMOJI
 }
 
+==================================================
+File: MuteDuration.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MuteDuration.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\MuteDuration.java
 package com.tuniv.backend.chat.model;
 
  public enum MuteDuration {
         ONE_HOUR, EIGHT_HOURS, ONE_DAY, ONE_WEEK, PERMANENT
     }
 
+==================================================
+File: Reaction.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Reaction.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\chat\model\Reaction.java
 package com.tuniv.backend.chat.model;
 
 import java.time.Instant;
-
-import org.hibernate.annotations.Where;
 
 import com.tuniv.backend.shared.model.Auditable;
 import com.tuniv.backend.university.model.University;
@@ -839,7 +889,7 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "reactions", indexes = {
-    // âœ… CORRECTED: Unique constraint now includes emoji
+    // ✅ CORRECTED: Unique constraint now includes emoji
     @Index(name = "idx_reaction_message_user_emoji", columnList = "message_id, user_id, emoji", unique = true),
     @Index(name = "idx_reaction_message", columnList = "message_id, created_at"),
     @Index(name = "idx_reaction_user", columnList = "user_id, created_at"),
@@ -849,7 +899,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_removed = false") // âœ… ADD: Global filter for non-removed reactions
 public class Reaction extends Auditable {
 
     @Id
@@ -898,9 +947,11 @@ public class Reaction extends Auditable {
     private String removalReason;
 }
 
+==================================================
+File: Community.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\Community.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\Community.java
 package com.tuniv.backend.community.model;
 
 import org.hibernate.annotations.Where;
@@ -908,6 +959,7 @@ import org.hibernate.annotations.Where;
 import com.tuniv.backend.follow.model.Followable;
 import com.tuniv.backend.shared.model.Auditable;
 import com.tuniv.backend.university.model.University;
+import com.tuniv.backend.user.model.User;
 
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
@@ -934,7 +986,7 @@ import lombok.Setter;
 @Entity
 @Table(name = "communities", indexes = {
     @Index(name = "idx_community_name", columnList = "name"),
-    @Index(name = "idx_community_university", columnList = "university_id"), // âœ… ADDED: University relationship
+    @Index(name = "idx_community_university", columnList = "university_id"),
     @Index(name = "idx_community_member_count", columnList = "member_count DESC"),
     @Index(name = "idx_community_topic_count", columnList = "topic_count DESC"),
     @Index(name = "idx_community_created", columnList = "created_at DESC"),
@@ -950,11 +1002,9 @@ public class Community extends Auditable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer communityId;
 
-    // ========== OPTIMISTIC LOCKING ==========
     @Version
     private Long version;
 
-    // ========== BASIC INFO ==========
     @NotBlank(message = "Community name cannot be empty")
     @Size(max = 100, message = "Community name cannot exceed 100 characters")
     @Column(name = "name", nullable = false, unique = true, length = 100)
@@ -970,12 +1020,15 @@ public class Community extends Auditable {
     @Column(name = "icon_url")
     private String iconUrl;
 
-    // ========== UNIVERSITY CONTEXT ==========
+    // ADDED: Missing creator field
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "creator_user_id", nullable = false, updatable = false)
+    private User creator;
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "university_id") // âœ… ADDED: Link to university
+    @JoinColumn(name = "university_id")
     private University university;
 
-    // ========== CONFIGURATION ==========
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "join_policy", nullable = false)
@@ -1000,7 +1053,6 @@ public class Community extends Auditable {
     @Column(name = "is_verified", nullable = false)
     private boolean isVerified = false;
 
-    // ========== STATISTICS ==========
     @Column(name = "member_count", nullable = false)
     private int memberCount = 0;
 
@@ -1016,15 +1068,16 @@ public class Community extends Auditable {
     @Column(name = "weekly_growth_rate")
     private Double weeklyGrowthRate = 0.0;
 
-    // ========== FOLLOWABLE ==========
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false, orphanRemoval = true)
     @JoinColumn(name = "followable_id", nullable = false, unique = true)
     private Followable followable;
 }
 
+==================================================
+File: CommunityJoinPolicy.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityJoinPolicy.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityJoinPolicy.java
 package com.tuniv.backend.community.model;
 
     // ========== ENUMS ==========
@@ -1035,9 +1088,11 @@ package com.tuniv.backend.community.model;
         UNIVERSITY_ONLY // Only university members
     }
 
+==================================================
+File: CommunityMembership.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityMembership.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityMembership.java
 package com.tuniv.backend.community.model;
 
 import java.io.Serializable;
@@ -1108,9 +1163,6 @@ public class CommunityMembership extends Auditable {
     @Column(name = "notifications_enabled", nullable = false)
     private boolean notificationsEnabled = true;
 
-    @Column(name = "is_banned", nullable = false)
-    private boolean isBanned = false;
-
     // ========== METADATA ==========
     @Column(name = "joined_at", nullable = false, updatable = false)
     private Instant joinedAt = Instant.now();
@@ -1126,23 +1178,6 @@ public class CommunityMembership extends Auditable {
 
     @Column(name = "display_order")
     private Integer displayOrder = 0;
-
-    // ========== MODERATION FIELDS ==========
-    @Column(name = "banned_at")
-    private Instant bannedAt;
-
-    @Column(name = "ban_reason")
-    private String banReason;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "banned_by_user_id")
-    private User bannedBy;
-
-    @Column(name = "mute_until")
-    private Instant muteUntil;
-
-    @Column(name = "mute_reason")
-    private String muteReason;
 
     // ========== CONSTRUCTORS ==========
     public CommunityMembership(User user, Community community, CommunityRole role) {
@@ -1194,9 +1229,11 @@ public class CommunityMembership extends Auditable {
     }
 }
 
+==================================================
+File: CommunityPostingPolicy.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityPostingPolicy.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityPostingPolicy.java
 package com.tuniv.backend.community.model;
 
 
@@ -1208,9 +1245,11 @@ package com.tuniv.backend.community.model;
     }
 
 
+==================================================
+File: CommunityRole.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityRole.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityRole.java
 package com.tuniv.backend.community.model;
 
 import java.util.HashSet;
@@ -1237,7 +1276,7 @@ import lombok.Setter;
 
 @Entity
 @Table(name = "community_roles", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"name", "community_id"}) // âœ… Prevents duplicate role names within the same community
+    @UniqueConstraint(columnNames = {"name", "community_id"}) // ✅ Prevents duplicate role names within the same community
 })
 @Getter
 @Setter
@@ -1256,7 +1295,7 @@ public class CommunityRole {
     @Column(name = "display_name", nullable = false, length = 100)
     private String displayName;
 
-    // âœ… ADDED: Link to a community. Will be NULL for system roles.
+    // ✅ ADDED: Link to a community. Will be NULL for system roles.
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "community_id")
     private Community community;
@@ -1267,7 +1306,7 @@ public class CommunityRole {
     @Column(name = "is_default", nullable = false)
     private boolean isDefault = false;
 
-    // âœ… FIXED: Changed from EAGER to LAZY to prevent performance issues
+    // ✅ FIXED: Changed from EAGER to LAZY to prevent performance issues
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "community_role_permissions",
@@ -1280,9 +1319,11 @@ public class CommunityRole {
     private Integer memberCount = 0;
 }
 
+==================================================
+File: CommunityVisibility.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityVisibility.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\CommunityVisibility.java
 package com.tuniv.backend.community.model;
 
 
@@ -1293,9 +1334,11 @@ package com.tuniv.backend.community.model;
         PRIVATE         // Hidden from listings
     }
 
+==================================================
+File: DefaultCommunityRoles.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\DefaultCommunityRoles.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\community\model\DefaultCommunityRoles.java
 package com.tuniv.backend.community.model;
 
 public enum DefaultCommunityRoles {
@@ -1327,9 +1370,11 @@ public enum DefaultCommunityRoles {
     }
 }
 
+==================================================
+File: FileStorage.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\filestorage\model\FileStorage.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\filestorage\model\FileStorage.java
 package com.tuniv.backend.filestorage.model;
 
 import org.springframework.web.multipart.MultipartFile;
@@ -1340,9 +1385,11 @@ public interface FileStorage {
 
 }
 
+==================================================
+File: FeedItemType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\FeedItemType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\FeedItemType.java
 package com.tuniv.backend.follow.model;
 
 public enum FeedItemType {
@@ -1353,9 +1400,11 @@ public enum FeedItemType {
     UNIVERSITY_NEW_ANNOUNCEMENT
 }
 
+==================================================
+File: Follow.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\Follow.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\Follow.java
 package com.tuniv.backend.follow.model;
 
 import java.util.Objects;
@@ -1431,9 +1480,11 @@ public class Follow extends Auditable {
     }
 }
 
+==================================================
+File: Followable.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\Followable.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\Followable.java
 package com.tuniv.backend.follow.model;
 
 import com.tuniv.backend.shared.model.Auditable;
@@ -1453,14 +1504,14 @@ public class Followable extends Auditable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id; // âœ… CHANGED to Long for scalability
+    private Long id; // ✅ CHANGED to Long for scalability
 
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(name = "entity_type", nullable = false, length = 50)
     private FollowableType entityType;
 
-    // âœ… Optional: Denormalized counter for performance
+    // ✅ Optional: Denormalized counter for performance
     @Column(name = "follower_count", nullable = false)
     private Integer followerCount = 0;
 
@@ -1469,9 +1520,11 @@ public class Followable extends Auditable {
     }
 }
 
+==================================================
+File: FollowableType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\FollowableType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\follow\model\FollowableType.java
 package com.tuniv.backend.follow.model;
 
 public enum FollowableType {
@@ -1482,9 +1535,11 @@ public enum FollowableType {
     MODULE
 }
 
+==================================================
+File: ModerationLog.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\ModerationLog.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\ModerationLog.java
 package com.tuniv.backend.moderation.model;
 
 import java.time.Instant;
@@ -1527,7 +1582,7 @@ public class ModerationLog {
     @Column(columnDefinition = "TEXT")
     private String justification;
 
-    // âœ… IMPROVED: Proper JPA relationships instead of raw IDs
+    // ✅ IMPROVED: Proper JPA relationships instead of raw IDs
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "target_post_id")
     private Post targetPost;
@@ -1540,9 +1595,11 @@ public class ModerationLog {
     private Instant createdAt;
 }
 
+==================================================
+File: Report.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\Report.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\Report.java
 package com.tuniv.backend.moderation.model;
 
 import java.time.Instant;
@@ -1582,7 +1639,12 @@ import lombok.Setter;
 @Table(name = "reports", indexes = {
         @Index(name = "idx_report_target", columnList = "target_type, target_id"),
         @Index(name = "idx_report_status", columnList = "status"),
-        @Index(name = "idx_report_created", columnList = "created_at DESC")
+        @Index(name = "idx_report_created", columnList = "created_at DESC"),
+        // ✅ ADDED: Indexes for filtering moderation queues
+        @Index(name = "idx_report_scope_status", columnList = "scope, status"),
+        @Index(name = "idx_report_university_status", columnList = "university_id, scope, status"),
+        @Index(name = "idx_report_community_status", columnList = "community_id, scope, status"),
+        @Index(name = "idx_report_conversation_status", columnList = "conversation_id, scope, status")
 })
 @Getter
 @Setter
@@ -1636,6 +1698,22 @@ public class Report extends Auditable {
     @Column(name = "status", nullable = false, length = 20)
     private ReportStatus status = ReportStatus.PENDING;
 
+    // ✅ ADDED: Scope for categorizing the report
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scope", nullable = false)
+    private ReportScope scope;
+
+    // ✅ ADDED: Denormalized IDs for filtering (NO JOINS)
+    @Column(name = "university_id")
+    private Integer universityId;
+
+    @Column(name = "community_id")
+    private Integer communityId;
+
+    @Column(name = "conversation_id")
+    private Integer conversationId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resolved_by_user_id")
     private User resolvedBy;
@@ -1646,38 +1724,50 @@ public class Report extends Auditable {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
-    /**
-     * Custom constructor for creating a new report.
-     *
-     * @param reporter The user filing the report.
-     * @param target   The entity being reported (e.g., Post, User).
-     * @param reason   The primary reason for the report.
-     */
-    public Report(User reporter, Object target, String reason) {
-        this.reporter = reporter;
-        this.target = target;
-        this.reason = reason;
-        this.status = ReportStatus.PENDING;
-    }
-
-    /**
-     * Helper method to dynamically get the ID from the target object,
-     * which is useful for DTOs or serialization.
-     *
-     * @return The primary key of the target entity.
-     */
-    public Integer getTargetId() {
-        if (target instanceof Post) return ((Post) target).getId();
-        if (target instanceof User) return ((User) target).getUserId();
-        if (target instanceof Community) return ((Community) target).getCommunityId();
-        if (target instanceof Message) return ((Message) target).getId();
-        return null;
-    }
 }
 
+==================================================
+File: ReportScope.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\ReportScope.java
+==================================================
 
+package com.tuniv.backend.moderation.model;
 
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\ReportStatus.java
+/**
+ * Defines the moderation queue or "scope" a report belongs to.
+ * This is used for filtering reports for different moderator groups.
+ */
+public enum ReportScope {
+    /**
+     * Platform-wide reports (e.g., user profiles).
+     * Handled by platform admins.
+     */
+    PLATFORM,
+
+    /**
+     * Reports related to university-specific content (e.g., Topics in a university context).
+     * Handled by university moderators/admins.
+     */
+    UNIVERSITY,
+
+    /**
+     * Reports related to community-specific content (e.g., Topics in a community).
+     * Handled by community moderators/admins.
+     */
+    COMMUNITY,
+
+    /**
+     * Reports related to chat messages or conversations.
+     * Handled by chat moderators or context-aware admins (uni/community).
+     */
+    CHAT
+}
+
+==================================================
+File: ReportStatus.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\moderation\model\ReportStatus.java
+==================================================
+
 package com.tuniv.backend.moderation.model;
 
 public enum ReportStatus {
@@ -1687,9 +1777,11 @@ public enum ReportStatus {
         DISMISSED
     }
 
+==================================================
+File: Notification.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\Notification.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\Notification.java
 package com.tuniv.backend.notification.model;
 
 import jakarta.persistence.*;
@@ -1720,8 +1812,8 @@ import com.tuniv.backend.shared.model.Auditable;
     @Index(name = "idx_notification_type", columnList = "type, created_at DESC"),
     @Index(name = "idx_notification_actor", columnList = "actor_id, created_at"),
     @Index(name = "idx_notification_expiry", columnList = "expires_at"),
-    @Index(name = "idx_notification_source", columnList = "source_entity_type, source_entity_id"), // âœ… ADDED
-    @Index(name = "idx_notification_priority", columnList = "priority, created_at DESC") // âœ… ADDED
+    @Index(name = "idx_notification_source", columnList = "source_entity_type, source_entity_id"), // ✅ ADDED
+    @Index(name = "idx_notification_priority", columnList = "priority, created_at DESC") // ✅ ADDED
 
 })
 @Getter
@@ -1730,7 +1822,7 @@ import com.tuniv.backend.shared.model.Auditable;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Where(clause = "is_dismissed = false") // âœ… ADD: Global filter for non-dismissed notifications
+@Where(clause = "is_dismissed = false") // ✅ ADD: Global filter for non-dismissed notifications
 public class Notification extends Auditable {
 
     @Id
@@ -1832,9 +1924,11 @@ public class Notification extends Auditable {
 
 }
 
+==================================================
+File: NotificationPriority.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\NotificationPriority.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\NotificationPriority.java
 package com.tuniv.backend.notification.model;
 
 
@@ -1845,9 +1939,11 @@ package com.tuniv.backend.notification.model;
         URGENT
     }
 
+==================================================
+File: NotificationType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\NotificationType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\notification\model\NotificationType.java
 package com.tuniv.backend.notification.model;
 
 // ========== ENUMS ==========
@@ -1887,9 +1983,11 @@ package com.tuniv.backend.notification.model;
         ANSWER_UNMARKED_AS_SOLUTION
     }
 
+==================================================
+File: Attachment.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Attachment.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Attachment.java
 package com.tuniv.backend.qa.model;
 
 import java.time.Instant;
@@ -1967,7 +2065,7 @@ public class Attachment extends Auditable {
 
     // ========== UPLOAD METADATA ==========
     @Column(name = "uploaded_at", nullable = false)
-    private Instant uploadedAt = Instant.now(); // âœ… Standardized to Instant
+    private Instant uploadedAt = Instant.now(); // ✅ Standardized to Instant
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by_user_id")
@@ -2043,9 +2141,11 @@ public class Attachment extends Auditable {
     private Post post;
 }
 
+==================================================
+File: ContentVisibility.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\ContentVisibility.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\ContentVisibility.java
 package com.tuniv.backend.qa.model;
 
 
@@ -2059,9 +2159,11 @@ package com.tuniv.backend.qa.model;
         PRIVATE         // Only specific users
     }
 
+==================================================
+File: Post.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Post.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Post.java
 package com.tuniv.backend.qa.model;
 
 import java.time.Instant;
@@ -2147,16 +2249,18 @@ public abstract class Post extends Auditable implements SoftDeletable {
     @Column(name = "deletion_reason")
     private String deletionReason;
 
-    // âŒ REMOVED: Dangerous attachments collection
+    // ❌ REMOVED: Dangerous attachments collection
     // @OneToMany(mappedBy = "post", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     // private Set<Attachment> attachments = new HashSet<>();
 
     public abstract String getPostType();
 }
 
+==================================================
+File: PostEditHistory.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\PostEditHistory.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\PostEditHistory.java
 package com.tuniv.backend.qa.model;
 
 import java.time.Instant;
@@ -2223,9 +2327,11 @@ public class PostEditHistory extends Auditable {
     }
 }
 
+==================================================
+File: Reply.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Reply.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Reply.java
 package com.tuniv.backend.qa.model;
 
 import com.tuniv.backend.university.model.University;
@@ -2263,7 +2369,7 @@ public class Reply extends VotablePost {
     @JoinColumn(name = "parent_reply_id")
     private Reply parentReply;
 
-    // âŒ REMOVED: Dangerous childReplies collection
+    // ❌ REMOVED: Dangerous childReplies collection
     // @OneToMany(mappedBy = "parentReply", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     // private Set<Reply> childReplies = new HashSet<>();
 
@@ -2291,9 +2397,11 @@ public class Reply extends VotablePost {
     }
 }
 
+==================================================
+File: Tag.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Tag.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Tag.java
 package com.tuniv.backend.qa.model;
 
 
@@ -2400,7 +2508,7 @@ public class Tag extends Auditable {
     private Followable followable;
     
 
-    // âŒ REMOVED: Collection - use repository queries instead
+    // ❌ REMOVED: Collection - use repository queries instead
     // - Set<Topic> topics (replaced by TopicTag entity)
 
     // ========== CONSTRUCTORS ==========
@@ -2426,9 +2534,11 @@ public class Tag extends Auditable {
     }
 }
 
+==================================================
+File: Topic.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Topic.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Topic.java
 package com.tuniv.backend.qa.model;
 import java.time.Instant;
 import java.util.HashSet;
@@ -2549,7 +2659,7 @@ public class Topic extends VotablePost {
     @JoinColumn(name = "module_id")
     private Module module;
 
-    // âŒ REMOVED: Collections - use repository queries instead
+    // ❌ REMOVED: Collections - use repository queries instead
     // - Set<Reply> replies
     // - Set<Tag> tags (replaced by TopicTag entity)
 
@@ -2605,9 +2715,11 @@ public class Topic extends VotablePost {
     }
 }
 
+==================================================
+File: TopicTag.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\TopicTag.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\TopicTag.java
 package com.tuniv.backend.qa.model;
 import java.io.Serializable;
 import java.util.HashSet;
@@ -2672,7 +2784,7 @@ public class TopicTag extends Auditable {
     @JoinColumn(name = "tag_id", nullable = false)
     private Tag tag;
 
-    // âœ… IMPROVED: Proper JPA relationship instead of raw ID
+    // ✅ IMPROVED: Proper JPA relationship instead of raw ID
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "added_by_user_id")
     private User addedBy;
@@ -2712,9 +2824,11 @@ public class TopicTag extends Auditable {
     }
 }
 
+==================================================
+File: TopicType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\TopicType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\TopicType.java
 package com.tuniv.backend.qa.model;
 
 public enum TopicType {
@@ -2728,9 +2842,11 @@ public enum TopicType {
     SUPPORT         // Technical support and help topics
 }
 
+==================================================
+File: VotablePost.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\VotablePost.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\VotablePost.java
 package com.tuniv.backend.qa.model;
 
 import java.time.Instant;
@@ -2767,14 +2883,16 @@ public abstract class VotablePost extends Post {
     @Column(name = "hot_score")
     private Double hotScore = 0.0;
 
-    // âœ… NEW: Optimization for background scoring jobs
+    // ✅ NEW: Optimization for background scoring jobs
     @Column(name = "last_score_recalculation_at")
     private Instant lastScoreRecalculationAt;
 }
 
+==================================================
+File: Vote.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Vote.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\qa\model\Vote.java
 package com.tuniv.backend.qa.model;
 
 
@@ -2809,12 +2927,12 @@ import lombok.Setter;
     @Index(name = "idx_vote_created", columnList = "created_at DESC"),
     @Index(name = "idx_vote_user_created", columnList = "user_id, created_at DESC"),
     @Index(name = "idx_vote_university", columnList = "university_context_id"),
-    @Index(name = "idx_vote_post_user_value", columnList = "post_id, user_id, value") // âœ… ADDED
+    @Index(name = "idx_vote_post_user_value", columnList = "post_id, user_id, value") // ✅ ADDED
 })
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_retracted = false") // âœ… ADD: Global filter for non-retracted votes
+@Where(clause = "is_retracted = false") // ✅ ADD: Global filter for non-retracted votes
 
 public class Vote extends Auditable {
 
@@ -2866,9 +2984,11 @@ public class Vote extends Auditable {
 
 
 
+==================================================
+File: Auditable.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\Auditable.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\Auditable.java
 package com.tuniv.backend.shared.model;
 
 import java.time.Instant;
@@ -2915,19 +3035,50 @@ public abstract class Auditable {
     }
 }
 
+==================================================
+File: ContainerType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\ContainerType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\ContainerType.java
 package com.tuniv.backend.shared.model;
 
+/**
+ * Represents a container or type of content within the application.
+ * Used for various purposes, including defining reportable content types
+ * and topic container types.
+ */
 public enum ContainerType {
-    MODULE, 
-    COMMUNITY 
+    // Original values (likely for topic containers)
+    MODULE,
+    COMMUNITY,
+
+    // ✅ ADDED: Values for moderation reporting
+    /**
+     * A Topic, which is a type of Post.
+     */
+    TOPIC,
+
+    /**
+     * A Reply, which is a type of Post.
+     */
+    REPLY,
+
+    /**
+     * A User's profile.
+     */
+    USER_PROFILE,
+
+    /**
+     * A chat message.
+     */
+    MESSAGE
 }
 
+==================================================
+File: JoinRequest.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\JoinRequest.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\JoinRequest.java
 package com.tuniv.backend.shared.model;
 
 import java.time.Instant;
@@ -3007,9 +3158,11 @@ public class JoinRequest extends Auditable {
     }
 }
 
+==================================================
+File: SoftDeletable.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\SoftDeletable.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\shared\model\SoftDeletable.java
 package com.tuniv.backend.shared.model;
 
 import java.time.Instant;
@@ -3051,9 +3204,11 @@ public interface SoftDeletable {
     }
 }
 
+==================================================
+File: MembershipType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\MembershipType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\MembershipType.java
 package com.tuniv.backend.university.model;
 
 public enum MembershipType {
@@ -3064,9 +3219,11 @@ public enum MembershipType {
     EXCHANGE      // Exchange student
 }
 
+==================================================
+File: Module.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\Module.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\Module.java
 package com.tuniv.backend.university.model;
 
 import org.hibernate.annotations.Where;
@@ -3144,7 +3301,7 @@ public class Module extends Auditable {
     @JoinColumn(name = "university_id", nullable = false)
     private University university;
 
-    // âŒ REMOVED: Dangerous topics collection
+    // ❌ REMOVED: Dangerous topics collection
     // @OneToMany(mappedBy = "module", cascade = {CascadeType.PERSIST, CascadeType.MERGE}, orphanRemoval = true)
     // private Set<Topic> topics = new HashSet<>();
 
@@ -3154,9 +3311,11 @@ public class Module extends Auditable {
     private Followable followable;
 }
 
+==================================================
+File: ModulePostingPolicy.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\ModulePostingPolicy.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\ModulePostingPolicy.java
 package com.tuniv.backend.university.model;
 
 // ========== ENUMS ==========
@@ -3167,9 +3326,11 @@ package com.tuniv.backend.university.model;
         RESTRICTED           // Specific users only
     }
 
+==================================================
+File: University.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\University.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\University.java
 package com.tuniv.backend.university.model;
 
 import org.hibernate.annotations.Where;
@@ -3283,7 +3444,7 @@ public class University extends Auditable {
     @Column(name = "weekly_new_members")
     private Integer weeklyNewMembers = 0;
 
-      // âœ… ADD: Relationship to Followable
+      // ✅ ADD: Relationship to Followable
     @OneToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL, optional = false, orphanRemoval = true)
     @JoinColumn(name = "followable_id", nullable = false, unique = true)
     private Followable followable;
@@ -3301,9 +3462,11 @@ public class University extends Auditable {
     }
 }
 
+==================================================
+File: UniversityJoinPolicy.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityJoinPolicy.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityJoinPolicy.java
 package com.tuniv.backend.university.model;
 
  public enum UniversityJoinPolicy {
@@ -3313,9 +3476,11 @@ package com.tuniv.backend.university.model;
         CLOSED          // Invitation only
     }
 
+==================================================
+File: UniversityMembership.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityMembership.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityMembership.java
 package com.tuniv.backend.university.model;
 
 import java.io.Serializable;
@@ -3494,9 +3659,11 @@ public class UniversityMembership extends Auditable {
     }
 }
 
+==================================================
+File: UniversityRole.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityRole.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\UniversityRole.java
 package com.tuniv.backend.university.model;
 
 import java.util.HashSet;
@@ -3552,9 +3719,11 @@ public class UniversityRole {
     private Set<Permission> permissions = new HashSet<>();
 }
 
+==================================================
+File: VerificationMethod.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\VerificationMethod.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\VerificationMethod.java
 package com.tuniv.backend.university.model;
 
     public enum VerificationMethod {
@@ -3564,9 +3733,11 @@ package com.tuniv.backend.university.model;
         INVITATION       // Invited by university admin
     }
 
+==================================================
+File: VerificationStatus.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\VerificationStatus.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\university\model\VerificationStatus.java
 package com.tuniv.backend.university.model;
 
  // ========== ENUMS ==========
@@ -3578,9 +3749,11 @@ package com.tuniv.backend.university.model;
         SUSPENDED
     }
 
+==================================================
+File: EmailDigestFrequency.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\EmailDigestFrequency.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\EmailDigestFrequency.java
 package com.tuniv.backend.user.model;
 
 
@@ -3591,9 +3764,11 @@ package com.tuniv.backend.user.model;
         MONTHLY
     }
 
+==================================================
+File: MessagePermissions.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\MessagePermissions.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\MessagePermissions.java
 package com.tuniv.backend.user.model;
 
 
@@ -3604,9 +3779,11 @@ package com.tuniv.backend.user.model;
         NONE           // No messages allowed
     }
 
+==================================================
+File: ProfileVisibility.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ProfileVisibility.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ProfileVisibility.java
 package com.tuniv.backend.user.model;
 
 
@@ -3617,9 +3794,11 @@ package com.tuniv.backend.user.model;
         PRIVATE         // Only self
     }
 
+==================================================
+File: ReputationActionType.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ReputationActionType.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ReputationActionType.java
 package com.tuniv.backend.user.model;
 
 public enum ReputationActionType {
@@ -3630,9 +3809,11 @@ public enum ReputationActionType {
         SOLUTION_RECEIVED
  }
 
+==================================================
+File: ReputationLog.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ReputationLog.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\ReputationLog.java
 package com.tuniv.backend.user.model;
 
 import com.tuniv.backend.shared.model.Auditable;
@@ -3709,9 +3890,11 @@ public class ReputationLog extends Auditable {
 
 }
 
+==================================================
+File: User.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\User.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\User.java
 package com.tuniv.backend.user.model;
 
 import java.time.Instant;
@@ -3766,12 +3949,12 @@ public class User extends Auditable {
     // ========== CORE PROFILE DATA ==========
     @Pattern(regexp = "^[a-zA-Z0-9_]+$", message = "Username can only contain letters, numbers and underscores")
     @Size(min = 3, max = 50, message = "Username must be between 3 and 50 characters")
-    @Column(name = "username", unique = true, length = 50) // âœ… MODIFIED: nullable = false removed
+    @Column(name = "username", unique = true, length = 50) // ✅ MODIFIED: nullable = false removed
     private String username;
 
     @NotNull
     @Email(message = "Email should be valid")
-    @Column(name = "email", unique = true) // âœ… MODIFIED: nullable = false removed
+    @Column(name = "email", unique = true) // ✅ MODIFIED: nullable = false removed
     private String email;
 
     @Size(min = 8, message = "Password must be at least 8 characters")
@@ -3903,9 +4086,11 @@ public class User extends Auditable {
     }
 }
 
+==================================================
+File: UserSettings.java
+Path: :\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\UserSettings.java
+==================================================
 
-
-//// FILE: C:\Users\Ahmed\Desktop\tuniv-project\backend\src\main\java\com\tuniv\backend\user\model\UserSettings.java
 package com.tuniv.backend.user.model;
 
 import jakarta.persistence.Column;
@@ -4027,6 +4212,4 @@ public class UserSettings {
 
 
 }
-
-
 

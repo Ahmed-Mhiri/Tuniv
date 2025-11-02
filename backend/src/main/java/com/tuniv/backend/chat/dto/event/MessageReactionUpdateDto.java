@@ -1,4 +1,7 @@
-package com.tuniv.backend.chat.dto;
+package com.tuniv.backend.chat.dto.event;
+
+import com.tuniv.backend.chat.dto.common.ReactionAction;
+import com.tuniv.backend.chat.dto.common.ReactionDto;
 
 import lombok.AllArgsConstructor; // ✅ ADDED
 import lombok.Getter;

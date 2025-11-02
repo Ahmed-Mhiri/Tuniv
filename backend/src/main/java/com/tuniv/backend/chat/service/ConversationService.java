@@ -2,7 +2,11 @@ package com.tuniv.backend.chat.service;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import com.tuniv.backend.chat.dto.*;
+import com.tuniv.backend.chat.dto.request.CreateGroupRequest;
+import com.tuniv.backend.chat.dto.request.StartConversationRequestDto;
+import com.tuniv.backend.chat.dto.request.UpdateGroupInfoRequest;
+import com.tuniv.backend.chat.dto.response.ConversationDetailDto;
+import com.tuniv.backend.chat.dto.response.ConversationSummaryDto;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 
 public interface ConversationService {

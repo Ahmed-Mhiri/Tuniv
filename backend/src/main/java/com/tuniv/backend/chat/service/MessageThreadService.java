@@ -3,8 +3,8 @@ package com.tuniv.backend.chat.service;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.MessageThreadDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.dto.response.MessageThreadDto;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 
 public interface MessageThreadService {

@@ -27,8 +27,11 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.tuniv.backend.authorization.model.ContentPermissions;
+import com.tuniv.backend.authorization.repository.PermissionRepository;
 import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
 import com.tuniv.backend.community.repository.CommunityMembershipRepository;
+import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.university.repository.UniversityMembershipRepository;
 
 @Service

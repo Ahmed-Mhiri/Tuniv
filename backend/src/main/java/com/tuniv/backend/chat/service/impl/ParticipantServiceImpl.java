@@ -6,17 +6,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.tuniv.backend.chat.dto.ParticipantDto;
-import com.tuniv.backend.chat.dto.UpdateConversationSettingsRequest;
-import com.tuniv.backend.chat.dto.UpdateParticipantsRequest;
+import com.tuniv.backend.chat.dto.request.UpdateConversationSettingsRequest;
+import com.tuniv.backend.chat.dto.request.UpdateParticipantsRequest;
+import com.tuniv.backend.chat.dto.response.ParticipantDto;
 import com.tuniv.backend.chat.mapper.mapstruct.ParticipantMapper;
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.model.ConversationParticipant;
 import com.tuniv.backend.chat.model.ConversationRole;
 import com.tuniv.backend.chat.model.MuteDuration;
+import com.tuniv.backend.chat.projection.participant.ParticipantProjection;
 import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
 import com.tuniv.backend.chat.repository.ConversationRepository;
 import com.tuniv.backend.chat.service.ChatEventPublisher;
@@ -31,9 +34,9 @@ import com.tuniv.backend.user.model.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
-@Slf4j
 @Transactional
 public class ParticipantServiceImpl implements ParticipantService {
 
@@ -43,17 +46,76 @@ public class ParticipantServiceImpl implements ParticipantService {
     private final ChatEventPublisher chatEventPublisher;
     private final EntityFinderService entityFinderService;
     private final ConversationPermissionService conversationPermissionService;
-    private final ConversationRoleService conversationRoleService; // Added this dependency
+    private final ConversationRoleService conversationRoleService;
+
+    // ========== Optimized Read Methods ==========
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ParticipantDto> getConversationParticipants(Integer conversationId, Pageable pageable) {
+        log.debug("Fetching participants for conversation {} with pagination", conversationId);
+        
+        Page<ParticipantProjection> projections = participantRepository
+            .findActiveParticipantsProjectionByConversationId(conversationId, pageable);
+        
+        return projections.map(participantMapper::projectionToParticipantDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ParticipantDto> getRecentlyActiveParticipants(Integer conversationId, int limit) {
+        log.debug("Fetching {} recently active participants for conversation {}", limit, conversationId);
+        
+        Pageable pageable = Pageable.ofSize(limit);
+        List<ParticipantProjection> projections = participantRepository
+            .findRecentlyActiveParticipantsSummary(conversationId, pageable);
+        
+        return participantMapper.projectionListToParticipantDtoList(projections);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ParticipantDto> getConversationAdmins(Integer conversationId) {
+        log.debug("Fetching admin participants for conversation {}", conversationId);
+        
+        List<String> adminRoles = List.of("CONVERSATION_ADMIN", "CONVERSATION_MODERATOR");
+        List<ParticipantProjection> projections = participantRepository
+            .findActiveAdminProjectionsByConversationId(conversationId, adminRoles);
+        
+        return participantMapper.projectionListToParticipantDtoList(projections);
+    }
+
+    @Override
+    @Transactional
+    public void batchUpdateLastActive(List<Integer> userIds, Integer conversationId) {
+        if (userIds == null || userIds.isEmpty()) {
+            log.debug("No users provided for batch update");
+            return;
+        }
+        
+        log.debug("Batch updating last active for {} users in conversation {}", userIds.size(), conversationId);
+        int updated = participantRepository.batchUpdateLastActiveAt(
+            conversationId, userIds, Instant.now());
+        log.debug("Updated last active for {} participants", updated);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long countActiveParticipants(Integer conversationId) {
+        return participantRepository.countActiveParticipantsByConversationId(conversationId);
+    }
+
+    // ========== Existing Business Logic Methods ==========
 
     @Override
     public List<ParticipantDto> addParticipants(Integer conversationId, UpdateParticipantsRequest request, UserDetailsImpl currentUser) {
         log.info("Adding participants to conversation {} by user {}", conversationId, currentUser.getId());
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         conversationPermissionService.checkPermission(currentUser, conversationId, "add_participants");
         
         List<User> newParticipants = validateAndGetParticipants(request.getUserIds());
-        ConversationRole memberRole = getDefaultConversationRole(); // Now uses the service
+        ConversationRole memberRole = conversationRoleService.getDefaultConversationRole(); // ✨ Using ConversationRoleService
         
         List<ConversationParticipant> newParticipantEntities = new ArrayList<>();
         List<ParticipantDto> addedParticipants = new ArrayList<>();
@@ -86,7 +148,7 @@ public class ParticipantServiceImpl implements ParticipantService {
     public void removeParticipant(Integer conversationId, Integer userIdToRemove, UserDetailsImpl currentUser) {
         log.info("Removing participant {} from conversation {} by user {}", userIdToRemove, conversationId, currentUser.getId());
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         
         if (!userIdToRemove.equals(currentUser.getId())) {
             conversationPermissionService.checkPermission(currentUser, conversationId, "remove_participants");
@@ -118,7 +180,7 @@ public class ParticipantServiceImpl implements ParticipantService {
     public ParticipantDto updateParticipantRole(Integer conversationId, Integer userIdToUpdate, Integer roleId, UserDetailsImpl currentUser) {
         log.info("Updating role for user {} in conversation {} by user {}", userIdToUpdate, conversationId, currentUser.getId());
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         conversationPermissionService.checkPermission(currentUser, conversationId, "manage_roles");
         
         ConversationParticipant participant = getParticipantEntity(conversation, userIdToUpdate);
@@ -135,7 +197,7 @@ public class ParticipantServiceImpl implements ParticipantService {
     public ParticipantDto updateMyConversationSettings(Integer conversationId, UpdateConversationSettingsRequest request, UserDetailsImpl currentUser) {
         log.info("Updating conversation settings for user {} in conversation {}", currentUser.getId(), conversationId);
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         ConversationParticipant participant = getParticipantEntity(conversation, currentUser.getId());
         
         if (request.getNickname() != null) {
@@ -165,7 +227,7 @@ public class ParticipantServiceImpl implements ParticipantService {
     public ParticipantDto muteParticipant(Integer conversationId, Integer userIdToMute, MuteDuration duration, UserDetailsImpl currentUser) {
         log.info("Muting user {} in conversation {} by user {}", userIdToMute, conversationId, currentUser.getId());
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         conversationPermissionService.checkPermission(currentUser, conversationId, "mute_participants");
         
         ConversationParticipant participant = getParticipantEntity(conversation, userIdToMute);
@@ -182,7 +244,7 @@ public class ParticipantServiceImpl implements ParticipantService {
     public ParticipantDto unmuteParticipant(Integer conversationId, Integer userIdToUnmute, UserDetailsImpl currentUser) {
         log.info("Unmuting user {} in conversation {} by user {}", userIdToUnmute, conversationId, currentUser.getId());
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         conversationPermissionService.checkPermission(currentUser, conversationId, "mute_participants");
         
         ConversationParticipant participant = getParticipantEntity(conversation, userIdToUnmute);
@@ -200,11 +262,11 @@ public class ParticipantServiceImpl implements ParticipantService {
     public List<ParticipantDto> getConversationParticipants(Integer conversationId, UserDetailsImpl currentUser) {
         log.debug("Fetching participants for conversation {} by user {}", conversationId, currentUser.getId());
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         conversationPermissionService.checkMembership(currentUser.getId(), conversationId);
         
         List<ConversationParticipant> participants = participantRepository
-            .findByConversationAndIsActiveTrue(conversation);
+            .findByConversation_ConversationIdAndIsActiveTrue(conversation.getConversationId());
         
         return participantMapper.toParticipantDtoList(participants);
     }
@@ -214,7 +276,7 @@ public class ParticipantServiceImpl implements ParticipantService {
     public ParticipantDto getMyParticipantInfo(Integer conversationId, UserDetailsImpl currentUser) {
         log.debug("Fetching participant info for user {} in conversation {}", currentUser.getId(), conversationId);
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         ConversationParticipant participant = getParticipantEntity(conversation, currentUser.getId());
         
         return participantMapper.toParticipantDto(participant);
@@ -223,14 +285,13 @@ public class ParticipantServiceImpl implements ParticipantService {
     @Override
     @Transactional(readOnly = true)
     public ConversationParticipant getParticipantEntity(Conversation conversation, Integer userId) {
-        return participantRepository.findByConversationAndUser_UserId(conversation, userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Participant not found in conversation"));
+        return entityFinderService.getActiveConversationParticipantOrThrow(conversation.getConversationId(), userId);
     }
 
     @Override
     @Transactional(readOnly = true)
     public boolean isUserParticipant(Conversation conversation, Integer userId) {
-        return participantRepository.existsByConversationAndUser_UserIdAndIsActive(conversation, userId, true);
+        return entityFinderService.isUserActiveParticipant(conversation.getConversationId(), userId);
     }
 
     @Override
@@ -259,12 +320,11 @@ public class ParticipantServiceImpl implements ParticipantService {
 
     @Override
     public void updateConversationStats(Integer conversationId) {
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         
-        long activeParticipantCount = countActiveParticipants(conversation);
+        long activeParticipantCount = countActiveParticipants(conversationId);
         conversation.setParticipantCount((int) activeParticipantCount);
         
-        // Save the updated conversation
         conversationRepository.save(conversation);
         
         log.debug("Updated conversation stats for conversation {}: {} active participants", 
@@ -274,33 +334,7 @@ public class ParticipantServiceImpl implements ParticipantService {
     @Override
     @Transactional(readOnly = true)
     public long countActiveParticipants(Conversation conversation) {
-        return participantRepository.countByConversationAndIsActive(conversation, true);
-    }
-
-    @Override
-    public ConversationRole getDefaultConversationRole() {
-        // Now uses the ConversationRoleService instead of directly using the repository
-        return conversationRoleService.getDefaultConversationRole();
-    }
-
-    @Override
-    public ConversationRole getConversationAdminRole() {
-        // Now uses the ConversationRoleService instead of directly using the repository
-        return conversationRoleService.getConversationAdminRole();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public ConversationRole getConversationModeratorRole() {
-        // Added this method to use the ConversationRoleService
-        return conversationRoleService.getConversationModeratorRole();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public ConversationRole getRoleByName(String roleName) {
-        // Added this method to use the ConversationRoleService
-        return conversationRoleService.getRoleByName(roleName);
+        return participantRepository.countActiveParticipantsByConversationId(conversation.getConversationId());
     }
 
     // ========== Private Helper Methods ==========

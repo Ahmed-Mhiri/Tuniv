@@ -2,17 +2,17 @@ package com.tuniv.backend.notification.event;
 
 import org.springframework.context.ApplicationEvent; // Adjust import as per your project
 
-import com.tuniv.backend.chat.model.MessageReaction;
+import com.tuniv.backend.chat.model.Reaction;
 
 public class NewChatMessageReactionEvent extends ApplicationEvent {
-    private final MessageReaction reaction;
+    private final Reaction reaction;
 
-    public NewChatMessageReactionEvent(Object source, MessageReaction reaction) {
+    public NewChatMessageReactionEvent(Object source, Reaction reaction) {
         super(source);
         this.reaction = reaction;
     }
 
-    public MessageReaction getReaction() {
+    public Reaction getReaction() {
         return reaction;
     }
 }

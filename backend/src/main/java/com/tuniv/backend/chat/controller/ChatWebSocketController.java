@@ -17,18 +17,19 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import com.tuniv.backend.authorization.service.PermissionService;
 import com.tuniv.backend.chat.annotation.RequiresMembership;
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.ChatNotificationDto;
-import com.tuniv.backend.chat.dto.EditMessageRequest;
-import com.tuniv.backend.chat.dto.ReactionRequestDto;
-import com.tuniv.backend.chat.dto.ReadReceiptDto;
-import com.tuniv.backend.chat.dto.RemoveReactionRequestDto;
-import com.tuniv.backend.chat.dto.SendMessageRequest;
-import com.tuniv.backend.chat.dto.TypingIndicatorDto;
-import com.tuniv.backend.chat.dto.UserPresenceDto;
+import com.tuniv.backend.chat.dto.common.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.event.ChatNotificationDto;
+import com.tuniv.backend.chat.dto.event.TypingIndicatorDto;
+import com.tuniv.backend.chat.dto.event.UserPresenceDto;
+import com.tuniv.backend.chat.dto.request.EditMessageRequest;
+import com.tuniv.backend.chat.dto.request.ReactionRequestDto;
+import com.tuniv.backend.chat.dto.request.RemoveReactionRequestDto;
+import com.tuniv.backend.chat.dto.request.SendMessageRequest;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
 import com.tuniv.backend.chat.service.ChatRealtimeService;
 import com.tuniv.backend.chat.service.ConversationPermissionService;
 import com.tuniv.backend.chat.service.MessageService;
+import com.tuniv.backend.chat.service.ReactionService;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.shared.exception.ResourceNotFoundException;
 import com.tuniv.backend.user.model.User;
@@ -46,6 +47,7 @@ public class ChatWebSocketController {
 
     private final ChatRealtimeService chatRealtimeService;
     private final MessageService messageService;
+    private final ReactionService reactionService;
     private final ConversationPermissionService conversationPermissionService;
     private final PermissionService permissionService;
     private final UserRepository userRepository;
@@ -111,7 +113,7 @@ public class ChatWebSocketController {
         log.info("WebSocket: Adding reaction to message {} by user {}", messageId, currentUser.getId());
         
         // Membership validation and permissions handled by MessageService
-        messageService.addOrUpdateReaction(messageId, request, currentUser);
+        reactionService.addOrUpdateReaction(messageId, request, currentUser);
     }
 
     @MessageMapping("/chat/messages/{messageId}/reactions/remove")
@@ -124,8 +126,7 @@ public class ChatWebSocketController {
         
         log.info("WebSocket: Removing reaction from message {} by user {}", messageId, currentUser.getId());
         
-        // Membership validation and permissions handled by MessageService
-        messageService.removeReaction(messageId, request.getEmoji(), currentUser);
+        reactionService.removeReaction(messageId, request.getEmoji(), currentUser);
     }
 
     // ========== Typing Indicators ==========

@@ -21,7 +21,10 @@ public enum ChatPermissions {
 
     // Moderation
     MUTE_PARTICIPANTS("mute_participants", "Mute participants temporarily"),
-    BAN_PARTICIPANTS("ban_participants", "Ban participants from conversation");
+    BAN_PARTICIPANTS("ban_participants", "Ban participants from conversation"),
+    
+    // ✅ ADDED: Report management
+    MANAGE_REPORTS("manage_reports", "View and manage chat reports");
 
     private final String name;
     private final String description;

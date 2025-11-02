@@ -1,7 +1,7 @@
 package com.tuniv.backend.chat.controller;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.MessageThreadDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.dto.response.MessageThreadDto;
 import com.tuniv.backend.chat.service.MessageThreadService;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import lombok.RequiredArgsConstructor;

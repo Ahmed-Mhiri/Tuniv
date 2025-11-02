@@ -7,10 +7,10 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
-import com.tuniv.backend.chat.dto.PinnedMessageDto;
-import com.tuniv.backend.chat.dto.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.common.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.dto.response.MessageReactionsSummaryDto;
+import com.tuniv.backend.chat.dto.response.PinnedMessageDto;
 import com.tuniv.backend.chat.mapper.mapstruct.MessageMapper;
 import com.tuniv.backend.chat.mapper.mapstruct.ReadReceiptMapper;
 import com.tuniv.backend.chat.model.ConversationParticipant;

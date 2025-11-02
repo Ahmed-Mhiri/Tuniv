@@ -1,5 +1,6 @@
 package com.tuniv.backend.qa.service;
 
+import com.tuniv.backend.auth.service.PostAuthorizationService;
 import com.tuniv.backend.community.model.Community;
 import com.tuniv.backend.community.repository.CommunityRepository;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;

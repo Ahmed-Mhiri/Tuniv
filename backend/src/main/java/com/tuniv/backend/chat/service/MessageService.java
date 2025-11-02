@@ -5,10 +5,10 @@ import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.EditMessageRequest;
-import com.tuniv.backend.chat.dto.MessageStatsDto;
-import com.tuniv.backend.chat.dto.SendMessageRequest;
+import com.tuniv.backend.chat.dto.request.EditMessageRequest;
+import com.tuniv.backend.chat.dto.request.SendMessageRequest;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.dto.response.MessageStatsDto;
 import com.tuniv.backend.chat.model.MessageStatus;
 import com.tuniv.backend.config.security.services.UserDetailsImpl;
 import com.tuniv.backend.user.model.User;

@@ -1,5 +1,21 @@
 package com.tuniv.backend.chat.service;
 
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.tuniv.backend.chat.dto.common.ConversationOnlineStatus;
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.model.ConversationParticipant;
 import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
@@ -7,20 +23,6 @@ import com.tuniv.backend.chat.repository.ConversationRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
-
-import lombok.Getter;
-import lombok.Setter;
 
 @Service
 @RequiredArgsConstructor
@@ -32,28 +34,26 @@ public class ConversationOnlineStatusService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final WebSocketSessionService webSocketSessionService;
 
-    // In-memory cache for frequently accessed conversations
-    private final Map<Integer, ConversationOnlineStatus> statusCache = new ConcurrentHashMap<>();
-
-    // Redis keys
-    private static final String CONVERSATION_ONLINE_KEY = "conversation:online:%d";
+    // Redis keys - aligned with WebSocketSessionService
+    private static final String CONVERSATION_ONLINE_KEY = "conversation:active:users:%d"; // Now using same key pattern
     private static final String CONVERSATION_ACTIVITY_KEY = "conversation:activity:%d";
-    private static final String USER_LAST_ACTIVITY_KEY = "user:activity:%d";
+    private static final String USER_LAST_ACTIVITY_KEY = "user:activity:%d"; // Consistent with WebSocketSessionService
 
     @Transactional
     public void updateUserOnlineStatus(Integer conversationId, Integer userId, boolean isOnline) {
-        String onlineKey = String.format(CONVERSATION_ONLINE_KEY, conversationId);
-        String activityKey = String.format(USER_LAST_ACTIVITY_KEY, userId);
-
+        // Use WebSocketSessionService for online status tracking since it's the source of truth
+        // This method now becomes a wrapper that coordinates between services
+        
         if (isOnline) {
-            redisTemplate.opsForSet().add(onlineKey, userId.toString());
-            redisTemplate.opsForValue().set(activityKey, Instant.now().toString());
+            // WebSocketSessionService already handles adding to conversation:active:users:%d
+            // We just need to record the activity timestamp
+            recordUserActivity(conversationId, userId);
         } else {
-            redisTemplate.opsForSet().remove(onlineKey, userId.toString());
+            // WebSocketSessionService handles removal from active users
+            // We clean up our activity tracking
+            String activityKey = String.format(CONVERSATION_ACTIVITY_KEY, conversationId);
+            redisTemplate.opsForZSet().remove(activityKey, userId.toString());
         }
-
-        // Update cache
-        updateCache(conversationId);
         
         log.debug("User {} {} in conversation {}", userId, isOnline ? "online" : "offline", conversationId);
     }
@@ -61,38 +61,35 @@ public class ConversationOnlineStatusService {
     @Transactional
     public void recordUserActivity(Integer conversationId, Integer userId) {
         String activityKey = String.format(CONVERSATION_ACTIVITY_KEY, conversationId);
-        String userActivityKey = String.format(USER_LAST_ACTIVITY_KEY, userId);
-
+        
         Instant now = Instant.now();
+        // Record user activity in this conversation with timestamp
         redisTemplate.opsForZSet().add(activityKey, userId.toString(), now.toEpochMilli());
-        redisTemplate.opsForValue().set(userActivityKey, now.toString());
-
-        // Update conversation last activity
+        
+        // Set TTL for automatic cleanup (24 hours for activity history)
+        redisTemplate.expire(activityKey, Duration.ofHours(24));
+        
+        // Update conversation last activity in database
         conversationRepository.findById(conversationId).ifPresent(conversation -> {
             conversation.setLastActivityAt(now);
             conversationRepository.save(conversation);
         });
-
-        updateCache(conversationId);
+        
+        log.debug("Recorded activity for user {} in conversation {}", userId, conversationId);
     }
 
     @Transactional(readOnly = true)
     public ConversationOnlineStatus getOnlineStatus(Integer conversationId) {
-        // Try cache first
-        ConversationOnlineStatus cachedStatus = statusCache.get(conversationId);
-        if (cachedStatus != null && cachedStatus.isValid()) {
-            return cachedStatus;
-        }
-
-        // Build from Redis
+        // Build fresh from Redis every time - no caching to ensure consistency across instances
         return buildOnlineStatus(conversationId);
     }
 
     private ConversationOnlineStatus buildOnlineStatus(Integer conversationId) {
-        String onlineKey = String.format(CONVERSATION_ONLINE_KEY, conversationId);
+        // Get online users from WebSocketSessionService (source of truth)
+        List<Integer> onlineUserIds = webSocketSessionService.getActiveUsersInConversation(conversationId);
+        
+        // Get recently active users from our activity tracking
         String activityKey = String.format(CONVERSATION_ACTIVITY_KEY, conversationId);
-
-        Set<Object> onlineUserIds = redisTemplate.opsForSet().members(onlineKey);
         Set<Object> recentlyActiveUserIds = redisTemplate.opsForZSet().rangeByScore(
             activityKey, 
             Instant.now().minus(15, ChronoUnit.MINUTES).toEpochMilli(),
@@ -104,9 +101,6 @@ public class ConversationOnlineStatusService {
         status.setOnlineCount(onlineUserIds != null ? onlineUserIds.size() : 0);
         status.setRecentlyActiveCount(recentlyActiveUserIds != null ? recentlyActiveUserIds.size() : 0);
         status.setLastUpdated(Instant.now());
-
-        // Cache the result
-        statusCache.put(conversationId, status);
 
         return status;
     }
@@ -141,10 +135,13 @@ public class ConversationOnlineStatusService {
         }
         
         conversationRepository.save(conversation);
+        
+        log.debug("Updated stats for conversation {}: online={}, recentlyActive={}", 
+                 conversation.getConversationId(), status.getOnlineCount(), status.getRecentlyActiveCount());
     }
 
     private void updateCachedAdminIds(Conversation conversation) {
-        List<ConversationParticipant> admins = participantRepository.findActiveParticipantsByRole(
+        List<ConversationParticipant> admins = participantRepository.findByConversationIdAndRoleNameAndIsActiveTrue(
             conversation.getConversationId(), "CONVERSATION_ADMIN");
         
         List<Integer> adminIds = admins.stream()
@@ -156,22 +153,62 @@ public class ConversationOnlineStatusService {
         conversation.setSummaryUpdatedAt(Instant.now());
     }
 
-    private void updateCache(Integer conversationId) {
-        statusCache.remove(conversationId); // Invalidate cache
+    // ========== Additional Utility Methods ==========
+    
+    /**
+     * Gets detailed online status for a conversation
+     */
+    public Map<String, Object> getDetailedOnlineStatus(Integer conversationId) {
+        Map<String, Object> detailedStatus = new HashMap<>();
+        
+        ConversationOnlineStatus basicStatus = getOnlineStatus(conversationId);
+        detailedStatus.put("basic", basicStatus);
+        
+        // Get actual user IDs for online users
+        List<Integer> onlineUsers = webSocketSessionService.getActiveUsersInConversation(conversationId);
+        detailedStatus.put("onlineUsers", onlineUsers);
+        
+        // Get recently active user IDs
+        String activityKey = String.format(CONVERSATION_ACTIVITY_KEY, conversationId);
+        Set<Object> recentActiveUsers = redisTemplate.opsForZSet().rangeByScore(
+            activityKey, 
+            Instant.now().minus(15, ChronoUnit.MINUTES).toEpochMilli(),
+            Double.MAX_VALUE
+        );
+        
+        List<Integer> recentUserIds = recentActiveUsers != null ? 
+            recentActiveUsers.stream()
+                .map(obj -> Integer.parseInt(obj.toString()))
+                .collect(Collectors.toList()) : 
+            Collections.emptyList();
+        
+        detailedStatus.put("recentlyActiveUsers", recentUserIds);
+        
+        return detailedStatus;
+    }
+    
+    /**
+     * Clean up old activity records (run periodically)
+     */
+    @Scheduled(cron = "0 0 2 * * ?") // Daily at 2 AM
+    public void cleanupOldActivityRecords() {
+        log.info("Cleaning up old conversation activity records");
+        
+        List<Conversation> conversations = conversationRepository.findByIsActiveTrue();
+        for (Conversation conversation : conversations) {
+            String activityKey = String.format(CONVERSATION_ACTIVITY_KEY, conversation.getConversationId());
+            
+            // Remove activity records older than 7 days
+            double maxScore = Instant.now().minus(7, ChronoUnit.DAYS).toEpochMilli();
+            Long removed = redisTemplate.opsForZSet().removeRangeByScore(activityKey, 0, maxScore);
+            
+            if (removed != null && removed > 0) {
+                log.debug("Removed {} old activity records for conversation {}", 
+                         removed, conversation.getConversationId());
+            }
+        }
     }
 
     // DTO for online status
-    @Getter
-    @Setter
-    public static class ConversationOnlineStatus {
-        private Integer conversationId;
-        private Integer onlineCount;
-        private Integer recentlyActiveCount;
-        private Instant lastUpdated;
-
-        public boolean isValid() {
-            return lastUpdated != null && 
-                   lastUpdated.isAfter(Instant.now().minus(2, ChronoUnit.MINUTES));
-        }
-    }
+    
 }

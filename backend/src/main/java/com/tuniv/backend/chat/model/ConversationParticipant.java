@@ -4,8 +4,6 @@ import java.io.Serializable;
 import java.time.Instant;
 import java.util.Objects;
 
-import org.hibernate.annotations.Where;
-
 import com.tuniv.backend.shared.model.Auditable;
 import com.tuniv.backend.user.model.User;
 
@@ -37,7 +35,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_active = true") // ✅ ADD: Global filter for active participants
 public class ConversationParticipant extends Auditable {
 
     @EmbeddedId

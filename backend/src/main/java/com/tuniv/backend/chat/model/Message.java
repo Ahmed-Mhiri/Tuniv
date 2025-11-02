@@ -2,8 +2,6 @@ package com.tuniv.backend.chat.model;
 
 import java.time.Instant;
 
-import org.hibernate.annotations.Where;
-
 import com.tuniv.backend.qa.model.Post;
 import com.tuniv.backend.user.model.User;
 
@@ -35,7 +33,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_deleted = false")
 public class Message extends Post {
 
     // ========== OPTIMISTIC LOCKING ==========

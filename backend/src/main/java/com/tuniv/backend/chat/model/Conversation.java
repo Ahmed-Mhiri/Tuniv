@@ -4,8 +4,6 @@ import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.hibernate.annotations.Where;
-
 import com.tuniv.backend.shared.model.Auditable;
 import com.tuniv.backend.university.model.University;
 import com.tuniv.backend.user.model.User;
@@ -44,8 +42,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@Where(clause = "is_active = true") // ✅ ADD: Global filter for active conversations
-
 public class Conversation extends Auditable {
 
     @Id

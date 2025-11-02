@@ -2,18 +2,15 @@ package com.tuniv.backend.chat.service.impl;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.PinnedMessageDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.dto.response.PinnedMessageDto;
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.model.Message;
-import com.tuniv.backend.chat.model.Reaction;
 import com.tuniv.backend.chat.repository.MessageRepository;
 import com.tuniv.backend.chat.service.BulkDataFetcherService;
 import com.tuniv.backend.chat.service.ChatMappingService;
@@ -38,13 +35,14 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
     private final ChatRealtimeService chatRealtimeService;
     private final BulkDataFetcherService bulkDataFetcherService;
     private final ReactionService reactionService;
-    private final ChatMappingService chatMappingService; // NEW: Added mapping service
+    private final ChatMappingService chatMappingService;
 
     @Override
     public PinnedMessageDto pinMessage(Integer messageId, UserDetailsImpl currentUser) {
         log.info("Pinning message {} by user {}", messageId, currentUser.getId());
         
-        Message message = entityFinderService.getMessageOrThrow(messageId);
+        // ✅ UPDATED: Use getNonDeletedMessageOrThrow instead of getMessageOrThrow
+        Message message = entityFinderService.getNonDeletedMessageOrThrow(messageId);
         User currentUserEntity = entityFinderService.getUserOrThrow(currentUser.getId());
         
         validateConversationMembership(message.getConversation(), currentUser);
@@ -58,7 +56,6 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
         
         Message updatedMessage = messageRepository.save(message);
         
-        // UPDATED: Use mapping service
         PinnedMessageDto pinnedMessage = chatMappingService.toPinnedMessageDto(updatedMessage);
         
         // Broadcast the message update to all conversation participants
@@ -72,7 +69,8 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
     public void unpinMessage(Integer messageId, UserDetailsImpl currentUser) {
         log.info("Unpinning message {} by user {}", messageId, currentUser.getId());
         
-        Message message = entityFinderService.getMessageOrThrow(messageId);
+        // ✅ UPDATED: Use getNonDeletedMessageOrThrow instead of getMessageOrThrow
+        Message message = entityFinderService.getNonDeletedMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
         validatePinPermissions(message, currentUser);
         validateMessageIsPinned(message);
@@ -91,33 +89,11 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<PinnedMessageDto> getPinnedMessages(Integer conversationId, UserDetailsImpl currentUser) {
-        log.debug("Fetching pinned messages for conversation {} by user {}", conversationId, currentUser.getId());
-        
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
-        validateConversationMembership(conversation, currentUser);
-        
-        List<Message> pinnedMessages = messageRepository.findByConversationAndPinnedTrueAndDeletedFalseOrderByPinnedAtDesc(conversation);
-        
-        if (pinnedMessages.isEmpty()) {
-            log.debug("No pinned messages found for conversation {}", conversationId);
-            return List.of();
-        }
-        
-        // UPDATED: Use mapping service for bulk conversion
-        List<PinnedMessageDto> pinnedMessageDtos = chatMappingService.toPinnedMessageDtoList(
-            pinnedMessages, currentUser.getId());
-        
-        log.debug("Found {} pinned messages for conversation {}", pinnedMessageDtos.size(), conversationId);
-        return pinnedMessageDtos;
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public boolean isMessagePinned(Integer messageId, UserDetailsImpl currentUser) {
         log.debug("Checking if message {} is pinned by user {}", messageId, currentUser.getId());
         
-        Message message = entityFinderService.getMessageOrThrow(messageId);
+        // ✅ UPDATED: Use getNonDeletedMessageOrThrow instead of getMessageOrThrow
+        Message message = entityFinderService.getNonDeletedMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
         
         boolean isPinned = message.isPinned();
@@ -125,14 +101,42 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
         return isPinned;
     }
 
+    // ========== VERIFIED METHODS (No changes needed) ==========
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<PinnedMessageDto> getPinnedMessages(Integer conversationId, UserDetailsImpl currentUser) {
+        log.debug("Fetching pinned messages for conversation {} by user {}", conversationId, currentUser.getId());
+        
+        // ✅ UPDATED: Use getActiveConversationOrThrow instead of getConversationOrThrow
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
+        validateConversationMembership(conversation, currentUser);
+        
+        // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
+        List<Message> pinnedMessages = messageRepository.findByConversationAndPinnedTrueAndDeletedFalseOrderByPinnedAtDesc(conversation);
+        
+        if (pinnedMessages.isEmpty()) {
+            log.debug("No pinned messages found for conversation {}", conversationId);
+            return List.of();
+        }
+        
+        List<PinnedMessageDto> pinnedMessageDtos = chatMappingService.toPinnedMessageDtoList(
+            pinnedMessages, currentUser.getId());
+        
+        log.debug("Found {} pinned messages for conversation {}", pinnedMessageDtos.size(), conversationId);
+        return pinnedMessageDtos;
+    }
+
     /**
      * Gets the count of pinned messages in a conversation
      */
     @Transactional(readOnly = true)
     public long getPinnedMessagesCount(Integer conversationId, UserDetailsImpl currentUser) {
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        // ✅ UPDATED: Use getActiveConversationOrThrow instead of getConversationOrThrow
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         validateConversationMembership(conversation, currentUser);
         
+        // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
         Long count = messageRepository.countByConversationAndPinnedTrueAndDeletedFalse(conversation);
         log.debug("Pinned messages count for conversation {}: {}", conversationId, count);
         return count;
@@ -144,10 +148,12 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
     public void unpinAllMessages(Integer conversationId, UserDetailsImpl currentUser) {
         log.info("Unpinning all messages in conversation {} by user {}", conversationId, currentUser.getId());
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        // ✅ UPDATED: Use getActiveConversationOrThrow instead of getConversationOrThrow
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         validateConversationMembership(conversation, currentUser);
         validatePinPermissions(conversation, currentUser, "pin_messages");
         
+        // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
         List<Message> pinnedMessages = messageRepository.findByConversationAndPinnedTrueAndDeletedFalse(conversation);
         
         if (pinnedMessages.isEmpty()) {
@@ -180,14 +186,15 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
         log.debug("Fetching messages pinned within last {} days for conversation {} by user {}", 
                  days, conversationId, currentUser.getId());
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        // ✅ UPDATED: Use getActiveConversationOrThrow instead of getConversationOrThrow
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         validateConversationMembership(conversation, currentUser);
         
         Instant since = Instant.now().minusSeconds(days * 24 * 60 * 60L);
+        // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
         List<Message> recentlyPinnedMessages = messageRepository
             .findByConversationAndPinnedTrueAndPinnedAtAfterAndDeletedFalseOrderByPinnedAtDesc(conversation, since);
         
-        // UPDATED: Use mapping service for bulk conversion
         List<PinnedMessageDto> pinnedMessageDtos = chatMappingService.toPinnedMessageDtoList(
             recentlyPinnedMessages, currentUser.getId());
         
@@ -203,7 +210,8 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
     
     private void validatePinPermissions(Conversation conversation, UserDetailsImpl currentUser, String permission) {
         try {
-            entityFinderService.getConversationParticipantOrThrow(conversation.getConversationId(), currentUser.getId());
+            // ✅ UPDATED: Use getActiveConversationParticipantOrThrow instead of getConversationParticipantOrThrow
+            entityFinderService.getActiveConversationParticipantOrThrow(conversation.getConversationId(), currentUser.getId());
         } catch (Exception e) {
             throw new AccessDeniedException("Insufficient permissions to pin/unpin messages");
         }
@@ -222,6 +230,7 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
     }
     
     private void validateMaxPinnedMessagesLimit(Conversation conversation) {
+        // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
         long currentPinnedCount = messageRepository.countByConversationAndPinnedTrueAndDeletedFalse(conversation);
         int maxPinnedMessages = 50; // Configurable limit
         
@@ -234,7 +243,8 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
     
     private void validateConversationMembership(Conversation conversation, UserDetailsImpl user) {
         try {
-            entityFinderService.getConversationParticipantOrThrow(conversation.getConversationId(), user.getId());
+            // ✅ UPDATED: Use getActiveConversationParticipantOrThrow instead of getConversationParticipantOrThrow
+            entityFinderService.getActiveConversationParticipantOrThrow(conversation.getConversationId(), user.getId());
         } catch (Exception e) {
             throw new AccessDeniedException("You are not a member of this conversation");
         }
@@ -242,7 +252,6 @@ public class PinnedMessageServiceImpl implements PinnedMessageService {
     
     private void broadcastPinnedMessageUpdate(Message message, UserDetailsImpl currentUser) {
         try {
-            // UPDATED: Use mapping service for conversion
             ChatMessageDto messageDto = chatMappingService.toChatMessageDto(
                 message, chatMappingService.createReactionsSummary(message, currentUser.getId()));
             

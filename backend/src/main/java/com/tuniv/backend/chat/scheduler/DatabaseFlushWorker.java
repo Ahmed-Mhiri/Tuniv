@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.tuniv.backend.chat.dto.NewMessageEventDto;
+import com.tuniv.backend.chat.dto.event.NewMessageEventDto;
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.repository.ConversationRepository;
 import com.tuniv.backend.user.model.User;

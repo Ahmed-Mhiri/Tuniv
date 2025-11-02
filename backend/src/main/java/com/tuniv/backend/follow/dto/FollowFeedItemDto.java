@@ -1,6 +1,7 @@
 package com.tuniv.backend.follow.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.tuniv.backend.follow.model.FeedItemType;
 import com.tuniv.backend.user.dto.UserSummaryDto;
 import java.time.Instant;
 

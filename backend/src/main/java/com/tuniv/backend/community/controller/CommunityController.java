@@ -187,12 +187,10 @@ public class CommunityController {
             Pageable pageable,
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         
-        Page<TopicSummaryDto> topics;
-        if (type != null) {
-            topics = communityService.getTopicsByCommunityAndType(communityId, type, pageable, currentUser);
-        } else {
-            topics = communityService.getTopicsByCommunity(communityId, pageable, currentUser);
-        }
+        // ** SIMPLIFIED - single call **
+        Page<TopicSummaryDto> topics = communityService.getTopicsByCommunity(
+            communityId, type, pageable, currentUser
+        );
         return ResponseEntity.ok(topics);
     }
 

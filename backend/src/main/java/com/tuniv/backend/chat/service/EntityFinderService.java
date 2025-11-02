@@ -31,36 +31,173 @@ public class EntityFinderService {
     private final ConversationRoleRepository conversationRoleRepository;
     private final ConversationParticipantRepository conversationParticipantRepository;
 
-    public Conversation getConversationOrThrow(Integer id) {
+    // ========== CONVERSATION METHODS ==========
+
+    /**
+     * Gets an ACTIVE conversation or throws exception
+     * Use this for most business operations
+     */
+    public Conversation getActiveConversationOrThrow(Integer id) {
+        return conversationRepository.findByIdAndIsActiveTrue(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Active conversation not found with id: " + id));
+    }
+
+    /**
+     * Gets any conversation (including inactive) or throws exception
+     * Use only for admin operations, deletion, or audit purposes
+     */
+    public Conversation getConversationByIdEvenIfInactive(Integer id) {
         return conversationRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + id));
     }
 
-    public Message getMessageOrThrow(Integer id) {
+    /**
+     * @deprecated Use {@link #getActiveConversationOrThrow(Integer)} instead
+     */
+    @Deprecated
+    public Conversation getConversationOrThrow(Integer id) {
+        return getActiveConversationOrThrow(id);
+    }
+
+    // ========== MESSAGE METHODS ==========
+
+    /**
+     * Gets a NON-DELETED message or throws exception
+     * Use this for most business operations
+     */
+    public Message getNonDeletedMessageOrThrow(Integer id) {
+        return messageRepository.findNonDeletedById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Non-deleted message not found with id: " + id));
+    }
+
+    /**
+     * Gets any message (including deleted) or throws exception
+     * Use only for admin operations, permanent deletion, or audit purposes
+     */
+    public Message getMessageByIdEvenIfDeleted(Integer id) {
         return messageRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
     }
 
-    public Reaction getReactionOrThrow(Integer id) {
+    /**
+     * @deprecated Use {@link #getNonDeletedMessageOrThrow(Integer)} instead
+     */
+    @Deprecated
+    public Message getMessageOrThrow(Integer id) {
+        return getNonDeletedMessageOrThrow(id);
+    }
+
+    // ========== REACTION METHODS ==========
+
+    /**
+     * Gets a NON-REMOVED reaction or throws exception
+     * Use this for most business operations
+     */
+    public Reaction getNonRemovedReactionOrThrow(Integer id) {
+        return reactionRepository.findByIdAndIsRemovedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Non-removed reaction not found with id: " + id));
+    }
+
+    /**
+     * Gets any reaction (including removed) or throws exception
+     * Use only for admin operations or audit purposes
+     */
+    public Reaction getReactionByIdEvenIfRemoved(Integer id) {
         return reactionRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Reaction not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Reaction not found with id: " + id));
+    }
+
+    /**
+     * @deprecated Use {@link #getNonRemovedReactionOrThrow(Integer)} instead
+     */
+    @Deprecated
+    public Reaction getReactionOrThrow(Integer id) {
+        return getNonRemovedReactionOrThrow(id);
+    }
+
+    // ========== USER METHODS ==========
+
+    /**
+     * Gets an ACTIVE user or throws exception
+     */
+    public User getActiveUserOrThrow(Integer id) {
+        return userRepository.findByIdAndIsActiveTrue(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Active user not found with id: " + id));
+    }
+
+    /**
+     * Gets any user (including inactive) or throws exception
+     */
+    public User getUserByIdEvenIfInactive(Integer id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
     }
 
     public User getUserOrThrow(Integer id) {
-        return userRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        return getActiveUserOrThrow(id);
     }
+
+    // ========== CONVERSATION ROLE METHODS ==========
 
     public ConversationRole getConversationRoleOrThrow(Integer id) {
         return conversationRoleRepository.findById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Conversation role not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation role not found with id: " + id));
     }
+
+    // ========== CONVERSATION PARTICIPANT METHODS ==========
+
+    /**
+     * Gets an ACTIVE conversation participant or throws exception
+     */
+    public ConversationParticipant getActiveConversationParticipantOrThrow(Integer conversationId, Integer userId) {
+        // ✅ UPDATED: Switched to the standardized repository method
+        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserIdAndIsActiveTrue(conversationId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Active conversation participant not found for conversationId: " + conversationId + " and userId: " + userId));
+    }
+
+    /**
+     * Gets any conversation participant (including inactive) or throws exception
+     */
+    public ConversationParticipant getConversationParticipantEvenIfInactive(Integer conversationId, Integer userId) {
+        // This method name was correct in the new repository
+        return conversationParticipantRepository.findByConversationIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Conversation participant not found for conversationId: " + conversationId + " and userId: " + userId));
+    }
+
+    /**
+     * @deprecated Use {@link #getActiveConversationParticipantOrThrow(Integer, Integer)} instead
+     */
+    @Deprecated
+    public ConversationParticipant getConversationParticipantOrThrow(Integer conversationId, Integer userId) {
+        return getActiveConversationParticipantOrThrow(conversationId, userId);
+    }
+
+    public Optional<ConversationParticipant> getConversationParticipant(Integer conversationId, Integer userId) {
+        // ✅ UPDATED: Switched to the standardized repository method
+        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserIdAndIsActiveTrue(conversationId, userId);
+    }
+
+    public Optional<ConversationParticipant> getActiveConversationParticipant(Integer conversationId, Integer userId) {
+        // ✅ UPDATED: Switched to the standardized repository method
+        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserIdAndIsActiveTrue(conversationId, userId);
+    }
+
+    // ========== BULK OPERATIONS ==========
 
     public List<User> getUsersByIds(List<Integer> userIds) {
         if (userIds == null || userIds.isEmpty()) {
             return List.of();
         }
-        return userRepository.findByUserIdIn(userIds);
+        return userRepository.findByUserIdInAndIsActiveTrue(userIds);
+    }
+
+    public List<Conversation> getActiveConversationsByIds(List<Integer> conversationIds) {
+        if (conversationIds == null || conversationIds.isEmpty()) {
+            return List.of();
+        }
+        return conversationRepository.findActiveByConversationIdIn(conversationIds);
     }
 
     public List<Conversation> getConversationsByIds(List<Integer> conversationIds) {
@@ -70,66 +207,68 @@ public class EntityFinderService {
         return conversationRepository.findByConversationIdIn(conversationIds);
     }
 
+    // ========== RELATIONSHIP METHODS ==========
+
     public Conversation getConversationWithParticipantsOrThrow(Integer id) {
-        return conversationRepository.findWithParticipantsById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + id));
+        return conversationRepository.findActiveWithParticipantsById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Active conversation not found with id: " + id));
+    }
+
+    public Message getNonDeletedMessageWithConversationOrThrow(Integer id) {
+        return messageRepository.findNonDeletedWithConversationById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Non-deleted message not found with id: " + id));
     }
 
     public Message getMessageWithConversationOrThrow(Integer id) {
-        return messageRepository.findWithConversationById(id)
-            .orElseThrow(() -> new ResourceNotFoundException("Message not found with id: " + id));
+        return getNonDeletedMessageWithConversationOrThrow(id);
     }
 
+    // ========== EXISTENCE CHECKS ==========
+
     public boolean userExists(Integer userId) {
-        return userRepository.existsById(userId);
+        return userRepository.existsByIdAndIsActiveTrue(userId);
+    }
+
+    public boolean activeConversationExists(Integer conversationId) {
+        return conversationRepository.existsActiveByConversationId(conversationId);
     }
 
     public boolean conversationExists(Integer conversationId) {
         return conversationRepository.existsById(conversationId);
     }
 
+    public boolean nonDeletedMessageExists(Integer messageId) {
+        return messageRepository.existsNonDeletedById(messageId);
+    }
+
     public boolean messageExists(Integer messageId) {
         return messageRepository.existsById(messageId);
     }
 
-    // Conversation Participant methods
-    public ConversationParticipant getConversationParticipantOrThrow(Integer conversationId, Integer userId) {
-        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserId(conversationId, userId)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Conversation participant not found for conversationId: " + conversationId + " and userId: " + userId));
-    }
-
-    public ConversationParticipant getActiveConversationParticipantOrThrow(Integer conversationId, Integer userId) {
-        return conversationParticipantRepository.findActiveParticipant(conversationId, userId)
-            .orElseThrow(() -> new ResourceNotFoundException(
-                "Active conversation participant not found for conversationId: " + conversationId + " and userId: " + userId));
-    }
-
-    public Optional<ConversationParticipant> getConversationParticipant(Integer conversationId, Integer userId) {
-        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserId(conversationId, userId);
-    }
-
-    public Optional<ConversationParticipant> getActiveConversationParticipant(Integer conversationId, Integer userId) {
-        return conversationParticipantRepository.findActiveParticipant(conversationId, userId);
-    }
+    // ========== PARTICIPANT COLLECTION METHODS ==========
 
     public List<ConversationParticipant> getActiveParticipantsByConversation(Integer conversationId) {
-        return conversationParticipantRepository.findActiveParticipantsByConversationId(conversationId);
+        // ✅ UPDATED: Switched to the standardized repository method
+        return conversationParticipantRepository.findByConversation_ConversationIdAndIsActiveTrue(conversationId);
     }
 
     public List<ConversationParticipant> getAllParticipantsByConversation(Integer conversationId) {
+        // This method name was correct in the new repository
         return conversationParticipantRepository.findByConversation_ConversationId(conversationId);
     }
 
     public List<ConversationParticipant> getActiveConversationsByUser(Integer userId) {
-        return conversationParticipantRepository.findActiveConversationsByUserId(userId);
+        // ✅ UPDATED: Switched to the standardized repository method
+        return conversationParticipantRepository.findByUser_UserIdAndIsActiveTrue(userId);
     }
 
     public boolean isUserActiveParticipant(Integer conversationId, Integer userId) {
-        return conversationParticipantRepository.findActiveParticipant(conversationId, userId).isPresent();
+        // ✅ UPDATED: Switched to the more efficient, dedicated boolean method
+        return conversationParticipantRepository.isUserActiveParticipant(conversationId, userId);
     }
 
     public boolean isUserParticipant(Integer conversationId, Integer userId) {
-        return conversationParticipantRepository.findByConversation_ConversationIdAndUser_UserId(conversationId, userId).isPresent();
+        // This method name was correct in the new repository
+        return conversationParticipantRepository.findByConversationIdAndUserId(conversationId, userId).isPresent();
     }
 }

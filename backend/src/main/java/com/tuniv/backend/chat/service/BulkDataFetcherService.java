@@ -1,5 +1,11 @@
 package com.tuniv.backend.chat.service;
 
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.model.ConversationParticipant;
 import com.tuniv.backend.chat.model.Message;
@@ -7,12 +13,9 @@ import com.tuniv.backend.chat.model.Reaction;
 import com.tuniv.backend.chat.repository.ConversationParticipantRepository;
 import com.tuniv.backend.chat.repository.MessageRepository;
 import com.tuniv.backend.chat.repository.ReactionRepository;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-
-import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -72,7 +75,7 @@ public class BulkDataFetcherService {
             .collect(Collectors.toList());
         
         List<ConversationParticipant> participants = participantRepository
-            .findByConversation_ConversationIdInAndUser_UserIdAndIsActiveTrue(conversationIds, currentUserId);
+            .findByConversationIdsAndUserIdAndIsActiveTrue(conversationIds, currentUserId);
         
         return participants.stream()
             .collect(Collectors.toMap(
@@ -91,7 +94,7 @@ public class BulkDataFetcherService {
             .collect(Collectors.toList());
         
         List<Reaction> reactions = reactionRepository
-            .findByMessage_IdInAndIsRemovedFalse(messageIds);
+            .findByMessageIdsInAndIsRemovedFalseWithUser(messageIds);
         
         return reactions.stream()
             .collect(Collectors.groupingBy(
@@ -109,7 +112,7 @@ public class BulkDataFetcherService {
             .collect(Collectors.toList());
         
         List<ConversationParticipant> participants = participantRepository
-            .findByConversation_ConversationIdInAndUser_UserIdAndIsActiveTrue(conversationIds, currentUserId);
+            .findByConversationIdsAndUserIdAndIsActiveTrue(conversationIds, currentUserId);
         
         return participants.stream()
             .collect(Collectors.toMap(

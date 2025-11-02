@@ -9,7 +9,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.context.event.EventListener;
 import org.springframework.data.redis.core.Cursor;
@@ -37,12 +36,10 @@ public class WebSocketSessionService {
     private final RedisTemplate<String, Object> redisTemplate;
     private final ConversationOnlineStatusService conversationOnlineStatusService;
 
-    // Track active sessions in memory (ephemeral)
-    private final Map<String, Integer> sessionToUserMap = new ConcurrentHashMap<>();
-    private final Map<String, Set<Integer>> sessionToConversationsMap = new ConcurrentHashMap<>();
-    
     // Redis key patterns
     private static final String USER_SESSIONS_KEY = "user:sessions:%d";
+    private static final String SESSION_USER_KEY = "session:user:%s";
+    private static final String SESSION_CONVERSATIONS_KEY = "session:conversations:%s";
     private static final String USER_ACTIVE_CONVERSATIONS_KEY = "user:active:conversations:%d";
     private static final String CONVERSATION_ACTIVE_USERS_KEY = "conversation:active:users:%d";
     private static final String USER_PRESENCE_KEY = "user:presence:%d";
@@ -56,12 +53,10 @@ public class WebSocketSessionService {
         Integer userId = extractUserIdFromHeaders(headers);
         
         if (userId != null) {
-            // Store session mapping in memory
-            sessionToUserMap.put(sessionId, userId);
-            sessionToConversationsMap.put(sessionId, new HashSet<>());
-            
-            // Store in Redis for distributed access
+            // Store session mapping in Redis only
             addUserSession(userId, sessionId);
+            setSessionUser(sessionId, userId);
+            initializeSessionConversations(sessionId);
             
             // Set user as globally online
             setUserOnline(userId, true);
@@ -80,10 +75,10 @@ public class WebSocketSessionService {
         StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
         String sessionId = headers.getSessionId();
         
-        Integer userId = sessionToUserMap.remove(sessionId);
+        Integer userId = getUserIdFromSession(sessionId);
         if (userId != null) {
-            // Remove from conversation subscriptions
-            Set<Integer> conversationIds = sessionToConversationsMap.remove(sessionId);
+            // Remove from conversation subscriptions using Redis data
+            Set<Integer> conversationIds = getSessionConversations(sessionId);
             if (conversationIds != null) {
                 for (Integer conversationId : conversationIds) {
                     handleUserLeftConversation(conversationId, userId);
@@ -92,6 +87,8 @@ public class WebSocketSessionService {
             
             // Remove session from Redis
             removeUserSession(userId, sessionId);
+            removeSessionUser(sessionId);
+            removeSessionConversations(sessionId);
             
             // Check if user has any remaining sessions
             if (getUserSessionCount(userId) == 0) {
@@ -110,7 +107,7 @@ public class WebSocketSessionService {
         String sessionId = headers.getSessionId();
         String destination = headers.getDestination();
         
-        Integer userId = sessionToUserMap.get(sessionId);
+        Integer userId = getUserIdFromSession(sessionId);
         if (userId != null && destination != null) {
             handleDestinationSubscription(userId, sessionId, destination, true);
         }
@@ -122,7 +119,7 @@ public class WebSocketSessionService {
         String sessionId = headers.getSessionId();
         String destination = headers.getDestination();
         
-        Integer userId = sessionToUserMap.get(sessionId);
+        Integer userId = getUserIdFromSession(sessionId);
         if (userId != null && destination != null) {
             handleDestinationSubscription(userId, sessionId, destination, false);
         }
@@ -231,8 +228,8 @@ public class WebSocketSessionService {
         addUserActiveConversation(userId, conversationId);
         addConversationActiveUser(conversationId, userId);
         
-        // Track in memory
-        sessionToConversationsMap.computeIfAbsent(sessionId, k -> new HashSet<>()).add(conversationId);
+        // Track in Redis session conversations
+        addSessionConversation(sessionId, conversationId);
         
         // Update presence status
         updateUserPresence(conversationId, userId, true);
@@ -295,6 +292,70 @@ public class WebSocketSessionService {
         String key = String.format(USER_SESSIONS_KEY, userId);
         Long size = redisTemplate.opsForSet().size(key);
         return size != null ? size : 0;
+    }
+
+    private void setSessionUser(String sessionId, Integer userId) {
+        String key = String.format(SESSION_USER_KEY, sessionId);
+        redisTemplate.opsForValue().set(key, userId.toString(), Duration.ofHours(24));
+    }
+
+    private Integer getUserIdFromSession(String sessionId) {
+        String key = String.format(SESSION_USER_KEY, sessionId);
+        String userIdStr = (String) redisTemplate.opsForValue().get(key);
+        if (userIdStr != null) {
+            try {
+                return Integer.parseInt(userIdStr);
+            } catch (NumberFormatException e) {
+                log.warn("Invalid user ID in session mapping: {}", userIdStr);
+            }
+        }
+        return null;
+    }
+
+    private void removeSessionUser(String sessionId) {
+        String key = String.format(SESSION_USER_KEY, sessionId);
+        redisTemplate.delete(key);
+    }
+
+    private void initializeSessionConversations(String sessionId) {
+        String key = String.format(SESSION_CONVERSATIONS_KEY, sessionId);
+        redisTemplate.opsForSet().add(key, ""); // Initialize with empty value
+        redisTemplate.expire(key, Duration.ofHours(24));
+    }
+
+    private void addSessionConversation(String sessionId, Integer conversationId) {
+        String key = String.format(SESSION_CONVERSATIONS_KEY, sessionId);
+        redisTemplate.opsForSet().add(key, conversationId.toString());
+    }
+
+    private void removeSessionConversation(String sessionId, Integer conversationId) {
+        String key = String.format(SESSION_CONVERSATIONS_KEY, sessionId);
+        redisTemplate.opsForSet().remove(key, conversationId.toString());
+    }
+
+    private Set<Integer> getSessionConversations(String sessionId) {
+        String key = String.format(SESSION_CONVERSATIONS_KEY, sessionId);
+        Set<Object> conversationIds = redisTemplate.opsForSet().members(key);
+        Set<Integer> result = new HashSet<>();
+        
+        if (conversationIds != null) {
+            for (Object convId : conversationIds) {
+                try {
+                    if (!convId.toString().isEmpty()) { // Skip empty initialization value
+                        result.add(Integer.parseInt(convId.toString()));
+                    }
+                } catch (NumberFormatException e) {
+                    log.warn("Invalid conversation ID in session: {}", convId);
+                }
+            }
+        }
+        
+        return result;
+    }
+
+    private void removeSessionConversations(String sessionId) {
+        String key = String.format(SESSION_CONVERSATIONS_KEY, sessionId);
+        redisTemplate.delete(key);
     }
 
     private void setUserOnline(Integer userId, boolean online) {
@@ -394,14 +455,13 @@ public class WebSocketSessionService {
     public List<Integer> getActiveUsersInConversation(Integer conversationId) {
         String key = String.format(CONVERSATION_ACTIVE_USERS_KEY, conversationId);
         List<Integer> activeUserIds = new ArrayList<>();
-        ScanOptions scanOptions = ScanOptions.scanOptions().match("*").count(1000).build(); // Adjust count as needed
+        ScanOptions scanOptions = ScanOptions.scanOptions().match("*").count(1000).build();
 
         try (Cursor<Object> cursor = redisTemplate.opsForSet().scan(key, scanOptions)) {
             while (cursor.hasNext()) {
                 Object userIdObj = cursor.next();
                 if (userIdObj != null) {
                     try {
-                        // Redis stores set members as Objects, often Strings
                         activeUserIds.add(Integer.parseInt(userIdObj.toString()));
                     } catch (NumberFormatException e) {
                         log.warn("Invalid user ID found in Redis set {} for conversation {}: {}", key, conversationId, userIdObj);
@@ -410,8 +470,7 @@ public class WebSocketSessionService {
             }
         } catch (Exception e) {
             log.error("Error scanning Redis set {} for conversation {}: {}", key, conversationId, e.getMessage(), e);
-            // Depending on requirements, you might return an empty list or re-throw
-            return Collections.emptyList(); // Return empty list on error
+            return Collections.emptyList();
         }
 
         log.debug("Found {} active users in conversation {} using SSCAN", activeUserIds.size(), conversationId);

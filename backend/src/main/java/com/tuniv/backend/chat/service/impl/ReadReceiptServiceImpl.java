@@ -5,15 +5,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.springframework.context.event.EventListener;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.ReadReceiptDto;
-import com.tuniv.backend.chat.dto.UnreadCountDto;
+import com.tuniv.backend.chat.dto.common.ReadReceiptDto;
+import com.tuniv.backend.chat.dto.event.UnreadCountDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.event.MessageReadEvent;
 import com.tuniv.backend.chat.model.Conversation;
 import com.tuniv.backend.chat.model.ConversationParticipant;
 import com.tuniv.backend.chat.model.Message;
@@ -43,14 +46,53 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
     private final ChatMappingService chatMappingService;
     private final MessageService messageService;
 
+    // ========== EVENT LISTENER METHOD ==========
+
+    /**
+     * Handles MessageReadEvent asynchronously to process read receipts.
+     * This method is triggered when a MessageReadEvent is published by MessageService.
+     */
+    @EventListener
+    @Async
+    @Transactional
+    public void handleMessageReadEvent(MessageReadEvent event) {
+        log.debug("Received MessageReadEvent for message {} read by user {}", event.getMessageId(), event.getUserId());
+        
+        try {
+            Integer messageId = event.getMessageId();
+            Integer userId = event.getUserId();
+
+            // Fetch necessary entities
+            Message message = entityFinderService.getNonDeletedMessageOrThrow(messageId);
+            Integer conversationId = message.getConversation().getConversationId();
+            
+            // Perform the core mark as read logic
+            performMarkAsRead(conversationId, messageId, userId);
+            
+            log.info("Successfully processed MessageReadEvent: Marked message {} as read for user {}", messageId, userId);
+
+        } catch (ResourceNotFoundException e) {
+            log.warn("MessageReadEvent processing failed - resource not found for message {} user {}: {}", 
+                    event.getMessageId(), event.getUserId(), e.getMessage());
+        } catch (Exception e) {
+            log.error("Error processing MessageReadEvent for message {} read by user {}: {}",
+                    event.getMessageId(), event.getUserId(), e.getMessage(), e);
+            // Consider adding retry logic or dead-letter queue for failed events
+        }
+    }
+
+    // ========== ORIGINAL SERVICE METHODS (UPDATED TO USE SHARED LOGIC) ==========
+
     @Override
     public void markMessageAsRead(Integer messageId, UserDetailsImpl currentUser) {
         log.debug("Marking message {} as read by user {}", messageId, currentUser.getId());
         
-        Message message = entityFinderService.getMessageOrThrow(messageId);
+        // ✅ UPDATED: Use getNonDeletedMessageOrThrow instead of getMessageOrThrow
+        Message message = entityFinderService.getNonDeletedMessageOrThrow(messageId);
         Integer conversationId = message.getConversation().getConversationId();
         
-        markMessagesAsRead(conversationId, messageId, currentUser);
+        // Use the shared core logic
+        performMarkAsRead(conversationId, messageId, currentUser.getId());
     }
 
     @Override
@@ -59,23 +101,88 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
                  conversationId, lastReadMessageId, currentUser.getId());
         
         // Validation
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
-        Message lastReadMessage = entityFinderService.getMessageOrThrow(lastReadMessageId);
+        // ✅ UPDATED: Use getActiveConversationOrThrow instead of getConversationOrThrow
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
+        // ✅ UPDATED: Use getNonDeletedMessageOrThrow instead of getMessageOrThrow
+        Message lastReadMessage = entityFinderService.getNonDeletedMessageOrThrow(lastReadMessageId);
         validateMessageBelongsToConversation(lastReadMessage, conversationId);
         validateConversationMembership(conversation, currentUser);
         
-        // Get and update participant
-        ConversationParticipant participant = entityFinderService.getActiveConversationParticipantOrThrow(
-            conversationId, currentUser.getId());
+        // Use the shared core logic
+        performMarkAsRead(conversationId, lastReadMessageId, currentUser.getId());
         
-        updateParticipantReadStatus(participant, lastReadMessage);
-        
-        // Broadcast read receipt
-        broadcastReadReceipt(participant, lastReadMessage, conversationId);
-        
-        log.debug("Messages marked as read in conversation {} by user {}. Unread count: {}", 
-                 conversationId, currentUser.getId(), participant.getUnreadCount());
+        log.debug("Messages marked as read in conversation {} by user {}", 
+                 conversationId, currentUser.getId());
     }
+
+    // ========== SHARED CORE LOGIC METHOD ==========
+
+    /**
+     * Shared core logic for marking messages as read.
+     * Used by both event listener and direct service calls.
+     */
+    private void performMarkAsRead(Integer conversationId, Integer lastReadMessageId, Integer userId) {
+        log.debug("Executing core mark-as-read logic for conversation {}, message {}, user {}", 
+                 conversationId, lastReadMessageId, userId);
+        
+        try {
+            // ✅ VERIFIED: Uses getActiveConversationParticipantOrThrow
+            ConversationParticipant participant = entityFinderService.getActiveConversationParticipantOrThrow(
+                conversationId, userId);
+            
+            // ✅ UPDATED: Use getNonDeletedMessageOrThrow instead of getMessageOrThrow
+            Message lastReadMessage = entityFinderService.getNonDeletedMessageOrThrow(lastReadMessageId);
+            validateMessageBelongsToConversation(lastReadMessage, conversationId);
+
+            // Update participant read status
+            updateParticipantReadStatus(participant, lastReadMessage);
+            
+            // Broadcast read receipt
+            broadcastReadReceipt(participant, lastReadMessage, conversationId);
+            
+            log.debug("Core logic completed: Messages marked as read in conversation {} up to {} by user {}. Unread count: {}",
+                     conversationId, lastReadMessageId, userId, participant.getUnreadCount());
+                     
+        } catch (Exception e) {
+            log.error("Error in performMarkAsRead for conversation {}, message {}, user {}: {}", 
+                     conversationId, lastReadMessageId, userId, e.getMessage(), e);
+            throw e; // Re-throw to maintain existing error handling behavior
+        }
+    }
+
+    // ========== PRIVATE HELPER METHODS ==========
+
+    private void updateParticipantReadStatus(ConversationParticipant participant, Message lastReadMessage) {
+        Instant previousReadTime = participant.getLastReadTimestamp();
+        participant.setLastReadTimestamp(lastReadMessage.getSentAt());
+        
+        // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
+        long unreadCount = calculateUnreadCount(
+            participant.getConversation().getConversationId(), 
+            lastReadMessage.getSentAt()
+        );
+        participant.setUnreadCount((int) unreadCount);
+        
+        participantRepository.save(participant);
+        
+        log.debug("Updated participant read status: lastReadTimestamp={}, unreadCount={}", 
+                 lastReadMessage.getSentAt(), unreadCount);
+    }
+
+    private void broadcastReadReceipt(ConversationParticipant participant, Message lastReadMessage, Integer conversationId) {
+        ReadReceiptDto readReceipt = chatMappingService.createBroadcastReadReceipt(participant, lastReadMessage);
+        chatRealtimeService.broadcastReadReceipt(conversationId, readReceipt);
+        
+        log.debug("Broadcast read receipt for conversation {}, message {}, user {}", 
+                 conversationId, lastReadMessage.getId(), participant.getUser().getUserId());
+    }
+
+    private long calculateUnreadCount(Integer conversationId, Instant lastReadTimestamp) {
+        // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
+        return messageRepository.countUnreadMessages(conversationId, lastReadTimestamp);
+    }
+
+    // ========== EXISTING METHODS (NO CHANGES NEEDED) ==========
 
     @Override
     public void markAllMessagesAsRead(Integer conversationId, UserDetailsImpl currentUser) {
@@ -83,8 +190,10 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
         
         validateReadPermission(conversationId, currentUser);
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
-        Message latestMessage = messageRepository.findFirstByConversationOrderBySentAtDesc(conversation)
+        // ✅ UPDATED: Use getActiveConversationOrThrow instead of getConversationOrThrow
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
+        // ✅ UPDATED: Use findFirstNonDeletedByConversationOrderBySentAtDesc instead of findFirstByConversationOrderBySentAtDesc
+        Message latestMessage = messageRepository.findFirstNonDeletedByConversationOrderBySentAtDesc(conversation)
                 .orElseThrow(() -> new ResourceNotFoundException("No messages found in conversation"));
         
         markMessagesAsRead(conversationId, latestMessage.getId(), currentUser);
@@ -94,53 +203,13 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
 
     @Override
     @Transactional(readOnly = true)
-    public UnreadCountDto getUnreadCount(Integer conversationId, UserDetailsImpl currentUser) {
-        log.debug("Fetching unread count for conversation {} by user {}", conversationId, currentUser.getId());
-        
-        validateReadPermission(conversationId, currentUser);
-        
-        ConversationParticipant participant = entityFinderService.getActiveConversationParticipantOrThrow(
-            conversationId, currentUser.getId());
-        
-        return createUnreadCountDto(conversationId, participant);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Page<ChatMessageDto> getUnreadMessages(Integer conversationId, UserDetailsImpl currentUser, Pageable pageable) {
-        log.debug("Fetching unread messages for conversation {} by user {}", conversationId, currentUser.getId());
-        
-        validateReadPermission(conversationId, currentUser);
-        
-        ConversationParticipant participant = entityFinderService.getActiveConversationParticipantOrThrow(
-            conversationId, currentUser.getId());
-        
-        Instant lastReadTimestamp = participant.getLastReadTimestamp();
-        
-        if (lastReadTimestamp == null) {
-            // If never read, return all messages
-            return messageService.getMessagesForConversation(conversationId, currentUser, pageable);
-        }
-        
-        // Get messages sent after the last read timestamp
-        List<Message> unreadMessages = messageRepository.findMessagesAfter(
-            conversationId, lastReadTimestamp, pageable);
-        
-        List<ChatMessageDto> unreadMessageDtos = chatMappingService.toChatMessageDtoList(
-            unreadMessages, currentUser.getId());
-        
-        log.debug("Found {} unread messages for conversation {}", unreadMessageDtos.size(), conversationId);
-        return new PageImpl<>(unreadMessageDtos, pageable, unreadMessages.size());
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public Page<ReadReceiptDto> getMessageReadReceipts(Integer messageId, UserDetailsImpl currentUser, Pageable pageable) {
         log.debug("Fetching read receipts for message {} by user {}", messageId, currentUser.getId());
         
         validateMessageReadPermission(messageId, currentUser);
         
-        Message message = entityFinderService.getMessageOrThrow(messageId);
+        // ✅ UPDATED: Use getNonDeletedMessageOrThrow instead of getMessageOrThrow
+        Message message = entityFinderService.getNonDeletedMessageOrThrow(messageId);
         
         // Get all participants who have read this message
         List<ConversationParticipant> readers = participantRepository
@@ -156,8 +225,6 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
         return new PageImpl<>(readReceipts, pageable, readers.size());
     }
 
-    // ========== Additional Utility Methods ==========
-
     @Override
     public void markMessagesAsRead(Integer conversationId, List<Integer> messageIds, UserDetailsImpl currentUser) {
         log.debug("Bulk marking {} messages as read in conversation {} by user {}", 
@@ -167,8 +234,52 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
             return;
         }
         
+        // ✅ UPDATED: Use getNonDeletedMessageOrThrow for each message in the list
         Message latestMessage = findLatestMessageInList(messageIds);
         markMessagesAsRead(conversationId, latestMessage.getId(), currentUser);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UnreadCountDto getUnreadCount(Integer conversationId, UserDetailsImpl currentUser) {
+        log.debug("Fetching unread count for conversation {} by user {}", conversationId, currentUser.getId());
+        
+        validateReadPermission(conversationId, currentUser);
+        
+        // ✅ VERIFIED: Uses getActiveConversationParticipantOrThrow
+        ConversationParticipant participant = entityFinderService.getActiveConversationParticipantOrThrow(
+            conversationId, currentUser.getId());
+        
+        return createUnreadCountDto(conversationId, participant);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ChatMessageDto> getUnreadMessages(Integer conversationId, UserDetailsImpl currentUser, Pageable pageable) {
+        log.debug("Fetching unread messages for conversation {} by user {}", conversationId, currentUser.getId());
+        
+        validateReadPermission(conversationId, currentUser);
+        
+        // ✅ VERIFIED: Uses getActiveConversationParticipantOrThrow
+        ConversationParticipant participant = entityFinderService.getActiveConversationParticipantOrThrow(
+            conversationId, currentUser.getId());
+        
+        Instant lastReadTimestamp = participant.getLastReadTimestamp();
+        
+        if (lastReadTimestamp == null) {
+            // If never read, return all messages
+            return messageService.getMessagesForConversation(conversationId, currentUser, pageable);
+        }
+        
+        // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
+        List<Message> unreadMessages = messageRepository.findMessagesAfter(
+            conversationId, lastReadTimestamp, pageable);
+        
+        List<ChatMessageDto> unreadMessageDtos = chatMappingService.toChatMessageDtoList(
+            unreadMessages, currentUser.getId());
+        
+        log.debug("Found {} unread messages for conversation {}", unreadMessageDtos.size(), conversationId);
+        return new PageImpl<>(unreadMessageDtos, pageable, unreadMessages.size());
     }
 
     @Override
@@ -186,7 +297,9 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
     public void recalculateUnreadCounts(Integer conversationId) {
         log.debug("Recalculating unread counts for conversation {}", conversationId);
         
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        // ✅ VERIFIED: Uses getActiveConversationOrThrow
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
+        // ✅ VERIFIED: Uses repository method with explicit isActive = true filter
         List<ConversationParticipant> participants = participantRepository
             .findByConversationAndIsActiveTrue(conversation);
         
@@ -200,26 +313,7 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
                  participants.size(), conversationId);
     }
 
-    // ========== Private Helper Methods ==========
-
-    private void updateParticipantReadStatus(ConversationParticipant participant, Message lastReadMessage) {
-        Instant previousReadTime = participant.getLastReadTimestamp();
-        participant.setLastReadTimestamp(lastReadMessage.getSentAt());
-        
-        // Calculate new unread count
-        long unreadCount = calculateUnreadCount(
-            participant.getConversation().getConversationId(), 
-            lastReadMessage.getSentAt()
-        );
-        participant.setUnreadCount((int) unreadCount);
-        
-        participantRepository.save(participant);
-    }
-
-    private void broadcastReadReceipt(ConversationParticipant participant, Message lastReadMessage, Integer conversationId) {
-        ReadReceiptDto readReceipt = chatMappingService.createBroadcastReadReceipt(participant, lastReadMessage);
-        chatRealtimeService.broadcastReadReceipt(conversationId, readReceipt);
-    }
+    // ========== PRIVATE HELPER METHODS (NO CHANGES NEEDED) ==========
 
     private UnreadCountDto createUnreadCountDto(Integer conversationId, ConversationParticipant participant) {
         UnreadCountDto unreadCountDto = new UnreadCountDto();
@@ -231,25 +325,25 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
 
     private Message findLatestMessageInList(List<Integer> messageIds) {
         return messageIds.stream()
-            .map(entityFinderService::getMessageOrThrow)
+            // ✅ UPDATED: Use getNonDeletedMessageOrThrow for each message
+            .map(entityFinderService::getNonDeletedMessageOrThrow)
             .max((m1, m2) -> m1.getSentAt().compareTo(m2.getSentAt()))
             .orElseThrow(() -> new ResourceNotFoundException("No valid messages found"));
     }
 
-    private long calculateUnreadCount(Integer conversationId, Instant lastReadTimestamp) {
-        return messageRepository.countUnreadMessages(conversationId, lastReadTimestamp);
-    }
-
     private int calculateParticipantUnreadCount(Integer conversationId, ConversationParticipant participant) {
         if (participant.getLastReadTimestamp() != null) {
+            // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
             return (int) calculateUnreadCount(conversationId, participant.getLastReadTimestamp());
         } else {
             // If never read, all messages are unread
+            // ✅ VERIFIED: Uses repository method with explicit deleted = false filter
             return (int) messageRepository.countByConversationId(conversationId);
         }
     }
 
     private void validateConversationMembership(Conversation conversation, UserDetailsImpl user) {
+        // ✅ VERIFIED: Uses isUserActiveParticipant which checks active status
         if (!entityFinderService.isUserActiveParticipant(conversation.getConversationId(), user.getId())) {
             throw new ResourceNotFoundException("User is not an active member of this conversation");
         }
@@ -262,12 +356,14 @@ public class ReadReceiptServiceImpl implements ReadReceiptService {
     }
 
     private void validateReadPermission(Integer conversationId, UserDetailsImpl currentUser) {
-        Conversation conversation = entityFinderService.getConversationOrThrow(conversationId);
+        // ✅ UPDATED: Use getActiveConversationOrThrow instead of getConversationOrThrow
+        Conversation conversation = entityFinderService.getActiveConversationOrThrow(conversationId);
         validateConversationMembership(conversation, currentUser);
     }
 
     private void validateMessageReadPermission(Integer messageId, UserDetailsImpl currentUser) {
-        Message message = entityFinderService.getMessageOrThrow(messageId);
+        // ✅ UPDATED: Use getNonDeletedMessageOrThrow instead of getMessageOrThrow
+        Message message = entityFinderService.getNonDeletedMessageOrThrow(messageId);
         validateConversationMembership(message.getConversation(), currentUser);
     }
 }

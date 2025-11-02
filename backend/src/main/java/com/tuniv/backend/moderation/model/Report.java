@@ -37,7 +37,12 @@ import lombok.Setter;
 @Table(name = "reports", indexes = {
         @Index(name = "idx_report_target", columnList = "target_type, target_id"),
         @Index(name = "idx_report_status", columnList = "status"),
-        @Index(name = "idx_report_created", columnList = "created_at DESC")
+        @Index(name = "idx_report_created", columnList = "created_at DESC"),
+        // ✅ ADDED: Indexes for filtering moderation queues
+        @Index(name = "idx_report_scope_status", columnList = "scope, status"),
+        @Index(name = "idx_report_university_status", columnList = "university_id, scope, status"),
+        @Index(name = "idx_report_community_status", columnList = "community_id, scope, status"),
+        @Index(name = "idx_report_conversation_status", columnList = "conversation_id, scope, status")
 })
 @Getter
 @Setter
@@ -91,6 +96,22 @@ public class Report extends Auditable {
     @Column(name = "status", nullable = false, length = 20)
     private ReportStatus status = ReportStatus.PENDING;
 
+    // ✅ ADDED: Scope for categorizing the report
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scope", nullable = false)
+    private ReportScope scope;
+
+    // ✅ ADDED: Denormalized IDs for filtering (NO JOINS)
+    @Column(name = "university_id")
+    private Integer universityId;
+
+    @Column(name = "community_id")
+    private Integer communityId;
+
+    @Column(name = "conversation_id")
+    private Integer conversationId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "resolved_by_user_id")
     private User resolvedBy;
@@ -101,31 +122,4 @@ public class Report extends Auditable {
     @Column(name = "resolved_at")
     private Instant resolvedAt;
 
-    /**
-     * Custom constructor for creating a new report.
-     *
-     * @param reporter The user filing the report.
-     * @param target   The entity being reported (e.g., Post, User).
-     * @param reason   The primary reason for the report.
-     */
-    public Report(User reporter, Object target, String reason) {
-        this.reporter = reporter;
-        this.target = target;
-        this.reason = reason;
-        this.status = ReportStatus.PENDING;
-    }
-
-    /**
-     * Helper method to dynamically get the ID from the target object,
-     * which is useful for DTOs or serialization.
-     *
-     * @return The primary key of the target entity.
-     */
-    public Integer getTargetId() {
-        if (target instanceof Post) return ((Post) target).getId();
-        if (target instanceof User) return ((User) target).getUserId();
-        if (target instanceof Community) return ((Community) target).getCommunityId();
-        if (target instanceof Message) return ((Message) target).getId();
-        return null;
-    }
 }

@@ -6,12 +6,14 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
-import com.tuniv.backend.chat.dto.ChatMessageDto;
-import com.tuniv.backend.chat.dto.ChatMessageLightDto;
-import com.tuniv.backend.chat.dto.ChatMessageSummaryDto;
-import com.tuniv.backend.chat.dto.MessageReactionsSummaryDto;
-import com.tuniv.backend.chat.dto.PinnedMessageDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageLightDto;
+import com.tuniv.backend.chat.dto.response.ChatMessageSummaryDto;
+import com.tuniv.backend.chat.dto.response.MessageReactionsSummaryDto;
+import com.tuniv.backend.chat.dto.response.PinnedMessageDto;
 import com.tuniv.backend.chat.model.Message;
+import com.tuniv.backend.chat.projection.message.MessageListProjection;
+import com.tuniv.backend.chat.projection.message.PinnedMessageProjection;
 
 @Mapper(componentModel = "spring", 
         uses = {ReactionMapper.class},
@@ -80,10 +82,47 @@ public interface MessageMapper {
     @Mapping(target = "totalReactions", ignore = true)
     ChatMessageLightDto toChatMessageLightDto(Message message);
     
+    // Projection mappings
+    @Mapping(target = "authorId", source = "author.userId")
+    @Mapping(target = "authorUsername", source = "author.username")
+    @Mapping(target = "conversationId", source = "conversation.conversationId")
+    ChatMessageDto toDto(Message message);
+
+    @Mapping(target = "id", source = "messageId")
+    @Mapping(target = "body", source = "messageBody")
+    @Mapping(target = "createdAt", source = "createdAt")
+    @Mapping(target = "updatedAt", source = "updatedAt")
+    @Mapping(target = "messageType", source = "messageType")
+    @Mapping(target = "authorId", source = "authorId")
+    @Mapping(target = "authorUsername", source = "authorUsername")
+    @Mapping(target = "authorProfilePhotoUrl", source = "authorProfilePhotoUrl")
+    @Mapping(target = "conversationId", source = "conversationId")
+    @Mapping(target = "replyToMessageId", source = "replyToMessageId")
+    @Mapping(target = "replyToMessageBody", source = "replyToMessageBody")
+    @Mapping(target = "replyToAuthorId", source = "replyToAuthorId")
+    @Mapping(target = "replyToAuthorUsername", source = "replyToAuthorUsername")
+    @Mapping(target = "isPinned", source = "pinned")
+    @Mapping(target = "pinnedAt", source = "pinnedAt")
+    @Mapping(target = "pinnedByUserId", source = "pinnedByUserId")
+    @Mapping(target = "pinnedByUsername", source = "pinnedByUsername")
+    @Mapping(target = "reactionsSummary", ignore = true)
+    @Mapping(target = "readByCount", ignore = true)
+    @Mapping(target = "isReadByCurrentUser", ignore = true)
+    ChatMessageDto projectionToDto(MessageListProjection projection);
+    
+    // Pinned Message Projection mappings
+    @Mapping(target = "authorProfilePhotoUrl", ignore = true) // Not in projection, ignore it
+    @Mapping(target = "reactionsSummary", ignore = true) // Fetched separately
+    @Mapping(target = "isPinned", constant = "true") // We know it's pinned
+    PinnedMessageDto projectionToPinnedMessageDto(PinnedMessageProjection projection);
+
+    List<PinnedMessageDto> projectionToPinnedMessageDtoList(List<PinnedMessageProjection> projections);
+    
     // Bulk mappings
     List<ChatMessageDto> toChatMessageDtoList(List<Message> messages);
     List<PinnedMessageDto> toPinnedMessageDtoList(List<Message> messages);
     List<ChatMessageSummaryDto> toChatMessageSummaryDtoList(List<Message> messages);
+    List<ChatMessageDto> projectionToDtoList(List<MessageListProjection> projections);
     
     default String mapMessageType(com.tuniv.backend.chat.model.MessageType messageType) {
         return messageType != null ? messageType.name() : null;

@@ -68,9 +68,6 @@ public class CommunityMembership extends Auditable {
     @Column(name = "notifications_enabled", nullable = false)
     private boolean notificationsEnabled = true;
 
-    @Column(name = "is_banned", nullable = false)
-    private boolean isBanned = false;
-
     // ========== METADATA ==========
     @Column(name = "joined_at", nullable = false, updatable = false)
     private Instant joinedAt = Instant.now();
@@ -86,23 +83,6 @@ public class CommunityMembership extends Auditable {
 
     @Column(name = "display_order")
     private Integer displayOrder = 0;
-
-    // ========== MODERATION FIELDS ==========
-    @Column(name = "banned_at")
-    private Instant bannedAt;
-
-    @Column(name = "ban_reason")
-    private String banReason;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "banned_by_user_id")
-    private User bannedBy;
-
-    @Column(name = "mute_until")
-    private Instant muteUntil;
-
-    @Column(name = "mute_reason")
-    private String muteReason;
 
     // ========== CONSTRUCTORS ==========
     public CommunityMembership(User user, Community community, CommunityRole role) {
